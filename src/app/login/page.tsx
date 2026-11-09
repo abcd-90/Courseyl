@@ -36,6 +36,15 @@ export default function LoginPage() {
   const [showPasswordOption, setShowPasswordOption] = useState(false);
   const [password, setPassword] = useState("");
 
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const err = new URLSearchParams(window.location.search).get("error");
+      if (err) {
+        setError(err);
+      }
+    }
+  }, []);
+
   const getNextUrl = () => {
     if (typeof window !== "undefined") {
       return new URLSearchParams(window.location.search).get("next") || "/dashboard";
@@ -43,36 +52,13 @@ export default function LoginPage() {
     return "/dashboard";
   };
 
-  // 1. OFFICIAL GOOGLE OAUTH LOGIN (Opens accounts.google.com)
-  const handleGoogleOAuth = async () => {
+  // 1. OFFICIAL GOOGLE OAUTH LOGIN (Opens Google Account Picker)
+  const handleGoogleOAuth = () => {
     setLoading(true);
     setError("");
-    setSuccessMsg("");
-
-    try {
-      const origin =
-        typeof window !== "undefined"
-          ? window.location.origin
-          : "https://courseyl.vercel.app";
-
-      const { error: oauthError } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(getNextUrl())}`,
-        },
-      });
-
-      if (oauthError) {
-        throw oauthError;
-      }
-    } catch (err: any) {
-      console.error("Google sign in error:", err);
-      setError(
-        err.message ||
-          "Google OAuth is not yet enabled in Supabase Dashboard. Enter your email below to sign in instantly!"
-      );
-      setLoading(false);
-    }
+    setSuccessMsg("Opening Google account selector...");
+    const nextUrl = getNextUrl();
+    window.location.href = `/api/auth/google?next=${encodeURIComponent(nextUrl)}`;
   };
 
   // 2. OFFICIAL GITHUB OAUTH LOGIN
@@ -102,6 +88,38 @@ export default function LoginPage() {
       setError(
         err.message ||
           "GitHub OAuth is not yet enabled in Supabase Dashboard. Enter your email below to sign in instantly!"
+      );
+      setLoading(false);
+    }
+  };
+
+  // 3. X (TWITTER) OAUTH LOGIN
+  const handleXOAuth = async () => {
+    setLoading(true);
+    setError("");
+    setSuccessMsg("");
+
+    try {
+      const origin =
+        typeof window !== "undefined"
+          ? window.location.origin
+          : "https://courseyl.vercel.app";
+
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "twitter",
+        options: {
+          redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(getNextUrl())}`,
+        },
+      });
+
+      if (oauthError) {
+        throw oauthError;
+      }
+    } catch (err: any) {
+      console.error("X sign in error:", err);
+      setError(
+        err.message ||
+          "X (Twitter) OAuth is not yet enabled. Enter your email below to sign in instantly!"
       );
       setLoading(false);
     }
@@ -256,6 +274,19 @@ export default function LoginPage() {
                 />
               </svg>
               <span>Continue with GitHub</span>
+            </button>
+
+            {/* 3. Continue with X (matching Reference Screenshot) */}
+            <button
+              type="button"
+              onClick={handleXOAuth}
+              disabled={loading}
+              className="w-full py-3.5 px-5 rounded-2xl border border-white/15 bg-white/5 hover:bg-white/10 hover:border-white/25 text-white text-xs sm:text-sm font-semibold flex items-center justify-center gap-3 transition-all cursor-pointer shadow-xs active:scale-[0.99] disabled:opacity-50"
+            >
+              <svg className="w-3.5 h-3.5 fill-white shrink-0" viewBox="0 0 24 24">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+              </svg>
+              <span>Continue with X</span>
             </button>
 
             {/* Subtle Divider */}

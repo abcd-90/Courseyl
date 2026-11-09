@@ -72,7 +72,7 @@ export default function MyCoursesPage() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-paper text-ink">
+    <div className="min-h-screen flex flex-col lg:flex-row bg-paper text-ink">
       {/* Persistent Left Sidebar */}
       <AppSidebar />
 

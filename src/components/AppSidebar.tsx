@@ -348,13 +348,13 @@ export function AppSidebar() {
 
   return (
     <>
-      {/* 1. MOBILE TOP NAVIGATION BAR (Visible ONLY on screens < md) */}
-      <header className="md:hidden sticky top-0 z-40 w-full flex items-center justify-between px-4 py-3 bg-paper/95 dark:bg-[#0c120e]/95 backdrop-blur-md border-b border-line dark:border-white/10 shrink-0">
+      {/* 1. MOBILE TOP NAVIGATION BAR (Visible on screens < lg) */}
+      <header className="lg:hidden sticky top-0 z-40 w-full flex items-center justify-between px-4 py-3 bg-paper/95 dark:bg-[#0c120e]/95 backdrop-blur-md border-b border-line dark:border-white/10 shrink-0">
         <div className="flex items-center gap-2.5">
           <button
             onClick={() => setIsMobileOpen(true)}
             className="p-1.5 -ml-1 rounded-xl text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-            aria-label="Open menu"
+            aria-label="Open navigation menu"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
@@ -395,24 +395,24 @@ export function AppSidebar() {
         </div>
       </header>
 
-      {/* 2. MOBILE SLIDE-OVER DRAWER (Visible when isMobileOpen is true) */}
+      {/* 2. MOBILE SLIDE-OVER DRAWER (Visible when isMobileOpen is true on screens < lg) */}
       {isMobileOpen && (
         <div
           onClick={() => setIsMobileOpen(false)}
-          className="md:hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
+          className="lg:hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
         />
       )}
 
       <aside
-        className={`md:hidden fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-sidebar border-r border-sidebar-border p-4 text-sidebar-foreground shadow-2xl transition-transform duration-300 ease-out flex flex-col ${
+        className={`lg:hidden fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-sidebar border-r border-sidebar-border p-4 text-sidebar-foreground shadow-2xl transition-transform duration-300 ease-out flex flex-col ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         {renderSidebarContent(true)}
       </aside>
 
-      {/* 3. DESKTOP PERMANENT SIDEBAR (Visible ONLY on screens >= md) */}
-      <aside className="hidden md:flex md:w-64 md:shrink-0 bg-sidebar border-r border-sidebar-border flex-col justify-between h-screen sticky top-0 p-4 text-sidebar-foreground">
+      {/* 3. DESKTOP PERMANENT SIDEBAR (Visible ONLY on screens >= lg) */}
+      <aside className="hidden lg:flex lg:w-64 lg:shrink-0 bg-sidebar border-r border-sidebar-border flex-col justify-between h-screen sticky top-0 p-4 text-sidebar-foreground">
         {renderSidebarContent(false)}
       </aside>
     </>

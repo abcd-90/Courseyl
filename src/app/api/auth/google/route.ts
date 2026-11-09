@@ -2,6 +2,52 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { signToken, getAuthCookieOptions } from "@/lib/auth";
 
+// GET /api/auth/google -> Redirect to Google's official OAuth 2.0 authorization screen
+export async function GET(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const next = searchParams.get("next") || "/dashboard";
+
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      return NextResponse.redirect(
+        new URL("/login?error=Google+Client+ID+is+not+configured+in+environment", req.url)
+      );
+    }
+
+    // Detect current request origin (supports localhost & Vercel deployment)
+    const host =
+      req.headers.get("x-forwarded-host") ||
+      req.headers.get("host") ||
+      "localhost:3000";
+    const proto =
+      req.headers.get("x-forwarded-proto") ||
+      (host.includes("localhost") ? "http" : "https");
+    const origin = `${proto}://${host}`;
+    const redirectUri = `${origin}/api/auth/google/callback`;
+
+    const stateObj = { next, origin };
+    const state = Buffer.from(JSON.stringify(stateObj)).toString("base64url");
+
+    const googleAuthUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+    googleAuthUrl.searchParams.set("client_id", clientId);
+    googleAuthUrl.searchParams.set("redirect_uri", redirectUri);
+    googleAuthUrl.searchParams.set("response_type", "code");
+    googleAuthUrl.searchParams.set("scope", "openid email profile");
+    googleAuthUrl.searchParams.set("access_type", "offline");
+    googleAuthUrl.searchParams.set("prompt", "select_account");
+    googleAuthUrl.searchParams.set("state", state);
+
+    return NextResponse.redirect(googleAuthUrl.toString());
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to initiate Google login";
+    return NextResponse.redirect(
+      new URL(`/login?error=${encodeURIComponent(msg)}`, req.url)
+    );
+  }
+}
+
+// POST /api/auth/google -> Authenticate with Google ID token credential or payload
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -98,4 +144,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
-

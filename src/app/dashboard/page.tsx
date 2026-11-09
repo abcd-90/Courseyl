@@ -77,20 +77,20 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-paper text-ink">
-      {/* Application Shell Sidebar (Responsive: Top bar & drawer on mobile, static on desktop) */}
+    <div className="min-h-screen flex flex-col lg:flex-row bg-paper text-ink">
+      {/* Application Shell Sidebar (Responsive: Top bar & drawer on mobile/tablet, fixed static sidebar on desktop lg+) */}
       <AppSidebar />
 
       {/* Main Content Area */}
-      <main className="w-full min-w-0 flex-1 p-4 sm:p-6 md:p-8 space-y-6 sm:space-y-8 overflow-y-auto max-w-7xl">
+      <main className="w-full min-w-0 flex-1 p-3.5 sm:p-6 md:p-8 space-y-6 sm:space-y-8 overflow-y-auto max-w-7xl">
         {/* Landscape Banner Card with Centered Intake Card */}
-        <div className="relative w-full rounded-3xl overflow-hidden border border-line dark:border-[#1c291d] bg-[#0e1311] min-h-[360px] sm:h-[400px] md:h-[430px] shadow-2xl flex items-center justify-center p-4">
+        <div className="relative w-full rounded-3xl overflow-hidden border border-line dark:border-[#1c291d] bg-[#0e1311] min-h-[300px] sm:min-h-[360px] md:h-[430px] shadow-2xl flex items-center justify-center p-3 sm:p-6">
           <LandscapeIllustration />
 
           {/* Centered Intake Card */}
-          <div className="relative z-10 w-full max-w-xl text-center">
-            <div className="bg-[#121a15]/90 backdrop-blur-md rounded-3xl border border-white/10 shadow-2xl p-5 sm:p-8 text-center space-y-4">
-              <div className="inline-flex items-center px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[0.72rem] font-medium text-ink-soft tracking-wider font-mono">
+          <div className="relative z-10 w-full max-w-xl text-center px-1">
+            <div className="bg-[#121a15]/90 backdrop-blur-md rounded-3xl border border-white/10 shadow-2xl p-4 sm:p-7 md:p-8 text-center space-y-3 sm:space-y-4">
+              <div className="inline-flex items-center px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[0.7rem] sm:text-[0.72rem] font-medium text-ink-soft tracking-wider font-mono">
                 Welcome to CourseIt
               </div>
 
@@ -126,14 +126,14 @@ export default function DashboardPage() {
         {/* 4 Connected Stats Cards in Lime Green */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
           {/* Card 1: Streak */}
-          <div className="relative bg-[#b8c460] text-[#0f1611] rounded-3xl p-4 sm:p-5 overflow-hidden flex flex-col justify-between min-h-[130px] sm:min-h-[145px] shadow-xs">
-            <span className="text-[0.62rem] sm:text-[0.65rem] font-bold tracking-widest uppercase flex items-center gap-1 font-mono">
+          <div className="relative bg-[#b8c460] text-[#0f1611] rounded-3xl p-3.5 sm:p-5 overflow-hidden flex flex-col justify-between min-h-[120px] sm:min-h-[145px] shadow-xs">
+            <span className="text-[0.6rem] sm:text-[0.65rem] font-bold tracking-widest uppercase flex items-center gap-1 font-mono">
               <span>🔥</span>
               <span>STREAK</span>
             </span>
             <div className="my-auto py-1">
-              <h3 className="text-2xl sm:text-3xl md:text-4xl font-display font-bold leading-none">2 days</h3>
-              <p className="text-[0.65rem] sm:text-[0.68rem] text-[#0f1611]/80 mt-1 leading-tight">
+              <h3 className="text-xl sm:text-3xl md:text-4xl font-display font-bold leading-tight whitespace-nowrap">2 days</h3>
+              <p className="text-[0.62rem] sm:text-[0.68rem] text-[#0f1611]/80 mt-1 leading-tight">
                 Today counts. Come back tomorrow for 3.
               </p>
             </div>
@@ -142,39 +142,39 @@ export default function DashboardPage() {
           </div>
 
           {/* Card 2: Lessons this week */}
-          <div className="relative bg-[#b8c460] text-[#0f1611] rounded-3xl p-4 sm:p-5 overflow-hidden flex flex-col justify-between min-h-[130px] sm:min-h-[145px] shadow-xs">
+          <div className="relative bg-[#b8c460] text-[#0f1611] rounded-3xl p-3.5 sm:p-5 overflow-hidden flex flex-col justify-between min-h-[120px] sm:min-h-[145px] shadow-xs">
             <div className="hidden lg:block absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-paper z-10" />
-            <span className="text-[0.62rem] sm:text-[0.65rem] font-bold tracking-widest uppercase font-mono">
+            <span className="text-[0.6rem] sm:text-[0.65rem] font-bold tracking-widest uppercase font-mono">
               LESSONS THIS WEEK
             </span>
             <div className="my-auto py-1">
-              <h3 className="text-2xl sm:text-3xl md:text-4xl font-display font-bold leading-none">0</h3>
+              <h3 className="text-xl sm:text-3xl md:text-4xl font-display font-bold leading-tight">0</h3>
             </div>
             <div />
             <div className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-paper z-10" />
           </div>
 
           {/* Card 3: Quiz Score */}
-          <div className="relative bg-[#b8c460] text-[#0f1611] rounded-3xl p-4 sm:p-5 overflow-hidden flex flex-col justify-between min-h-[130px] sm:min-h-[145px] shadow-xs">
+          <div className="relative bg-[#b8c460] text-[#0f1611] rounded-3xl p-3.5 sm:p-5 overflow-hidden flex flex-col justify-between min-h-[120px] sm:min-h-[145px] shadow-xs">
             <div className="hidden lg:block absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-paper z-10" />
-            <span className="text-[0.62rem] sm:text-[0.65rem] font-bold tracking-widest uppercase font-mono">
+            <span className="text-[0.6rem] sm:text-[0.65rem] font-bold tracking-widest uppercase font-mono">
               QUIZ SCORE
             </span>
             <div className="my-auto py-1">
-              <h3 className="text-2xl sm:text-3xl md:text-4xl font-display font-bold leading-none">—</h3>
+              <h3 className="text-xl sm:text-3xl md:text-4xl font-display font-bold leading-tight">—</h3>
             </div>
             <div />
             <div className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-paper z-10" />
           </div>
 
           {/* Card 4: Watched this week */}
-          <div className="relative bg-[#b8c460] text-[#0f1611] rounded-3xl p-4 sm:p-5 overflow-hidden flex flex-col justify-between min-h-[130px] sm:min-h-[145px] shadow-xs">
+          <div className="relative bg-[#b8c460] text-[#0f1611] rounded-3xl p-3.5 sm:p-5 overflow-hidden flex flex-col justify-between min-h-[120px] sm:min-h-[145px] shadow-xs">
             <div className="hidden lg:block absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-paper z-10" />
-            <span className="text-[0.62rem] sm:text-[0.65rem] font-bold tracking-widest uppercase font-mono">
+            <span className="text-[0.6rem] sm:text-[0.65rem] font-bold tracking-widest uppercase font-mono">
               WATCHED THIS WEEK
             </span>
             <div className="my-auto py-1">
-              <h3 className="text-2xl sm:text-3xl md:text-4xl font-display font-bold leading-none">0m</h3>
+              <h3 className="text-xl sm:text-3xl md:text-4xl font-display font-bold leading-tight">0m</h3>
             </div>
             <div />
           </div>

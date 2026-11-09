@@ -5,7 +5,7 @@ import Link from "next/link";
 
 export function MarketingNavbar() {
   const [isDark, setIsDark] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
 
   useEffect(() => {
     const isDarkMode = document.documentElement.classList.contains("dark");
