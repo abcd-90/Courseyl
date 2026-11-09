@@ -34,19 +34,6 @@ export function SiteSettingsProvider({
     if (typeof document === "undefined") return;
     const root = document.documentElement;
 
-    // Apply custom CSS variables
-    if (branding.primaryColor) {
-      root.style.setProperty("--moss", branding.primaryColor);
-    }
-    if (branding.accentColor) {
-      root.style.setProperty("--lime", branding.accentColor);
-    }
-    if (branding.lightBgColor) {
-      root.style.setProperty("--paper-custom", branding.lightBgColor);
-    }
-    if (branding.darkBgColor) {
-      root.style.setProperty("--dark-bg-custom", branding.darkBgColor);
-    }
     if (branding.fontFamily) {
       root.style.setProperty("--font-family-display", `"${branding.fontFamily}", sans-serif`);
     }
@@ -68,20 +55,17 @@ export function SiteSettingsProvider({
         }
       }
     } catch {
-      // Fallback to local
+      // Fallback
     } finally {
       setLoading(false);
     }
   };
 
   const updateLiveColors = (primary: string, accent: string, darkBg: string, lightBg: string) => {
-    applyColorsToDOM({
-      ...settings.branding,
-      primaryColor: primary,
-      accentColor: accent,
-      darkBgColor: darkBg,
-      lightBgColor: lightBg,
-    });
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    if (primary) root.style.setProperty("--moss", primary);
+    if (accent) root.style.setProperty("--lime", accent);
   };
 
   useEffect(() => {

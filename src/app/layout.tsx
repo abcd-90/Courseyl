@@ -30,8 +30,8 @@ export default async function RootLayout({
             __html: `(function() {
               try {
                 var theme = localStorage.getItem('theme');
-                var supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
-                if (theme === 'dark' || (!theme && supportDarkMode)) {
+                // Default to clean light mode matching CourseIt signature identity
+                if (theme === 'dark') {
                   document.documentElement.classList.add('dark');
                   document.documentElement.classList.remove('light');
                   document.documentElement.style.colorScheme = 'dark';
@@ -42,21 +42,6 @@ export default async function RootLayout({
                 }
               } catch (e) {}
             })();`,
-          }}
-        />
-        <style
-          id="live-theme-vars"
-          dangerouslySetInnerHTML={{
-            __html: `
-              :root {
-                --moss: ${publicSettings.branding.primaryColor || "#4b5e1e"};
-                --lime: ${publicSettings.branding.accentColor || "#b8c460"};
-              }
-              .dark {
-                --moss: ${publicSettings.branding.accentColor || "#b8c460"};
-                --lime: ${publicSettings.branding.accentColor || "#b8c460"};
-              }
-            `,
           }}
         />
       </head>

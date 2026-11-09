@@ -802,8 +802,9 @@ export default function StudioHubAdminPage() {
                       <span style={{ color: accentColor }} className="text-xl">
                         {logoIcon === "sparkles" ? "✨" : logoIcon === "code" ? "</>" : logoIcon === "rocket" ? "🚀" : logoIcon === "video" ? "▶" : "🎓"}
                       </span>
-                      <span className="text-lg font-bold text-white">
-                        {brandName} <span style={{ color: accentColor }}>{brandSuffix}</span>
+                      <span className="text-lg font-bold">
+                        <span className="text-white font-bold">Course</span>
+                        <span style={{ color: accentColor }} className="font-bold">yl</span>
                       </span>
                     </div>
                     <button
@@ -1744,3 +1745,4 @@ export default function StudioHubAdminPage() {
     </div>
   );
 }
+

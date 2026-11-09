@@ -277,7 +277,7 @@ export default function HomePage() {
           </div>
 
           <p className="mt-6 text-center text-[0.85rem] text-ink-soft">
-            Counted live from CourseIt, updated every hour.
+            Counted live from Courseyl, updated every hour.
           </p>
         </div>
       </section>
@@ -833,7 +833,7 @@ export default function HomePage() {
           <div className="mt-12 grid grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))] gap-5">
             <figure className="flex flex-col justify-between gap-7 rounded-card bg-surface p-7 shadow-[0_0_0_1px_var(--line)]">
               <blockquote className="font-display text-[1.3rem] leading-[1.35] text-ink">
-                “I had started that 6-hour React video four times. CourseIt cut it to two and a half hours and I finished
+                “I had started that 6-hour React video four times. Courseyl cut it to two and a half hours and I finished
                 in nine days.”
               </blockquote>
               <figcaption className="flex flex-col gap-3.5">

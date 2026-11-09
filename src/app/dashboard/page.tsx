@@ -127,7 +127,7 @@ export default function DashboardPage() {
           <div className="relative z-10 w-full max-w-xl text-center px-1">
             <div className="bg-[#121a15]/90 backdrop-blur-md rounded-3xl border border-white/10 shadow-2xl p-4 sm:p-7 md:p-8 text-center space-y-3 sm:space-y-4">
               <div className="inline-flex items-center px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[0.7rem] sm:text-[0.72rem] font-medium text-ink-soft tracking-wider font-mono">
-                Welcome to CourseIt
+                Welcome to Courseyl
               </div>
 
               <h1 className="text-xl sm:text-2xl md:text-[2rem] font-display font-bold text-white tracking-tight leading-snug">
