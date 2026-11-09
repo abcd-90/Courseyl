@@ -72,12 +72,12 @@ export default function MyCoursesPage() {
   }, []);
 
   return (
-    <div className="min-h-screen flex bg-paper text-ink">
+    <div className="min-h-screen flex flex-col md:flex-row bg-paper text-ink">
       {/* Persistent Left Sidebar */}
       <AppSidebar />
 
-      {/* Main Content Area matching Screenshot 2 */}
-      <main className="flex-1 p-6 md:p-8 overflow-y-auto max-w-6xl w-full">
+      {/* Main Content Area */}
+      <main className="w-full min-w-0 flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto max-w-6xl">
         {/* Header Breadcrumbs */}
         <div className="mb-2">
           <span className="text-[0.7rem] font-bold text-ink-soft/70 tracking-widest uppercase font-mono">

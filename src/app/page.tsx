@@ -14,6 +14,14 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<"video" | "article">("video");
   const [copiedLink, setCopiedLink] = useState(false);
   const [scrollY, setScrollY] = useState(0);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => setIsAuthenticated(!!d?.authenticated))
+      .catch(() => setIsAuthenticated(false));
+  }, []);
 
   // Tour section ref for 3D scroll tilt animation
   const tourRef = useRef<HTMLDivElement>(null);
@@ -171,8 +179,8 @@ export default function HomePage() {
           {/* Buttons */}
           <div className="mt-1.5 flex flex-wrap justify-center gap-2.5">
             <Link
-              href="/dashboard"
-              className="inline-flex shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground hover:-translate-y-px hover:bg-moss-dark transition-all h-12 gap-2 px-7 text-[0.92rem] font-semibold shadow-sm"
+              href={isAuthenticated ? "/dashboard" : "/login?next=/dashboard"}
+              className="inline-flex shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground hover:-translate-y-px hover:bg-moss-dark transition-all h-12 gap-2 px-7 text-[0.92rem] font-semibold shadow-sm cursor-pointer"
             >
               Start with a link
             </Link>
@@ -921,14 +929,14 @@ export default function HomePage() {
               </p>
               <div className="mt-2 flex flex-wrap justify-center gap-2.5">
                 <Link
-                  href="/dashboard"
-                  className="inline-flex shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-moss-dark hover:-translate-y-px transition-all h-12 gap-2 px-7 text-[0.92rem] font-semibold shadow-sm"
+                  href={isAuthenticated ? "/dashboard" : "/login?next=/dashboard"}
+                  className="inline-flex shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-moss-dark hover:-translate-y-px transition-all h-12 gap-2 px-7 text-[0.92rem] font-semibold shadow-sm cursor-pointer"
                 >
-                  Go to your dashboard
+                  {isAuthenticated ? "Go to your dashboard" : "Start learning"}
                 </Link>
                 <Link
-                  href="/dashboard"
-                  className="inline-flex shrink-0 items-center justify-center rounded-full bg-surface/80 text-ink shadow-[inset_0_0_0_1px_var(--line)] hover:bg-muted transition-all h-12 gap-2 px-7 text-[0.92rem] font-medium"
+                  href={isAuthenticated ? "/dashboard" : "/login?next=/dashboard"}
+                  className="inline-flex shrink-0 items-center justify-center rounded-full bg-surface/80 text-ink shadow-[inset_0_0_0_1px_var(--line)] hover:bg-muted transition-all h-12 gap-2 px-7 text-[0.92rem] font-medium cursor-pointer"
                 >
                   Paste a link
                 </Link>

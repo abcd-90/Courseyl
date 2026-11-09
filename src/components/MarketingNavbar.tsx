@@ -5,10 +5,21 @@ import Link from "next/link";
 
 export function MarketingNavbar() {
   const [isDark, setIsDark] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   useEffect(() => {
     const isDarkMode = document.documentElement.classList.contains("dark");
     setIsDark(isDarkMode);
+
+    // Check live authentication state
+    fetch("/api/auth/me")
+      .then((res) => res.json())
+      .then((data) => {
+        setIsAuthenticated(!!data?.authenticated);
+      })
+      .catch(() => {
+        setIsAuthenticated(false);
+      });
   }, []);
 
   const toggleTheme = () => {
@@ -34,7 +45,7 @@ export function MarketingNavbar() {
         {/* Brand */}
         <Link
           href="/"
-          className="inline-flex items-center gap-2 font-display text-[1.15rem] font-medium leading-none tracking-[-0.02em] text-ink"
+          className="inline-flex items-center gap-2 font-display text-[1.15rem] font-medium leading-none tracking-[-0.02em] text-ink shrink-0"
         >
           <svg viewBox="2 6 60 44" aria-hidden="true" className="h-5 w-[27px] fill-current text-ink">
             <path
@@ -53,7 +64,7 @@ export function MarketingNavbar() {
           <span>Course<span className="text-moss">It</span></span>
         </Link>
 
-        {/* Navigation Links */}
+        {/* Navigation Links (Desktop) */}
         <nav aria-label="Main" className="ml-auto hidden gap-6 text-[0.92rem] text-ink-soft md:flex items-center">
           <Link className="transition-colors hover:text-ink" href="/#features">
             Features
@@ -75,7 +86,7 @@ export function MarketingNavbar() {
             type="button"
             onClick={toggleTheme}
             aria-label="Toggle light and dark theme"
-            className="inline-flex shrink-0 items-center justify-center rounded-full border border-transparent size-11 text-ink shadow-[inset_0_0_0_1px_var(--line)] hover:bg-muted transition-colors cursor-pointer"
+            className="inline-flex shrink-0 items-center justify-center rounded-full border border-transparent size-10 sm:size-11 text-ink shadow-[inset_0_0_0_1px_var(--line)] hover:bg-muted transition-colors cursor-pointer"
           >
             {/* Sun icon visible in dark mode */}
             <svg
@@ -117,12 +128,22 @@ export function MarketingNavbar() {
             </svg>
           </button>
 
-          <Link
-            href="/dashboard"
-            className="inline-flex shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-moss-dark hover:-translate-y-px transition-all font-medium h-11 px-5 text-[0.92rem] shadow-sm"
-          >
-            Dashboard
-          </Link>
+          {/* Dynamic Auth Button: "Dashboard" if logged in, "Start learning" if not */}
+          {isAuthenticated ? (
+            <Link
+              href="/dashboard"
+              className="inline-flex shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-moss-dark hover:-translate-y-px transition-all font-medium h-10 sm:h-11 px-4 sm:px-5 text-xs sm:text-[0.92rem] shadow-sm cursor-pointer whitespace-nowrap"
+            >
+              Dashboard
+            </Link>
+          ) : (
+            <Link
+              href="/login?next=/dashboard"
+              className="inline-flex shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-moss-dark hover:-translate-y-px transition-all font-medium h-10 sm:h-11 px-3.5 sm:px-5 text-xs sm:text-[0.92rem] shadow-sm cursor-pointer whitespace-nowrap"
+            >
+              Start learning
+            </Link>
+          )}
         </div>
       </div>
     </header>

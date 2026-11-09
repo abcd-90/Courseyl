@@ -263,12 +263,12 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
   );
 
   return (
-    <div className="min-h-screen flex bg-paper text-ink">
+    <div className="min-h-screen flex flex-col md:flex-row bg-paper text-ink">
       {/* Left Application Shell Sidebar */}
       <AppSidebar />
 
       {/* Main Roadmap Area */}
-      <main className="flex-1 p-6 md:p-8 overflow-y-auto max-w-6xl w-full space-y-6">
+      <main className="w-full min-w-0 flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto max-w-6xl space-y-6">
         {/* Top Back Navigation */}
         <Link
           href="/roadmaps"

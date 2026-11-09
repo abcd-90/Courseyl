@@ -70,10 +70,10 @@ export default function BillingPage() {
   const hoursPercent = Math.min(100, Math.round((hoursUsed / maxHours) * 100));
 
   return (
-    <div className="min-h-screen flex bg-paper text-ink">
+    <div className="min-h-screen flex flex-col md:flex-row bg-paper text-ink">
       <AppSidebar />
 
-      <main className="flex-1 p-6 md:p-8 overflow-y-auto max-w-4xl">
+      <main className="w-full min-w-0 flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto max-w-4xl">
         {/* Breadcrumb */}
         <div className="mb-2">
           <span className="text-[0.7rem] font-bold text-ink-soft/70 tracking-widest uppercase">

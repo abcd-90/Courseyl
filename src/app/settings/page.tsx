@@ -64,10 +64,10 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen flex bg-[#fcfcfa] text-[#0f1611]">
+    <div className="min-h-screen flex flex-col md:flex-row bg-[#fcfcfa] text-[#0f1611]">
       <AppSidebar />
 
-      <main className="flex-1 p-6 md:p-8 overflow-y-auto max-w-3xl">
+      <main className="w-full min-w-0 flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto max-w-3xl">
         <div className="mb-2">
           <span className="text-[0.7rem] font-bold text-[#4c4c3d]/70 tracking-widest uppercase">
             Account & Preferences

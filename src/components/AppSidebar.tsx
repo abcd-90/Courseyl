@@ -9,6 +9,7 @@ export function AppSidebar() {
   const pathname = usePathname();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   // Dynamic recent courses matching user screenshots
   const [recents, setRecents] = useState<any[]>([
@@ -47,6 +48,12 @@ export function AppSidebar() {
     } catch {}
   }, []);
 
+  // Close mobile drawer on route change
+  useEffect(() => {
+    setIsMobileOpen(false);
+    setShowUserMenu(false);
+  }, [pathname]);
+
   const handleLogout = async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
@@ -58,31 +65,28 @@ export function AppSidebar() {
     {
       name: "Today",
       href: "/dashboard",
-      badge: null,
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
         </svg>
       ),
-      active: pathname === "/dashboard",
+      active: pathname === "/dashboard" || pathname === "/",
     },
     {
       name: "My courses",
       href: "/courses",
       badge: "2",
-      badgeVariant: "default",
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
         </svg>
       ),
-      active: pathname.startsWith("/courses") && !pathname.includes("learn"),
+      active: pathname.startsWith("/courses") && !pathname.includes("/learn"),
     },
     {
       name: "Roadmaps",
       href: "/roadmaps",
       badge: "1",
-      badgeVariant: "default",
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
@@ -93,8 +97,6 @@ export function AppSidebar() {
     {
       name: "Notes",
       href: "/notes",
-      badge: null,
-      badgeVariant: "default",
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -116,24 +118,40 @@ export function AppSidebar() {
     },
   ];
 
-  return (
-    <aside className="w-64 shrink-0 bg-sidebar border-r border-sidebar-border flex flex-col justify-between min-h-screen p-4 text-sidebar-foreground">
-      <div className="space-y-5">
+  const renderSidebarContent = (isMobile = false) => (
+    <div className="flex flex-col justify-between h-full min-h-0 space-y-5">
+      <div className="space-y-5 overflow-y-auto pr-1">
         {/* Top Header */}
         <div className="flex items-center justify-between px-2 pt-1">
           <CourseItLogo size="default" />
-          <button className="text-ink-soft hover:text-ink p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer" title="Collapse sidebar">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-              <rect x="3" y="4" width="18" height="16" rx="2" />
-              <path d="M9 4v16" />
-            </svg>
-          </button>
+          {isMobile ? (
+            <button
+              onClick={() => setIsMobileOpen(false)}
+              className="p-1.5 rounded-xl text-ink-soft hover:text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+              title="Close menu"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          ) : (
+            <button
+              className="text-ink-soft hover:text-ink p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+              title="CourseIt Workspace"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+                <rect x="3" y="4" width="18" height="16" rx="2" />
+                <path d="M9 4v16" />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* Primary CTA: + New course */}
         <div>
           <Link
             href="/generate"
+            onClick={() => isMobile && setIsMobileOpen(false)}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-[#b8c460] text-[#0f1611] text-sm font-semibold hover:bg-[#a6b350] transition-transform hover:-translate-y-0.5 shadow-sm"
           >
             <span className="text-base font-bold">+</span>
@@ -147,6 +165,7 @@ export function AppSidebar() {
             <Link
               key={item.name}
               href={item.href}
+              onClick={() => isMobile && setIsMobileOpen(false)}
               className={`flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
                 item.active
                   ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
@@ -172,7 +191,7 @@ export function AppSidebar() {
           ))}
         </nav>
 
-        {/* RECENTS Section matching Reference Screenshots */}
+        {/* RECENTS Section */}
         <div className="pt-2 px-2 space-y-2">
           <h5 className="text-[0.68rem] font-bold text-ink-soft/70 tracking-wider uppercase font-mono px-1">
             RECENTS
@@ -183,6 +202,7 @@ export function AppSidebar() {
                 <Link
                   key={r.slug || idx}
                   href={`/courses/${r.slug}`}
+                  onClick={() => isMobile && setIsMobileOpen(false)}
                   className="flex items-center justify-between p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors group cursor-pointer text-xs"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
@@ -211,8 +231,8 @@ export function AppSidebar() {
           )}
         </div>
 
-        {/* Quota Meter Card matching Reference Screenshot 4 */}
-        <div className="bg-surface rounded-2xl border border-line p-3.5 space-y-2 shadow-xs">
+        {/* Quota Meter Card */}
+        <div className="bg-surface dark:bg-[#121a15] rounded-2xl border border-line dark:border-white/10 p-3.5 space-y-2 shadow-xs">
           <div className="flex items-center justify-between text-xs font-medium">
             <span className="text-ink">Hours left</span>
             <span className="text-ink-soft font-mono">1h 25m / 5h</span>
@@ -230,6 +250,7 @@ export function AppSidebar() {
           </h5>
           <Link
             href="/community"
+            onClick={() => isMobile && setIsMobileOpen(false)}
             className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-ink-soft hover:bg-black/5 dark:hover:bg-white/5 hover:text-ink transition-colors"
           >
             <svg className="w-4 h-4 text-ink-soft" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -241,7 +262,7 @@ export function AppSidebar() {
       </div>
 
       {/* User profile capsule at bottom */}
-      <div className="pt-4 border-t border-line relative">
+      <div className="pt-4 border-t border-line dark:border-white/10 relative mt-auto">
         {currentUser ? (
           <div>
             <button
@@ -279,6 +300,7 @@ export function AppSidebar() {
                 </div>
                 <Link
                   href="/settings"
+                  onClick={() => isMobile && setIsMobileOpen(false)}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 >
                   <span>⚙️</span>
@@ -286,6 +308,7 @@ export function AppSidebar() {
                 </Link>
                 <Link
                   href="/billing"
+                  onClick={() => isMobile && setIsMobileOpen(false)}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 >
                   <span>💳</span>
@@ -304,6 +327,7 @@ export function AppSidebar() {
         ) : (
           <Link
             href="/login"
+            onClick={() => isMobile && setIsMobileOpen(false)}
             className="flex items-center justify-between p-2.5 rounded-2xl bg-[#b8c460]/10 border border-[#b8c460]/30 hover:bg-[#b8c460]/20 transition-all text-ink group"
           >
             <div className="flex items-center gap-2.5">
@@ -319,6 +343,78 @@ export function AppSidebar() {
           </Link>
         )}
       </div>
-    </aside>
+    </div>
+  );
+
+  return (
+    <>
+      {/* 1. MOBILE TOP NAVIGATION BAR (Visible ONLY on screens < md) */}
+      <header className="md:hidden sticky top-0 z-40 w-full flex items-center justify-between px-4 py-3 bg-paper/95 dark:bg-[#0c120e]/95 backdrop-blur-md border-b border-line dark:border-white/10 shrink-0">
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setIsMobileOpen(true)}
+            className="p-1.5 -ml-1 rounded-xl text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+            aria-label="Open menu"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <CourseItLogo size="default" />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Link
+            href="/generate"
+            className="px-3 py-1.5 rounded-full bg-[#b8c460] text-[#0f1611] text-xs font-bold hover:bg-[#a6b350] transition-colors shadow-xs"
+          >
+            + New
+          </Link>
+
+          {currentUser ? (
+            <button
+              onClick={() => setIsMobileOpen(true)}
+              className="w-8 h-8 rounded-full bg-[#f97316] text-white flex items-center justify-center font-bold text-xs overflow-hidden border border-moss/30 cursor-pointer"
+              title="Open profile"
+            >
+              {currentUser.profile?.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={currentUser.profile.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                (currentUser.profile?.displayName || currentUser.email || "S").charAt(0).toUpperCase()
+              )}
+            </button>
+          ) : (
+            <Link
+              href="/login"
+              className="px-3 py-1.5 rounded-full border border-line dark:border-white/10 text-xs font-medium text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+            >
+              Sign in
+            </Link>
+          )}
+        </div>
+      </header>
+
+      {/* 2. MOBILE SLIDE-OVER DRAWER (Visible when isMobileOpen is true) */}
+      {isMobileOpen && (
+        <div
+          onClick={() => setIsMobileOpen(false)}
+          className="md:hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
+        />
+      )}
+
+      <aside
+        className={`md:hidden fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-sidebar border-r border-sidebar-border p-4 text-sidebar-foreground shadow-2xl transition-transform duration-300 ease-out flex flex-col ${
+          isMobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        {renderSidebarContent(true)}
+      </aside>
+
+      {/* 3. DESKTOP PERMANENT SIDEBAR (Visible ONLY on screens >= md) */}
+      <aside className="hidden md:flex md:w-64 md:shrink-0 bg-sidebar border-r border-sidebar-border flex-col justify-between h-screen sticky top-0 p-4 text-sidebar-foreground">
+        {renderSidebarContent(false)}
+      </aside>
+    </>
   );
 }
