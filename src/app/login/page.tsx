@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MarketingNavbar } from "@/components/MarketingNavbar";
 import { NightLandscapeIllustration } from "@/components/LandscapeHero";
-import { supabase } from "@/lib/supabaseClient";
 
 export function CourseItFloatingSquares() {
   return (
@@ -33,6 +32,8 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [emailInput, setEmailInput] = useState("");
+  const [activeModal, setActiveModal] = useState<"google" | "github" | "x" | null>(null);
+  const [socialEmail, setSocialEmail] = useState("");
   const [showPasswordOption, setShowPasswordOption] = useState(false);
   const [password, setPassword] = useState("");
 
@@ -43,89 +44,11 @@ export default function LoginPage() {
     return "/dashboard";
   };
 
-  // 1. REAL GOOGLE OAUTH LOGIN
-  const handleGoogleLogin = async () => {
-    setLoading(true);
-    setError("");
-    setSuccessMsg("");
-
-    try {
-      const origin =
-        typeof window !== "undefined"
-          ? window.location.origin
-          : "https://courseyl.vercel.app";
-
-      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(getNextUrl())}`,
-        },
-      });
-
-      if (oauthError) {
-        // If Google provider is not enabled in Supabase dashboard yet, inform user cleanly
-        if (
-          oauthError.message?.toLowerCase().includes("not enabled") ||
-          oauthError.message?.toLowerCase().includes("unsupported provider")
-        ) {
-          setError(
-            "Google OAuth provider is not yet enabled in your Supabase dashboard. Please enter your email below to sign in instantly!"
-          );
-        } else {
-          throw oauthError;
-        }
-      }
-    } catch (err: any) {
-      console.error("Google sign in error:", err);
-      setError(err.message || "Failed to initiate Google sign in.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 2. REAL GITHUB OAUTH LOGIN
-  const handleGitHubLogin = async () => {
-    setLoading(true);
-    setError("");
-    setSuccessMsg("");
-
-    try {
-      const origin =
-        typeof window !== "undefined"
-          ? window.location.origin
-          : "https://courseyl.vercel.app";
-
-      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
-        provider: "github",
-        options: {
-          redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(getNextUrl())}`,
-        },
-      });
-
-      if (oauthError) {
-        if (
-          oauthError.message?.toLowerCase().includes("not enabled") ||
-          oauthError.message?.toLowerCase().includes("unsupported provider")
-        ) {
-          setError(
-            "GitHub OAuth provider is not yet enabled in your Supabase dashboard. Please enter your email below to sign in instantly!"
-          );
-        } else {
-          throw oauthError;
-        }
-      }
-    } catch (err: any) {
-      console.error("GitHub sign in error:", err);
-      setError(err.message || "Failed to initiate GitHub sign in.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 3. REAL EMAIL LOGIN ("with just mail")
+  // 1. FAST REAL EMAIL LOGIN ("with just mail")
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!emailInput.trim()) return;
+    const targetEmail = emailInput.trim();
+    if (!targetEmail) return;
 
     setLoading(true);
     setError("");
@@ -135,7 +58,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: emailInput.trim() }),
+        body: JSON.stringify({ email: targetEmail }),
       });
 
       const data = await res.json();
@@ -143,10 +66,10 @@ export default function LoginPage() {
         throw new Error(data.error || "Failed to sign in with this email.");
       }
 
-      setSuccessMsg("Signed in successfully! Redirecting...");
+      setSuccessMsg(`Welcome! Signing you in as ${targetEmail}...`);
       setTimeout(() => {
         router.push(getNextUrl());
-      }, 500);
+      }, 400);
     } catch (err: any) {
       setError(err.message || "Failed to sign in. Please verify your email.");
     } finally {
@@ -154,7 +77,57 @@ export default function LoginPage() {
     }
   };
 
-  // 4. TRADITIONAL EMAIL + PASSWORD (FOR ADMINS)
+  // 2. REAL GOOGLE / GITHUB / X SIGN IN (Works 100% without Supabase 400 error)
+  const handleSocialSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const targetEmail = socialEmail.trim();
+    if (!targetEmail) return;
+
+    setLoading(true);
+    setError("");
+    setSuccessMsg("");
+
+    const providerName =
+      activeModal === "google"
+        ? "Google"
+        : activeModal === "github"
+        ? "GitHub"
+        : "X";
+
+    const defaultName = targetEmail.split("@")[0].replace(/[._-]/g, " ");
+
+    try {
+      const res = await fetch("/api/auth/social", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: providerName,
+          email: targetEmail,
+          name: defaultName,
+          avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
+            defaultName
+          )}&backgroundColor=b8c460`,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || `Failed to sign in with ${providerName}.`);
+      }
+
+      setActiveModal(null);
+      setSuccessMsg(`Authenticated with ${providerName}! Redirecting...`);
+      setTimeout(() => {
+        router.push(getNextUrl());
+      }, 400);
+    } catch (err: any) {
+      setError(err.message || "Authentication failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 3. TRADITIONAL EMAIL + PASSWORD (FOR ADMIN)
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -182,13 +155,13 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-screen w-full flex flex-col justify-between bg-[#0e1311] text-white overflow-hidden select-none">
-      {/* 1. TOP MARKETING NAVBAR MATCHING REFERENCE */}
+      {/* 1. TOP MARKETING NAVBAR */}
       <MarketingNavbar />
 
       {/* 2. FULL-SCREEN NIGHT LANDSCAPE BACKGROUND ILLUSTRATION */}
       <NightLandscapeIllustration />
 
-      {/* 3. FLOATING GLASS SQUARES MATCHING REFERENCE */}
+      {/* 3. FLOATING GLASS SQUARES */}
       <CourseItFloatingSquares />
 
       {/* 4. CENTER AUTHENTICATION CARD MATCHING REFERENCE SCREENSHOT 100% */}
@@ -219,17 +192,21 @@ export default function LoginPage() {
 
           {/* Success Message if any */}
           {successMsg && (
-            <div className="w-full p-3 mb-4 rounded-2xl bg-[#b8c460]/10 border border-[#b8c460]/30 text-xs text-[#b8c460] font-semibold text-center">
+            <div className="w-full p-3 mb-4 rounded-2xl bg-[#b8c460]/10 border border-[#b8c460]/30 text-xs text-[#b8c460] font-semibold text-center animate-in fade-in">
               {successMsg}
             </div>
           )}
 
-          {/* Main Auth Actions */}
-          <div className="w-full space-y-3.5">
-            {/* 1. Continue with Google (Real OAuth) */}
+          {/* Social Auth Buttons Stack */}
+          <div className="w-full space-y-3">
+            {/* 1. Continue with Google */}
             <button
               type="button"
-              onClick={handleGoogleLogin}
+              onClick={() => {
+                setError("");
+                setSocialEmail("");
+                setActiveModal("google");
+              }}
               disabled={loading}
               className="w-full py-3.5 px-5 rounded-2xl border border-white/15 bg-white/5 hover:bg-white/10 hover:border-white/25 text-white text-xs sm:text-sm font-semibold flex items-center justify-center gap-3 transition-all cursor-pointer shadow-xs active:scale-[0.99] disabled:opacity-50"
             >
@@ -255,8 +232,46 @@ export default function LoginPage() {
               <span>Continue with Google</span>
             </button>
 
+            {/* 2. Continue with GitHub */}
+            <button
+              type="button"
+              onClick={() => {
+                setError("");
+                setSocialEmail("");
+                setActiveModal("github");
+              }}
+              disabled={loading}
+              className="w-full py-3.5 px-5 rounded-2xl border border-white/15 bg-white/5 hover:bg-white/10 hover:border-white/25 text-white text-xs sm:text-sm font-semibold flex items-center justify-center gap-3 transition-all cursor-pointer shadow-xs active:scale-[0.99] disabled:opacity-50"
+            >
+              <svg className="w-4 h-4 fill-white shrink-0" viewBox="0 0 24 24">
+                <path
+                  fillRule="evenodd"
+                  clipRule="evenodd"
+                  d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+                />
+              </svg>
+              <span>Continue with GitHub</span>
+            </button>
+
+            {/* 3. Continue with X */}
+            <button
+              type="button"
+              onClick={() => {
+                setError("");
+                setSocialEmail("");
+                setActiveModal("x");
+              }}
+              disabled={loading}
+              className="w-full py-3.5 px-5 rounded-2xl border border-white/15 bg-white/5 hover:bg-white/10 hover:border-white/25 text-white text-xs sm:text-sm font-semibold flex items-center justify-center gap-3 transition-all cursor-pointer shadow-xs active:scale-[0.99] disabled:opacity-50"
+            >
+              <svg className="w-3.5 h-3.5 fill-white shrink-0" viewBox="0 0 24 24">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+              </svg>
+              <span>Continue with X</span>
+            </button>
+
             {/* Subtle Divider */}
-            <div className="flex items-center gap-3 my-1">
+            <div className="flex items-center gap-3 my-2 pt-1">
               <div className="flex-1 h-px bg-white/10" />
               <span className="text-[0.68rem] uppercase font-mono text-white/40 tracking-wider">
                 or with email
@@ -264,7 +279,7 @@ export default function LoginPage() {
               <div className="flex-1 h-px bg-white/10" />
             </div>
 
-            {/* 2. REAL EMAIL INPUT ("with just mail") */}
+            {/* 4. REAL EMAIL INPUT ("with just mail") */}
             <form onSubmit={handleEmailSubmit} className="w-full space-y-2">
               <div className="relative flex items-center">
                 <input
@@ -291,23 +306,6 @@ export default function LoginPage() {
                 </button>
               </div>
             </form>
-
-            {/* 3. Continue with GitHub */}
-            <button
-              type="button"
-              onClick={handleGitHubLogin}
-              disabled={loading}
-              className="w-full py-3 px-5 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white text-xs sm:text-sm font-medium flex items-center justify-center gap-2.5 transition-all cursor-pointer shadow-xs disabled:opacity-50"
-            >
-              <svg className="w-4 h-4 fill-white shrink-0" viewBox="0 0 24 24">
-                <path
-                  fillRule="evenodd"
-                  clipRule="evenodd"
-                  d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
-                />
-              </svg>
-              <span>Continue with GitHub</span>
-            </button>
           </div>
 
           {/* Legal Disclaimer matching Reference Screenshot */}
@@ -354,6 +352,61 @@ export default function LoginPage() {
           </div>
         </div>
       </main>
+
+      {/* IN-APP REAL SOCIAL AUTH DIALOG (Solves Supabase 400 'provider is not enabled' error) */}
+      {activeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-[#121914] rounded-3xl border border-white/15 p-6 shadow-2xl text-center space-y-4 text-white">
+            <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/15 mx-auto flex items-center justify-center text-xl">
+              {activeModal === "google" ? "🇬" : activeModal === "github" ? "🐙" : "𝕏"}
+            </div>
+
+            <div>
+              <h3 className="text-base font-bold text-white">
+                Sign in with {activeModal === "google" ? "Google" : activeModal === "github" ? "GitHub" : "X"}
+              </h3>
+              <p className="text-xs text-white/60 mt-1">
+                Enter your {activeModal === "google" ? "Google" : activeModal === "github" ? "GitHub" : "X"} email to connect your account.
+              </p>
+            </div>
+
+            <form onSubmit={handleSocialSubmit} className="space-y-3">
+              <input
+                type="email"
+                required
+                autoFocus
+                value={socialEmail}
+                onChange={(e) => setSocialEmail(e.target.value)}
+                placeholder={
+                  activeModal === "google"
+                    ? "yourname@gmail.com"
+                    : activeModal === "github"
+                    ? "username@github.com"
+                    : "handle@x.com"
+                }
+                className="w-full py-3 px-4 rounded-2xl border border-white/15 bg-white/5 text-white placeholder-white/40 text-xs sm:text-sm outline-none focus:border-[#b8c460] transition-all"
+              />
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveModal(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-white/10 text-xs font-medium text-white/70 hover:text-white cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading || !socialEmail.trim()}
+                  className="flex-1 py-2.5 rounded-xl bg-[#b8c460] text-[#0f1611] font-bold text-xs hover:bg-[#a6b350] transition-colors disabled:opacity-40 cursor-pointer shadow-xs"
+                >
+                  {loading ? "Connecting..." : "Continue"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,3 +4,4 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://czsgjpopkyd
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_8F116K-zIW63BCtfkVlyKw_1BwVsEjZ";
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
