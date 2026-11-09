@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 
+import { CourseItLogo } from "./CourseItLogo";
+
 export function MarketingNavbar() {
   const [isDark, setIsDark] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -43,26 +45,7 @@ export function MarketingNavbar() {
     <header className="fixed inset-x-0 top-[18px] z-50 flex justify-center px-4 pointer-events-none">
       <div className="flex w-full max-w-[880px] items-center gap-3 rounded-full bg-paper/80 py-1.5 pr-1.5 pl-4 shadow-[0_0_0_1px_var(--line),0_20px_40px_-24px_rgba(22,49,92,0.35)] backdrop-blur-[14px] pointer-events-auto">
         {/* Brand */}
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 font-display text-[1.15rem] font-medium leading-none tracking-[-0.02em] text-ink shrink-0"
-        >
-          <svg viewBox="2 6 60 44" aria-hidden="true" className="h-5 w-[27px] fill-current text-ink">
-            <path
-              fillRule="evenodd"
-              d="M32 10 L60 24 L32 38 L4 24 Z M27 15.5 L41 23.5 L27 31.5 Z"
-              fill="currentColor"
-              stroke="currentColor"
-              strokeWidth="3"
-              strokeLinejoin="round"
-            />
-            <path d="M14 33 L32 42 L50 33 V43 A18 6.5 0 0 1 14 43 Z" fill="currentColor" />
-            <path d="M52 28 V36" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            <circle cx="52" cy="37" r="2" fill="currentColor" />
-            <path d="M50.6 38.5 H53.4 L55 47 H49 Z" fill="currentColor" />
-          </svg>
-          <span>Course<span className="text-moss">It</span></span>
-        </Link>
+        <CourseItLogo size="default" href="/" />
 
         {/* Navigation Links (Desktop) */}
         <nav aria-label="Main" className="ml-auto hidden gap-6 text-[0.92rem] text-ink-soft md:flex items-center">

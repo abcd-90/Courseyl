@@ -1,5 +1,8 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
+import { useSiteSettings } from "./SiteSettingsProvider";
 
 export function CourseItLogo({
   className = "",
@@ -10,6 +13,11 @@ export function CourseItLogo({
   size?: "sm" | "default" | "lg";
   href?: string;
 }) {
+  const { settings } = useSiteSettings();
+  const brandName = settings.branding?.brandName || "CourseIt";
+  const brandSuffix = settings.branding?.brandSuffix || "";
+  const logoIcon = settings.branding?.logoIcon || "grad-cap";
+
   const iconSizes = {
     sm: "w-5 h-4",
     default: "w-[27px] h-5",
@@ -22,9 +30,31 @@ export function CourseItLogo({
     lg: "text-[1.5rem]",
   };
 
-  const Content = (
-    <div className={`inline-flex items-center gap-2 font-display font-bold tracking-tight text-ink ${className}`}>
-      {/* Official CourseIt Graduation Cap + Play button SVG */}
+  // Render icon based on setting
+  const renderIcon = () => {
+    if (logoIcon === "sparkles") {
+      return (
+        <span className="text-moss text-lg leading-none shrink-0">✨</span>
+      );
+    }
+    if (logoIcon === "code") {
+      return (
+        <span className="text-moss text-lg font-mono font-bold leading-none shrink-0">&lt;/&gt;</span>
+      );
+    }
+    if (logoIcon === "rocket") {
+      return (
+        <span className="text-moss text-lg leading-none shrink-0">🚀</span>
+      );
+    }
+    if (logoIcon === "video") {
+      return (
+        <span className="text-moss text-lg leading-none shrink-0">▶</span>
+      );
+    }
+
+    // Default: Official Graduation Cap + Play button SVG
+    return (
       <svg
         viewBox="2 6 60 44"
         aria-hidden="true"
@@ -51,7 +81,30 @@ export function CourseItLogo({
         <circle cx="52" cy="37" r="2" fill="currentColor" />
         <path d="M50.6 38.5 H53.4 L55 47 H49 Z" fill="currentColor" />
       </svg>
-      <span className={`${textSizes[size]} font-semibold text-ink`}>Course<span className="text-moss">It</span></span>
+    );
+  };
+
+  // Determine base and highlighted suffix
+  let baseName = brandName;
+  let suffixHighlight = brandSuffix;
+
+  if (!suffixHighlight) {
+    if (brandName.toLowerCase().endsWith("it")) {
+      baseName = brandName.slice(0, -2);
+      suffixHighlight = brandName.slice(-2);
+    } else if (brandName.toLowerCase().endsWith("yl")) {
+      baseName = brandName.slice(0, -2);
+      suffixHighlight = brandName.slice(-2);
+    }
+  }
+
+  const Content = (
+    <div className={`inline-flex items-center gap-2 font-display font-bold tracking-tight text-ink ${className}`}>
+      {renderIcon()}
+      <span className={`${textSizes[size]} font-semibold text-ink`}>
+        {baseName}
+        {suffixHighlight && <span className="text-moss">{suffixHighlight}</span>}
+      </span>
     </div>
   );
 
@@ -65,4 +118,3 @@ export function CourseItLogo({
 
   return Content;
 }
-

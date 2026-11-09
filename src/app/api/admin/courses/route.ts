@@ -2,12 +2,17 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 
-export async function GET() {
+export const dynamic = "force-dynamic";
+
+export async function GET(req: Request) {
   try {
     const user = await getCurrentUser();
     if (!user || user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json({ error: "Forbidden: Administrator role required." }, { status: 403 });
     }
+
+    const { searchParams } = new URL(req.url);
+    const search = searchParams.get("search")?.toLowerCase().trim() || "";
 
     const courses = await prisma.course.findMany({
       orderBy: { createdAt: "desc" },
@@ -21,7 +26,16 @@ export async function GET() {
       },
     });
 
-    const formatted = courses.map((c) => ({
+    const filtered = search
+      ? courses.filter(
+          (c) =>
+            c.title.toLowerCase().includes(search) ||
+            c.slug.toLowerCase().includes(search) ||
+            c.creator.email.toLowerCase().includes(search)
+        )
+      : courses;
+
+    const formatted = filtered.map((c) => ({
       id: c.id,
       title: c.title,
       slug: c.slug,
@@ -33,6 +47,7 @@ export async function GET() {
       creatorEmail: c.creator.email,
       creatorName: c.creator.profile?.displayName || c.creator.email,
       chapterCount: c._count.chapters,
+      thumbnailUrl: c.thumbnailUrl,
       createdAt: c.createdAt,
     }));
 
@@ -47,14 +62,19 @@ export async function PATCH(req: Request) {
   try {
     const user = await getCurrentUser();
     if (!user || user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json({ error: "Forbidden: Administrator role required." }, { status: 403 });
     }
 
-    const { courseId, isPublic } = await req.json();
+    const body = await req.json();
+    const { courseId, isPublic, title } = body;
+
+    const data: any = {};
+    if (typeof isPublic === "boolean") data.isPublic = isPublic;
+    if (title && typeof title === "string") data.title = title.trim();
 
     const updated = await prisma.course.update({
       where: { id: courseId },
-      data: { isPublic },
+      data,
     });
 
     return NextResponse.json({ success: true, course: updated });
@@ -68,7 +88,7 @@ export async function DELETE(req: Request) {
   try {
     const user = await getCurrentUser();
     if (!user || user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json({ error: "Forbidden: Administrator role required." }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);
@@ -88,4 +108,3 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
-

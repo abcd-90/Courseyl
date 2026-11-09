@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const user = await getCurrentUser();
@@ -18,6 +20,7 @@ export async function GET() {
       completedJobs,
       proSubscribers,
       courses,
+      recentUsers,
     ] = await Promise.all([
       prisma.user.count(),
       prisma.course.count(),
@@ -27,9 +30,20 @@ export async function GET() {
       prisma.generationJob.count({ where: { status: "COMPLETED" } }),
       prisma.subscription.count({ where: { tier: { in: ["PRO", "MAX"] } } }),
       prisma.course.findMany({ select: { totalDurationSeconds: true } }),
+      prisma.user.findMany({
+        take: 5,
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          createdAt: true,
+          subscription: { select: { tier: true } },
+        },
+      }),
     ]);
 
-    const totalSeconds = courses.reduce((acc, c) => acc + c.totalDurationSeconds, 0);
+    const totalSeconds = courses.reduce((acc, c) => acc + (c.totalDurationSeconds || 0), 0);
     const totalLearningHours = Math.round((totalSeconds / 3600) * 10) / 10;
     const aiSuccessRate = totalJobs > 0 ? Math.round((completedJobs / totalJobs) * 100) : 100;
 
@@ -45,10 +59,10 @@ export async function GET() {
         completedJobs,
         aiSuccessRate,
       },
+      recentUsers,
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
-

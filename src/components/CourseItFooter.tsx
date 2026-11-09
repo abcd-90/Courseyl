@@ -1,7 +1,12 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
+import { useSiteSettings } from "./SiteSettingsProvider";
 
 export function CourseItFooter() {
+  const { settings } = useSiteSettings();
+  const brandName = settings.branding?.brandName || "Courseyl";
   return (
     <footer className="bg-[#b8c460] !text-[#0f1611] mt-auto">
       <div className="mx-auto max-w-[1200px] px-6 pt-16 pb-7">
@@ -23,7 +28,7 @@ export function CourseItFooter() {
                 <circle cx="52" cy="37" r="2" fill="currentColor" />
                 <path d="M50.6 38.5 H53.4 L55 47 H49 Z" fill="currentColor" />
               </svg>
-              <span>CourseIt</span>
+              <span>{brandName}</span>
             </Link>
 
             <p className="mt-5 max-w-sm text-[0.95rem] leading-relaxed text-[#0f1611]/75">

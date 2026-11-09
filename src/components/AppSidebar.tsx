@@ -315,9 +315,26 @@ export function AppSidebar() {
             {showUserMenu && (
               <div className="absolute bottom-16 left-0 right-0 bg-surface dark:bg-[#121a15] rounded-2xl border border-line dark:border-white/10 p-2 shadow-2xl space-y-1 z-30">
                 <div className="px-3 py-2 border-b border-line dark:border-white/5">
-                  <p className="text-xs font-bold text-ink truncate">{currentUser.profile?.displayName || "Learner"}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-ink truncate">{currentUser.profile?.displayName || "Learner"}</p>
+                    {currentUser.role === "ADMIN" && (
+                      <span className="px-1.5 py-0.5 rounded-md bg-[#b8c460] text-[#0f1611] font-mono font-bold text-[0.6rem]">
+                        ADMIN
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[0.68rem] text-ink-soft truncate">{currentUser.email}</p>
                 </div>
+                {currentUser.role === "ADMIN" && (
+                  <Link
+                    href="/studio-hub"
+                    onClick={() => isMobile && setIsMobileOpen(false)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold text-[#b8c460] hover:bg-[#b8c460]/10 transition-colors"
+                  >
+                    <span>⚡</span>
+                    <span>Studio Vault (Admin)</span>
+                  </Link>
+                )}
                 <Link
                   href="/settings"
                   onClick={() => isMobile && setIsMobileOpen(false)}
