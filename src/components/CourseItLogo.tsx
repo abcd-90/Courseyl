@@ -87,8 +87,8 @@ export function CourseItLogo({
       {renderIcon()}
       <span className={`${textSizes[size]} font-semibold`}>
         {/* "Course" in Black, "yl" in place of "It" */}
-        <span className="text-[#0f1611] font-bold">Course</span>
-        <span className="text-[#4b5e1e] font-bold">yl</span>
+        <span className="text-[#0f1611] dark:text-white font-bold">Course</span>
+        <span className="text-[#4b5e1e] dark:text-[#b8c460] font-bold">yl</span>
       </span>
     </div>
   );

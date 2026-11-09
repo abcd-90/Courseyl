@@ -11,7 +11,7 @@ export async function GET(req: Request) {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     if (!clientId) {
       return NextResponse.redirect(
-        new URL("/login?error=Google+Client+ID+is+not+configured+in+environment", req.url)
+        new URL("/login?error=Google+OAuth+is+not+configured.+Please+add+GOOGLE_CLIENT_ID+to+Vercel+Environment+Variables.", req.url)
       );
     }
 

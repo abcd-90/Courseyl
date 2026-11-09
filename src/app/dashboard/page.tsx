@@ -120,28 +120,28 @@ export default function DashboardPage() {
       {/* Main Content Area */}
       <main className="w-full min-w-0 flex-1 p-3.5 sm:p-6 md:p-8 space-y-6 sm:space-y-8 overflow-y-auto max-w-7xl">
         {/* Landscape Banner Card with Centered Intake Card */}
-        <div className="relative w-full rounded-3xl overflow-hidden border border-line dark:border-[#1c291d] bg-[#0e1311] min-h-[300px] sm:min-h-[360px] md:h-[430px] shadow-2xl flex items-center justify-center p-3 sm:p-6">
+        <div className="relative w-full rounded-3xl overflow-hidden border border-[#0f1611]/10 dark:border-[#1c291d] bg-[#fcfcfa] dark:bg-[#0e1311] min-h-[300px] sm:min-h-[360px] md:h-[430px] shadow-lg flex items-center justify-center p-3 sm:p-6">
           <LandscapeIllustration />
 
-          {/* Centered Intake Card */}
+          {/* Centered Intake Card (Frosted white card matching reference site) */}
           <div className="relative z-10 w-full max-w-xl text-center px-1">
-            <div className="bg-[#121a15]/90 backdrop-blur-md rounded-3xl border border-white/10 shadow-2xl p-4 sm:p-7 md:p-8 text-center space-y-3 sm:space-y-4">
-              <div className="inline-flex items-center px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[0.7rem] sm:text-[0.72rem] font-medium text-ink-soft tracking-wider font-mono">
+            <div className="bg-white/95 dark:bg-[#121a15]/95 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-[#0f1611]/10 dark:border-white/10 shadow-xl p-5 sm:p-8 text-center space-y-3 sm:space-y-4">
+              <div className="inline-flex items-center px-3.5 py-1 rounded-full bg-[#e4e9c6] dark:bg-white/10 text-[0.7rem] sm:text-[0.72rem] font-semibold text-[#4b5e1e] dark:text-[#b8c460] tracking-wide font-mono">
                 Welcome to Courseyl
               </div>
 
-              <h1 className="text-xl sm:text-2xl md:text-[2rem] font-display font-bold text-white tracking-tight leading-snug">
-                What should we learn, <span className="text-[#b8c460]">{displayName}?</span>
+              <h1 className="text-xl sm:text-2xl md:text-[2rem] font-display font-bold text-[#0f1611] dark:text-white tracking-tight leading-snug">
+                What should we learn, <span className="text-[#4b5e1e] dark:text-[#b8c460] italic font-serif">{displayName}?</span>
               </h1>
 
               <form onSubmit={handleGenerate} className="mt-2">
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-1.5 rounded-2xl sm:rounded-full border border-white/15 bg-[#0a100c] shadow-inner focus-within:border-[#b8c460] focus-within:ring-2 focus-within:ring-[#b8c460]/20 transition-all">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-1.5 rounded-2xl sm:rounded-full border border-[#0f1611]/15 dark:border-white/15 bg-[#fcfcfa] dark:bg-[#0a100c] shadow-inner focus-within:border-[#4b5e1e] dark:focus-within:border-[#b8c460] focus-within:ring-2 focus-within:ring-[#4b5e1e]/20 transition-all">
                   <input
                     type="url"
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
                     placeholder="youtube.com/playlist?list=..."
-                    className="w-full px-3.5 sm:px-4 py-2 sm:py-0 bg-transparent text-xs sm:text-sm text-white placeholder-white/40 outline-none border-none shadow-none"
+                    className="w-full px-3.5 sm:px-4 py-2 sm:py-0 bg-transparent text-xs sm:text-sm text-[#0f1611] dark:text-white placeholder-[#0f1611]/40 dark:placeholder-white/40 outline-none border-none shadow-none"
                   />
                   <button
                     type="submit"
@@ -152,7 +152,7 @@ export default function DashboardPage() {
                 </div>
               </form>
 
-              <p className="text-[0.68rem] sm:text-[0.72rem] text-ink-soft/70">
+              <p className="text-[0.68rem] sm:text-[0.72rem] text-[#4c4c3d]/70 dark:text-ink-soft/70">
                 Courses built on Free are shared in Community. Pro and Max keep them private.
               </p>
             </div>
@@ -245,8 +245,11 @@ export default function DashboardPage() {
                   <div className="relative aspect-video rounded-xl overflow-hidden bg-black">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={c.thumbnailUrl || "https://i.ytimg.com/vi/LSk5KaEGVK4/maxresdefault.jpg"}
+                      src={c.thumbnailUrl || "https://i.ytimg.com/vi/ygXn5nV5qFc/maxresdefault.jpg"}
                       alt={c.title}
+                      onError={(e: any) => {
+                        e.currentTarget.src = "https://i.ytimg.com/vi/ygXn5nV5qFc/hqdefault.jpg";
+                      }}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/85 text-white text-[0.65rem] font-semibold flex items-center gap-1.5 backdrop-blur-xs">
