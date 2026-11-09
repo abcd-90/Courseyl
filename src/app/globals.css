@@ -1,0 +1,592 @@
+@import url('https://fonts.googleapis.com/css2?family=Familjen+Grotesk:ital,wght@0,400..700;1,400..700&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&display=swap');
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-border: var(--border);
+  --color-moss: var(--moss);
+  --color-moss-dark: var(--moss-dark);
+  --color-on-moss: var(--on-moss);
+  --color-lime: var(--lime);
+  --color-lime-soft: var(--lime-soft);
+  --color-pill-ink: var(--pill-ink);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-primary: var(--moss);
+  --color-primary-foreground: var(--on-moss);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-tour: var(--tour);
+  --color-glass: var(--glass);
+  --color-dusk: var(--dusk);
+  --color-night: var(--night);
+  --color-ring: var(--ring);
+  --color-ok-bg: var(--ok-bg);
+  --color-ok-fg: var(--ok-fg);
+  --color-warn-bg: var(--warn-bg);
+  --color-warn-fg: var(--warn-fg);
+  --color-err-bg: var(--err-bg);
+  --color-err-fg: var(--err-fg);
+  --color-idle-bg: var(--idle-bg);
+  --color-idle-fg: var(--idle-fg);
+  --radius-card: 22px;
+  --radius-panel: 32px;
+}
+
+:root {
+  /* Exact CourseIt Design Foundations */
+  --font-family-primary: 'Instrument Sans', 'Instrument Sans Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-family-display: 'Familjen Grotesk', 'Familjen Grotesk Fallback', 'Helvetica Neue', Arial, sans-serif;
+  
+  /* CourseIt Core Palette (Light Mode) */
+  --paper: #fcfcfa;
+  --background: #fcfcfa;
+  --foreground: #0f1611;
+  --surface: #ffffff;
+  --card: #ffffff;
+  --card-foreground: #0f1611;
+  --popover: #ffffff;
+  --popover-foreground: #0f1611;
+  --ink: #0f1611;
+  --ink-soft: #4c4c3d;
+  --line: rgba(15, 22, 17, 0.09);
+  --border: rgba(15, 22, 17, 0.09);
+  --moss: #4b5e1e;
+  --moss-dark: #3c4c16;
+  --on-moss: #f6f8ec;
+  --lime: #b8c460;
+  --lime-soft: #e4e9c6;
+  --pill-ink: #0f1611;
+  --muted: #f1f2ea;
+  --muted-foreground: #4c4c3d;
+  --sidebar: #f6f7f1;
+  --sidebar-foreground: #0f1611;
+  --sidebar-accent: #e4e9c6;
+  --sidebar-accent-foreground: #0f1611;
+  --sidebar-border: rgba(15, 22, 17, 0.09);
+  --tour: #f7f8f0;
+  --glass: rgba(255, 255, 255, 0.90);
+  --dusk: #445eb2;
+  --night: #16315c;
+  --peach: #e6a26c;
+  --rose: #caa2a4;
+  --ring: #445eb2;
+
+  --ok-bg: #eef2da;
+  --ok-fg: #4b5e1e;
+  --warn-bg: #f7e9da;
+  --warn-fg: #9a5a22;
+  --err-bg: #f6e1dd;
+  --err-fg: #a0473b;
+  --idle-bg: #ecedf3;
+  --idle-fg: #4e587a;
+
+  --radius: 0.75rem;
+  --radius-card: 22px;
+  --radius-panel: 32px;
+  --radius-full: 9999px;
+  --shadow-subtle: 0px 0px 0px 1px rgba(15, 22, 17, 0.08), 0px 2px 4px rgba(15, 22, 17, 0.04);
+  --shadow-card: 0px 0px 0px 1px rgba(15, 22, 17, 0.08), 0px 4px 12px rgba(15, 22, 17, 0.05);
+  --shadow-float: 0px 0px 0px 1px rgba(15, 22, 17, 0.08), 0px 20px 40px -15px rgba(15, 22, 17, 0.12);
+}
+
+.dark {
+  /* CourseIt Dark Mode Palette matching reference */
+  --paper: #0e1311;
+  --background: #0e1311;
+  --foreground: #f1f3ea;
+  --surface: #161d18;
+  --card: #161d18;
+  --card-foreground: #f1f3ea;
+  --popover: #161d18;
+  --popover-foreground: #f1f3ea;
+  --ink: #f1f3ea;
+  --ink-soft: #b3b7a3;
+  --line: rgba(241, 243, 234, 0.11);
+  --border: rgba(241, 243, 234, 0.11);
+  --moss: #b8c460;
+  --moss-dark: #a6b24f;
+  --on-moss: #0f1611;
+  --lime: #b8c460;
+  --lime-soft: #283117;
+  --pill-ink: #e4e9c6;
+  --muted: #1c231e;
+  --muted-foreground: #b3b7a3;
+  --sidebar: #121815;
+  --sidebar-foreground: #f1f3ea;
+  --sidebar-accent: #283117;
+  --sidebar-accent-foreground: #e4e9c6;
+  --sidebar-border: rgba(241, 243, 234, 0.11);
+  --tour: #121814;
+  --glass: rgba(22, 29, 24, 0.62);
+  --dusk: #7d93e0;
+  --night: #0b1a33;
+  --peach: #e6a26c;
+  --rose: #caa2a4;
+  --ring: #7d93e0;
+
+  --ok-bg: #24301a;
+  --ok-fg: #c9d57a;
+  --warn-bg: #3a2a18;
+  --warn-fg: #f0b47c;
+  --err-bg: #3a1e1a;
+  --err-fg: #f0a497;
+  --idle-bg: #22263a;
+  --idle-fg: #aeb6d6;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-family-primary);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Typography styles matching CourseIt */
+.font-display {
+  font-family: var(--font-family-display);
+}
+
+.text-h1 {
+  font-family: var(--font-family-display);
+  font-size: clamp(2.5rem, 6vw, 4.2rem);
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.text-h2 {
+  font-family: var(--font-family-display);
+  font-size: clamp(2rem, 4.5vw, 2.9rem);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.text-h3 {
+  font-family: var(--font-family-display);
+  font-size: 1.35rem;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.text-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.text-moss {
+  color: var(--moss);
+}
+
+.text-on-moss {
+  color: var(--on-moss);
+}
+
+.text-ink {
+  color: var(--ink);
+}
+
+.text-ink-soft {
+  color: var(--ink-soft);
+}
+
+.text-pill-ink {
+  color: var(--pill-ink);
+}
+
+.bg-moss {
+  background-color: var(--moss);
+}
+
+.bg-moss-dark {
+  background-color: var(--moss-dark);
+}
+
+.bg-lime-soft {
+  background-color: var(--lime-soft);
+}
+
+.bg-lime {
+  background-color: var(--lime);
+}
+
+.bg-paper {
+  background-color: var(--paper);
+}
+
+.bg-surface {
+  background-color: var(--surface);
+}
+
+.bg-sidebar {
+  background-color: var(--sidebar);
+}
+
+.bg-tour {
+  background-color: var(--tour);
+}
+
+.bg-ok-bg {
+  background-color: var(--ok-bg);
+}
+
+.text-ok-fg {
+  color: var(--ok-fg);
+}
+
+.bg-warn-bg {
+  background-color: var(--warn-bg);
+}
+
+.text-warn-fg {
+  color: var(--warn-fg);
+}
+
+.bg-err-bg {
+  background-color: var(--err-bg);
+}
+
+.text-err-fg {
+  color: var(--err-fg);
+}
+
+.border-line {
+  border-color: var(--line);
+}
+
+.border-sidebar {
+  border-color: var(--sidebar-border);
+}
+
+.rounded-card {
+  border-radius: 22px;
+}
+
+.rounded-panel {
+  border-radius: 32px;
+}
+
+.shadow-blue {
+  box-shadow: 0 40px 80px -30px rgba(22, 49, 92, 0.45), 0 0 0 1px var(--line);
+}
+
+/* Float Square frosted badges in Hero and CTA */
+.float-square {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 9px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: 7s ease-in-out infinite float;
+  pointer-events: none;
+  z-index: 10;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Glass styling */
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--line);
+  box-shadow: 0 30px 60px -25px rgba(22, 49, 92, 0.35);
+}
+
+/* CourseIt Button Styles */
+.btn-moss {
+  background-color: var(--moss);
+  color: var(--on-moss);
+  border-radius: 9999px;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  font-weight: 500;
+}
+
+.btn-moss:hover {
+  background-color: var(--moss-dark);
+  transform: translateY(-1px);
+}
+
+.btn-outline-pill {
+  background-color: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 9999px;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  font-weight: 500;
+}
+
+.btn-outline-pill:hover {
+  background-color: var(--muted);
+}
+
+/* CourseIt Card Styles */
+.courseit-card {
+  background-color: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: var(--shadow-subtle);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.courseit-card:hover {
+  border-color: var(--moss);
+  box-shadow: var(--shadow-card);
+  transform: translateY(-2px);
+}
+
+/* Floating Glass Panel */
+.courseit-glass {
+  background: var(--glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--line);
+  border-radius: 1.5rem;
+  box-shadow: var(--shadow-float);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-soft);
+}
+
+/* Comprehensive Dark Mode Fallbacks for elements across all pages */
+.dark body {
+  background-color: var(--background) !important;
+  color: var(--foreground) !important;
+}
+
+.dark .bg-\[\#fcfcfa\],
+.dark .bg-\[\#fcfcfa\]\/90,
+.dark .bg-\[\#fcfcfa\]\/80 {
+  background-color: var(--paper) !important;
+}
+
+.dark .bg-white,
+.dark .bg-white\/80,
+.dark .bg-white\/90 {
+  background-color: var(--surface) !important;
+}
+
+.dark .bg-\[\#f6f7f1\] {
+  background-color: var(--sidebar) !important;
+}
+
+.dark .text-\[\#0f1611\]:not(:is(footer, footer *, [class*="bg-[#b8c460]"], [class*="bg-[#b8c460]"] *, .bg-lime, .bg-lime *)) {
+  color: var(--ink) !important;
+}
+
+.dark .text-\[\#4c4c3d\]:not(:is(footer, footer *, [class*="bg-[#b8c460]"], [class*="bg-[#b8c460]"] *, .bg-lime, .bg-lime *)) {
+  color: var(--ink-soft) !important;
+}
+
+.dark [class*="bg-[#b8c460]"]:not(button),
+.dark [class*="bg-[#b8c460]"] h1,
+.dark [class*="bg-[#b8c460]"] h2,
+.dark [class*="bg-[#b8c460]"] h3,
+.dark [class*="bg-[#b8c460]"] > span,
+.dark [class*="bg-[#b8c460]"] > div,
+.dark [class*="bg-[#b8c460]"] p,
+button.bg-\[\#b8c460\],
+a.bg-\[\#b8c460\],
+.dark button.bg-\[\#b8c460\],
+.dark a.bg-\[\#b8c460\],
+.dark .bg-\[\#b8c460\] button {
+  color: #0f1611 !important;
+}
+
+.dark .border-\[\#0f1611\]\/10:not(:is(footer, footer *)),
+.dark .border-\[\#0f1611\]\/15:not(:is(footer, footer *)),
+.dark .border-\[\#0f1611\]\/20:not(:is(footer, footer *)),
+.dark .divide-\[\#0f1611\]\/10:not(:is(footer, footer *)) > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--line) !important;
+}
+
+.dark .bg-black\/5 {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.dark .hover\:bg-black\/5:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.dark .bg-\[\#e4e9c6\] {
+  background-color: var(--lime-soft) !important;
+  color: var(--pill-ink) !important;
+}
+
+.dark .text-\[\#4b5e1e\] {
+  color: var(--moss) !important;
+}
+
+.dark .bg-\[\#4b5e1e\] {
+  background-color: var(--moss) !important;
+  color: var(--on-moss) !important;
+}
+
+.dark .hover\:bg-\[\#3c4c16\]:hover {
+  background-color: var(--moss-dark) !important;
+}
+
+.dark .hover\:bg-\[\#f1f2ea\]:hover {
+  background-color: var(--muted) !important;
+}
+
+.dark input:not([class*="bg-transparent"]):not(.bg-transparent),
+.dark textarea:not([class*="bg-transparent"]):not(.bg-transparent),
+.dark select:not([class*="bg-transparent"]):not(.bg-transparent) {
+  color: var(--ink);
+  background-color: var(--surface);
+  border-color: var(--line);
+}
+
+input.bg-transparent,
+.dark input.bg-transparent,
+input[class*="bg-transparent"],
+.dark input[class*="bg-transparent"] {
+  background-color: transparent !important;
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Footer text and elements must ALWAYS stay black/dark ink (#0f1611) on the lime background */
+html footer,
+html.dark footer {
+  background-color: #b8c460 !important;
+  color: #0f1611 !important;
+}
+
+html footer *,
+html.dark footer * {
+  border-color: rgba(15, 22, 17, 0.2);
+}
+
+html footer a,
+html footer p,
+html footer span,
+html footer h2,
+html footer li,
+html footer svg,
+html.dark footer a,
+html.dark footer p,
+html.dark footer span,
+html.dark footer h2,
+html.dark footer li,
+html.dark footer svg {
+  color: #0f1611 !important;
+  fill: #0f1611 !important;
+}
+
+/* Secondary opacity text in footer */
+html footer p,
+html footer li a,
+html footer .text-\[\#0f1611\]\/75,
+html footer div.mt-14 span,
+html.dark footer p,
+html.dark footer li a,
+html.dark footer .text-\[\#0f1611\]\/75,
+html.dark footer div.mt-14 span {
+  color: rgba(15, 22, 17, 0.75) !important;
+}
+
+html footer h2,
+html footer .font-medium,
+html footer a:hover,
+html footer li a:hover,
+html.dark footer h2,
+html.dark footer .font-medium,
+html.dark footer a:hover,
+html.dark footer li a:hover {
+  color: #0f1611 !important;
+}
+
+/* Button CTA in footer */
+html footer a.bg-\[\#0f1611\],
+html footer a.bg-\[\#0f1611\]:hover,
+html.dark footer a.bg-\[\#0f1611\],
+html.dark footer a.bg-\[\#0f1611\]:hover {
+  background-color: #0f1611 !important;
+  color: #b8c460 !important;
+}
+
+html footer a.bg-\[\#0f1611\] svg,
+html.dark footer a.bg-\[\#0f1611\] svg {
+  color: #b8c460 !important;
+  fill: none !important;
+  stroke: #b8c460 !important;
+}
+
+/* Social icons in footer */
+html footer .bg-\[\#0f1611\]\/10,
+html.dark footer .bg-\[\#0f1611\]\/10 {
+  background-color: rgba(15, 22, 17, 0.1) !important;
+  color: #0f1611 !important;
+}
+
+html footer .bg-\[\#0f1611\]\/10 svg,
+html.dark footer .bg-\[\#0f1611\]\/10 svg {
+  color: #0f1611 !important;
+  fill: currentColor !important;
+}
+
+html footer .bg-\[\#0f1611\]\/10:hover,
+html.dark footer .bg-\[\#0f1611\]\/10:hover {
+  background-color: #0f1611 !important;
+  color: #b8c460 !important;
+}
+
+html footer .bg-\[\#0f1611\]\/10:hover svg,
+html.dark footer .bg-\[\#0f1611\]\/10:hover svg {
+  color: #b8c460 !important;
+  fill: currentColor !important;
+}
+
+/* Footer bottom border */
+html footer .border-\[\#0f1611\]\/20,
+html.dark footer .border-\[\#0f1611\]\/20 {
+  border-color: rgba(15, 22, 17, 0.2) !important;
+}
