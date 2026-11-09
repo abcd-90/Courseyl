@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -9,6 +9,42 @@ import { LandscapeIllustration } from "@/components/LandscapeHero";
 export default function DashboardPage() {
   const router = useRouter();
   const [url, setUrl] = useState("");
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [myCourses, setMyCourses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // 1. Fetch live authenticated user
+    fetch("/api/auth/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.authenticated && data.user) {
+          setCurrentUser(data.user);
+        }
+      })
+      .catch(() => {});
+
+    // 2. Fetch live enrolled courses
+    fetch("/api/courses?enrolled=true")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.courses && data.courses.length > 0) {
+          setMyCourses(data.courses);
+        } else {
+          // Fallback: fetch available community courses so dashboard has courses to explore
+          fetch("/api/courses?limit=4")
+            .then((r) => r.json())
+            .then((d) => {
+              if (d.courses && d.courses.length > 0) {
+                setMyCourses(d.courses);
+              }
+            })
+            .catch(() => {});
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   const handleGenerate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,6 +54,12 @@ export default function DashboardPage() {
     }
     router.push(`/generate?url=${encodeURIComponent(url.trim())}`);
   };
+
+  const displayName =
+    currentUser?.profile?.displayName ||
+    currentUser?.email?.split("@")[0] ||
+    "12.";
+  const streakDays = currentUser?.profile?.currentStreakDays || 1;
 
   const sampleCourses = [
     {
@@ -95,7 +137,7 @@ export default function DashboardPage() {
               </div>
 
               <h1 className="text-xl sm:text-2xl md:text-[2rem] font-display font-bold text-white tracking-tight leading-snug">
-                What should we learn, <span className="text-[#b8c460]">12.?</span>
+                What should we learn, <span className="text-[#b8c460]">{displayName}?</span>
               </h1>
 
               <form onSubmit={handleGenerate} className="mt-2">
@@ -132,9 +174,11 @@ export default function DashboardPage() {
               <span>STREAK</span>
             </span>
             <div className="my-auto py-1">
-              <h3 className="text-xl sm:text-3xl md:text-4xl font-display font-bold leading-tight whitespace-nowrap">2 days</h3>
+              <h3 className="text-xl sm:text-3xl md:text-4xl font-display font-bold leading-tight whitespace-nowrap">
+                {streakDays} {streakDays === 1 ? "day" : "days"}
+              </h3>
               <p className="text-[0.62rem] sm:text-[0.68rem] text-[#0f1611]/80 mt-1 leading-tight">
-                Today counts. Come back tomorrow for 3.
+                Today counts. Come back tomorrow for {streakDays + 1}.
               </p>
             </div>
             {/* Notch connector on right edge */}
@@ -197,70 +241,51 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-            {/* Course 1: Jon Krohn's Agentic AI Course */}
-            <Link
-              href="/courses/agentic-ai-engineering-workshop"
-              className="group bg-surface dark:bg-[#0c120e] rounded-2xl border border-line dark:border-white/10 p-3 shadow-xs hover:border-moss/40 hover:shadow-md transition-all flex flex-col text-ink w-full"
-            >
-              <div className="relative aspect-video rounded-xl overflow-hidden bg-black">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="https://i.ytimg.com/vi/LSk5KaEGVK4/maxresdefault.jpg"
-                  alt="Agentic AI Engineering"
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-                <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/85 text-white text-[0.65rem] font-semibold flex items-center gap-1.5 backdrop-blur-xs">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#f97316] animate-pulse" />
-                  <span>In progress</span>
-                </div>
-              </div>
+            {myCourses.length > 0 ? (
+              myCourses.slice(0, 3).map((c: any) => (
+                <Link
+                  key={c.id || c.slug}
+                  href={`/courses/${c.slug}`}
+                  className="group bg-surface dark:bg-[#0c120e] rounded-2xl border border-line dark:border-white/10 p-3 shadow-xs hover:border-moss/40 hover:shadow-md transition-all flex flex-col text-ink w-full"
+                >
+                  <div className="relative aspect-video rounded-xl overflow-hidden bg-black">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={c.thumbnailUrl || "https://i.ytimg.com/vi/LSk5KaEGVK4/maxresdefault.jpg"}
+                      alt={c.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/85 text-white text-[0.65rem] font-semibold flex items-center gap-1.5 backdrop-blur-xs">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#f97316] animate-pulse" />
+                      <span>{c.progressPercentage && c.progressPercentage > 0 ? "In progress" : "Start now"}</span>
+                    </div>
+                  </div>
 
-              <div className="pt-3 pb-1 px-1 space-y-1.5">
-                <h3 className="text-sm font-bold text-ink line-clamp-2 group-hover:text-moss transition-colors leading-snug">
-                  Agentic AI Engineering: Complete 4-Hour Worksho...
-                </h3>
-                <p className="text-[0.68rem] font-bold text-ink-soft tracking-wider uppercase font-mono">
-                  0 OF 13 LESSONS · 102 MIN A DAY
-                </p>
-                <div className="pt-1 flex items-center justify-between text-xs text-ink-soft border-t border-line dark:border-white/5">
-                  <span className="truncate max-w-[200px]">Next: Workshop Overview &amp; Agent Def...</span>
-                  <span className="font-semibold text-moss">0%</span>
-                </div>
+                  <div className="pt-3 pb-1 px-1 space-y-1.5">
+                    <h3 className="text-sm font-bold text-ink line-clamp-2 group-hover:text-moss transition-colors leading-snug">
+                      {c.title}
+                    </h3>
+                    <p className="text-[0.68rem] font-bold text-ink-soft tracking-wider uppercase font-mono">
+                      {c.lessonCount ? `0 OF ${c.lessonCount} LESSONS` : "13 LESSONS"} · {c.duration || "90 MIN"}
+                    </p>
+                    <div className="pt-1 flex items-center justify-between text-xs text-ink-soft border-t border-line dark:border-white/5">
+                      <span className="truncate max-w-[200px]">{c.creator || "Instructor"}</span>
+                      <span className="font-semibold text-moss">{c.progressPercentage || 0}%</span>
+                    </div>
+                  </div>
+                </Link>
+              ))
+            ) : (
+              <div className="col-span-full py-8 text-center bg-surface/50 rounded-2xl border border-line dark:border-white/5">
+                <p className="text-sm text-ink-soft">You have not started any courses yet.</p>
+                <Link
+                  href="/generate"
+                  className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-moss hover:underline"
+                >
+                  + Generate a course from a YouTube link →
+                </Link>
               </div>
-            </Link>
-
-            {/* Course 2: Dave Ebbelaar's Full-Stack AI Course */}
-            <Link
-              href="/courses/full-stack-ai-engineering-course/learn/lsn_ebb_1"
-              className="group bg-surface dark:bg-[#0c120e] rounded-2xl border border-line dark:border-white/10 p-3 shadow-xs hover:border-moss/40 hover:shadow-md transition-all flex flex-col text-ink w-full"
-            >
-              <div className="relative aspect-video rounded-xl overflow-hidden bg-black">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="https://i.ytimg.com/vi/XzjSx7u9mGw/maxresdefault.jpg"
-                  alt="Full-Stack AI Engineering Course"
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-                {/* • In progress badge matching Screenshot 3 */}
-                <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/85 text-white text-[0.65rem] font-semibold flex items-center gap-1.5 backdrop-blur-xs">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#f97316] animate-pulse" />
-                  <span>In progress</span>
-                </div>
-              </div>
-
-              <div className="pt-3 pb-1 px-1 space-y-1.5">
-                <h3 className="text-sm font-bold text-ink line-clamp-2 group-hover:text-moss transition-colors leading-snug">
-                  Full-Stack AI Engineering Course (FastAPI, LLMs,...
-                </h3>
-                <p className="text-[0.68rem] font-bold text-ink-soft tracking-wider uppercase font-mono">
-                  0 OF 14 LESSONS · 90 MIN A DAY
-                </p>
-                <div className="pt-1 flex items-center justify-between text-xs text-ink-soft border-t border-line dark:border-white/5">
-                  <span className="truncate max-w-[200px]">Next: Course Introduction &amp; Project...</span>
-                  <span className="font-semibold text-moss">0%</span>
-                </div>
-              </div>
-            </Link>
+            )}
           </div>
         </div>
 

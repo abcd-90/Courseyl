@@ -10,64 +10,25 @@ export default function MyCoursesPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch user enrolled courses from API / courses
-    fetch("/api/courses")
+    // Fetch live user enrolled courses
+    fetch("/api/courses?enrolled=true")
       .then((res) => res.json())
       .then((data) => {
         if (data.courses && data.courses.length > 0) {
-          const userEnrolled = data.courses.filter(
-            (c: any) =>
-              c.slug === "full-stack-ai-engineering-course" ||
-              c.slug === "agentic-ai-engineering-workshop" ||
-              c.slug === "best-python-ai-full-course-mayank-aggarwal" ||
-              c.id === "crs_jhiu0gwjmw91bzjv" ||
-              c.id === "crs_krohn_agentic_ai" ||
-              c.id === "crs_mayank_python_ai"
-          );
-
-          if (userEnrolled.length > 0) {
-            setCourses(userEnrolled);
-          } else {
-            setCourses([
-              {
-                id: "crs_jhiu0gwjmw91bzjv",
-                slug: "full-stack-ai-engineering-course",
-                title: "Full-Stack AI Engineering Course (FastAPI, LLMs, Docker, Supabase)",
-                creator: "Dave Ebbelaar",
-                duration: "3h 10m",
-                thumbnailUrl: "https://i.ytimg.com/vi/XzjSx7u9mGw/maxresdefault.jpg",
-                lessonCount: 14,
-              },
-            ]);
-          }
+          setCourses(data.courses);
         } else {
-          // Default to enrolled sample course matching Screenshot 2
-          setCourses([
-            {
-              id: "crs_jhiu0gwjmw91bzjv",
-              slug: "full-stack-ai-engineering-course",
-              title: "Full-Stack AI Engineering Course (FastAPI, LLMs, Docker, Supabase)",
-              creator: "Dave Ebbelaar",
-              duration: "3h 10m",
-              thumbnailUrl: "https://i.ytimg.com/vi/XzjSx7u9mGw/maxresdefault.jpg",
-              lessonCount: 14,
-            },
-          ]);
+          // Fallback: fetch public community courses so the page has rich content
+          fetch("/api/courses?limit=6")
+            .then((r) => r.json())
+            .then((d) => {
+              if (d.courses && d.courses.length > 0) {
+                setCourses(d.courses.slice(0, 2));
+              }
+            })
+            .catch(() => {});
         }
       })
-      .catch(() => {
-        setCourses([
-          {
-            id: "crs_jhiu0gwjmw91bzjv",
-            slug: "full-stack-ai-engineering-course",
-            title: "Full-Stack AI Engineering Course (FastAPI, LLMs, Docker, Supabase)",
-            creator: "Dave Ebbelaar",
-            duration: "3h 10m",
-            thumbnailUrl: "https://i.ytimg.com/vi/XzjSx7u9mGw/maxresdefault.jpg",
-            lessonCount: 14,
-          },
-        ]);
-      })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 

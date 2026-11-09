@@ -235,12 +235,38 @@ export function AppSidebar() {
         <div className="bg-surface dark:bg-[#121a15] rounded-2xl border border-line dark:border-white/10 p-3.5 space-y-2 shadow-xs">
           <div className="flex items-center justify-between text-xs font-medium">
             <span className="text-ink">Hours left</span>
-            <span className="text-ink-soft font-mono">1h 25m / 5h</span>
+            <span className="text-ink-soft font-mono">
+              {currentUser?.subscription
+                ? `${Math.max(0, 5 - Math.floor((currentUser.subscription.monthlyHoursUsedSeconds || 0) / 3600))}h / 5h`
+                : "5h / 5h"}
+            </span>
           </div>
           <div className="w-full bg-lime-soft dark:bg-[#1a2517] h-1.5 rounded-full overflow-hidden">
-            <div className="bg-moss dark:bg-[#b8c460] h-full w-[28%] rounded-full" />
+            <div
+              className="bg-moss dark:bg-[#b8c460] h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${
+                  currentUser?.subscription
+                    ? Math.max(
+                        5,
+                        100 -
+                          Math.min(
+                            100,
+                            Math.round(
+                              ((currentUser.subscription.monthlyHoursUsedSeconds || 0) / (5 * 3600)) * 100
+                            )
+                          )
+                      )
+                    : 100
+                }%`,
+              }}
+            />
           </div>
-          <p className="text-[0.7rem] text-ink-soft/80">Courses up to 5h · renews 8 Dec</p>
+          <p className="text-[0.7rem] text-ink-soft/80">
+            {currentUser?.subscription?.tier === "PRO" || currentUser?.subscription?.tier === "MAX"
+              ? `${currentUser.subscription.tier} plan active · Unlimited courses`
+              : "Courses up to 5h · Free tier"}
+          </p>
         </div>
 
         {/* EXPLORE Section */}

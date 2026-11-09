@@ -266,7 +266,7 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col md:flex-row bg-paper text-ink">
+      <div className="min-h-screen flex flex-col lg:flex-row bg-paper text-ink">
         <AppSidebar />
         <div className="flex-1 flex items-center justify-center p-12 text-sm text-ink-soft">
           <div className="flex items-center gap-3">
@@ -280,7 +280,7 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
 
   if (!data?.roadmap) {
     return (
-      <div className="min-h-screen flex flex-col md:flex-row bg-paper text-ink">
+      <div className="min-h-screen flex flex-col lg:flex-row bg-paper text-ink">
         <AppSidebar />
         <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
           <h2 className="text-xl font-bold text-ink">Roadmap not found</h2>
@@ -307,7 +307,7 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
   );
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-paper text-ink w-full overflow-x-hidden">
+    <div className="min-h-screen flex flex-col lg:flex-row bg-paper text-ink w-full overflow-x-hidden">
       {/* Left Application Shell Sidebar */}
       <AppSidebar />
 

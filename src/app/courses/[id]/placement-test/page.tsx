@@ -51,7 +51,7 @@ export default function PlacementTestPage({ params }: { params: Promise<{ id: st
 
   if (loading) {
     return (
-      <div className="min-h-screen flex bg-paper text-ink">
+      <div className="min-h-screen flex flex-col lg:flex-row bg-paper text-ink">
         <AppSidebar />
         <div className="flex-1 flex items-center justify-center p-12 text-sm text-ink-soft">
           Preparing diagnostic assessment...
@@ -63,7 +63,7 @@ export default function PlacementTestPage({ params }: { params: Promise<{ id: st
   const courseSlug = resolvedParams.id;
 
   return (
-    <div className="min-h-screen flex bg-paper text-ink">
+    <div className="min-h-screen flex flex-col lg:flex-row bg-paper text-ink">
       <AppSidebar />
 
       <main className="flex-1 p-6 md:p-8 overflow-y-auto max-w-4xl">
