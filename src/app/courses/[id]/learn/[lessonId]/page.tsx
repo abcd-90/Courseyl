@@ -180,14 +180,14 @@ export default function LessonLearnPage({
   const dayLessons = selectedChapter?.lessons || [];
 
   return (
-    <div className="min-h-screen flex bg-paper text-ink">
+    <div className="min-h-screen flex flex-col md:flex-row bg-paper text-ink w-full overflow-x-hidden">
       {/* Left Application Sidebar */}
       <AppSidebar />
 
       {/* Main Lesson Player Container */}
-      <main className="flex-1 min-h-screen flex flex-col overflow-y-auto">
+      <main className="w-full min-w-0 flex-1 min-h-screen flex flex-col overflow-y-auto">
         {/* Top Header Bar matching Screenshot 1 */}
-        <header className="h-14 px-5 sm:px-8 border-b border-line dark:border-white/5 flex items-center justify-between shrink-0 bg-paper sticky top-0 z-20">
+        <header className="h-14 px-4 sm:px-8 border-b border-line dark:border-white/5 flex items-center justify-between shrink-0 bg-paper sticky top-0 z-20">
           <Link
             href={`/courses/${courseSlug}`}
             className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-ink-soft hover:text-ink transition-colors truncate max-w-xl"
@@ -200,7 +200,7 @@ export default function LessonLearnPage({
             {/* Mark as completed CTA */}
             <button
               onClick={handleMarkComplete}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold transition-all shadow-xs cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs font-semibold transition-all shadow-xs cursor-pointer ${
                 completed
                   ? "bg-[#25321d] text-[#b8c460] border border-[#3b4e28]"
                   : "bg-[#b8c460] text-[#0f1611] hover:bg-[#a6b350]"
@@ -232,16 +232,16 @@ export default function LessonLearnPage({
           </div>
         </header>
 
-        {/* 2-Column Learning Workspace matching Screenshot 1 */}
-        <div className="flex-1 p-5 sm:p-8 max-w-[1500px] w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* 2-Column Learning Workspace */}
+        <div className="flex-1 p-4 sm:p-6 md:p-8 max-w-[1500px] w-full min-w-0 mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
           {/* Left Column: Video, Creator & Notes (8 cols) */}
-          <div className="lg:col-span-8 flex flex-col space-y-6">
+          <div className="lg:col-span-8 min-w-0 w-full flex flex-col space-y-5">
             {/* Video Player Card */}
             <div className="bg-surface dark:bg-[#090e0b] rounded-3xl border border-line dark:border-white/10 overflow-hidden shadow-md">
               <div className="relative aspect-video bg-black">
                 <iframe
                   ref={iframeRef}
-                  src={`https://www.youtube.com/embed/${lesson?.youtubeVideoId || "XzjSx7u9mGw"}?start=${lesson?.startSeconds || 0}&autoplay=0&enablejsapi=1&rel=0`}
+                  src={`https://www.youtube.com/embed/${lesson?.youtubeVideoId || "J9BI0jGOds8"}?start=${lesson?.startSeconds || 0}&autoplay=0&enablejsapi=1&rel=0`}
                   title={lesson?.title || "Lesson Video"}
                   className="w-full h-full border-0"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -298,17 +298,17 @@ export default function LessonLearnPage({
               </div>
             </div>
 
-            {/* YouTube Embed Restriction Notice & Quick Direct Link */}
+            {/* YouTube Embed Restriction Notice & Direct YouTube Link */}
             <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200">
               <div className="flex items-center gap-2">
                 <span>⚠️</span>
-                <span>If YouTube shows &quot;Playback on other websites has been disabled&quot;:</span>
+                <span>If video says &quot;Playback on other websites has been disabled by video owner&quot;:</span>
               </div>
               <a
-                href={`https://www.youtube.com/watch?v=${lesson?.youtubeVideoId || "XzjSx7u9mGw"}&t=${lesson?.startSeconds || 0}s`}
+                href={`https://www.youtube.com/watch?v=${lesson?.youtubeVideoId || "J9BI0jGOds8"}&t=${lesson?.startSeconds || 0}s`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400 text-[#0f1611] font-bold text-xs hover:bg-amber-300 transition-colors shadow-xs"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-amber-400 text-[#0f1611] font-bold text-xs hover:bg-amber-300 transition-colors shadow-xs"
               >
                 <span>Watch on YouTube at {formatTime(lesson?.startSeconds || 0)}</span>
                 <span>↗</span>
@@ -505,9 +505,9 @@ export default function LessonLearnPage({
           </div>
 
           {/* Right Column: Course Syllabus & Study Tools (4 cols) */}
-          <div className="lg:col-span-4 flex flex-col space-y-6">
-            {/* Syllabus Card matching Screenshot 1 */}
-            <div className="bg-surface dark:bg-[#0c120e] rounded-3xl border border-line dark:border-white/10 p-5 shadow-sm space-y-4">
+          <div className="lg:col-span-4 min-w-0 w-full flex flex-col space-y-6">
+            {/* Syllabus Card */}
+            <div className="bg-surface dark:bg-[#0c120e] rounded-3xl border border-line dark:border-white/10 p-5 shadow-sm space-y-4 w-full min-w-0 overflow-hidden">
               <div>
                 <h3 className="text-sm font-bold text-ink truncate leading-tight">
                   {courseTitle}
@@ -517,27 +517,33 @@ export default function LessonLearnPage({
                 </p>
               </div>
 
-              {/* Day Pills matching Screenshot 1 */}
-              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1">
-                {chapters.map((ch, idx) => (
-                  <button
-                    key={ch.id || idx}
-                    onClick={() => setSelectedDayIndex(idx)}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
-                      selectedDayIndex === idx
-                        ? "bg-[#28381a] text-[#b8c460] border border-[#3e5628] shadow-xs"
-                        : "bg-surface dark:bg-[#151c17] text-ink-soft border border-line dark:border-white/10 hover:text-ink hover:border-moss/40"
-                    }`}
-                  >
-                    Day {idx + 1} {selectedDayIndex === idx ? "•" : ""}
-                  </button>
-                ))}
+              {/* Day Pills Bar with Horizontal Scroll Snap */}
+              <div className="w-full min-w-0 flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-2 scroll-smooth">
+                {chapters.map((ch, idx) => {
+                  const isSelected = selectedDayIndex === idx;
+                  return (
+                    <button
+                      key={ch.id || idx}
+                      onClick={() => setSelectedDayIndex(idx)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+                        isSelected
+                          ? "bg-[#28381a] text-[#b8c460] border border-[#3e5628] shadow-xs"
+                          : "bg-surface dark:bg-[#151c17] text-ink-soft border border-line dark:border-white/10 hover:text-ink hover:border-moss/40"
+                      }`}
+                    >
+                      Day {idx + 1} {isSelected ? "•" : ""}
+                    </button>
+                  );
+                })}
               </div>
 
-              {/* Selected Day Name / Topic Subtitle */}
+              {/* Selected Day Name / Topic Subtitle Focus Card */}
               {chapters[selectedDayIndex]?.title && (
-                <div className="px-1 -mt-2">
-                  <p className="text-[0.72rem] text-ink-soft font-medium truncate">
+                <div className="px-3 py-2 rounded-xl bg-black/5 dark:bg-[#141d16] border border-line dark:border-white/5">
+                  <span className="text-[0.65rem] uppercase tracking-wider font-mono text-[#b8c460] font-bold block">
+                    Day {selectedDayIndex + 1} Focus
+                  </span>
+                  <p className="text-xs text-ink font-medium truncate mt-0.5">
                     {chapters[selectedDayIndex].title.replace(/^Day\s*\d+\s*[\(:]?/, "").replace(/\)$/, "").trim() || chapters[selectedDayIndex].title}
                   </p>
                 </div>

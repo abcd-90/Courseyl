@@ -12,20 +12,25 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
 
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [courseUrl, setCourseUrl] = useState("");
-  const [isAddingCourse, setIsAddingCourse] = useState(false);
-  const [buildingStatus, setBuildingStatus] = useState<string | null>(null);
+  const [courseUrlMap, setCourseUrlMap] = useState<Record<string, string>>({});
+  const [addingCourseStageId, setAddingCourseStageId] = useState<string | null>(null);
 
-  // Interactivity states for editing & sharing
+  // Modals & Interactivity states
+  const [showShareModal, setShowShareModal] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [titleDraft, setTitleDraft] = useState("");
-  const [isSavingTitle, setIsSavingTitle] = useState(false);
 
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const [descriptionDraft, setDescriptionDraft] = useState("");
+  const [isSavingRoadmap, setIsSavingRoadmap] = useState(false);
+  const [isDeletingRoadmap, setIsDeletingRoadmap] = useState(false);
+
+  // Stage editing states
   const [editingStageId, setEditingStageId] = useState<string | null>(null);
   const [stageTitleDraft, setStageTitleDraft] = useState("");
   const [isSavingStage, setIsSavingStage] = useState(false);
   const [isAddingStage, setIsAddingStage] = useState(false);
+  const [deletingStageId, setDeletingStageId] = useState<string | null>(null);
 
   const fetchRoadmap = () => {
     fetch(`/api/roadmaps/${id}`)
@@ -37,6 +42,7 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
         setData(d);
         if (d?.roadmap?.title) {
           setTitleDraft(d.roadmap.title);
+          setDescriptionDraft(d.roadmap.description || "");
         }
         setLoading(false);
       })
@@ -67,40 +73,74 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
-  const handleShare = () => {
+  const getShareUrl = () => {
     if (typeof window !== "undefined") {
-      const url = window.location.href;
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(url).catch(() => {
-          fallbackCopyText(url);
-        });
-      } else {
-        fallbackCopyText(url);
-      }
-      setShareCopied(true);
-      setTimeout(() => setShareCopied(false), 2500);
+      return window.location.href;
     }
+    return `https://courseyl.vercel.app/roadmaps/${id}`;
   };
 
-  const handleSaveTitle = async () => {
+  const handleShareClick = () => {
+    setShowShareModal(true);
+    handleCopyLink();
+  };
+
+  const handleCopyLink = () => {
+    const url = getShareUrl();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).catch(() => {
+        fallbackCopyText(url);
+      });
+    } else {
+      fallbackCopyText(url);
+    }
+    setShareCopied(true);
+    setTimeout(() => setShareCopied(false), 2500);
+  };
+
+  const handleSaveRoadmap = async () => {
     if (!titleDraft.trim()) return;
-    setIsSavingTitle(true);
+    setIsSavingRoadmap(true);
     try {
       const res = await fetch(`/api/roadmaps/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: titleDraft.trim() }),
+        body: JSON.stringify({
+          title: titleDraft.trim(),
+          description: descriptionDraft.trim(),
+        }),
       });
       if (res.ok) {
-        setIsEditingTitle(false);
+        setShowEditModal(false);
         fetchRoadmap();
       } else {
-        alert("Failed to update roadmap title.");
+        alert("Failed to update roadmap.");
       }
     } catch {
-      alert("Failed to update roadmap title.");
+      alert("Failed to update roadmap.");
     } finally {
-      setIsSavingTitle(false);
+      setIsSavingRoadmap(false);
+    }
+  };
+
+  const handleDeleteRoadmap = async () => {
+    if (!confirm("Are you sure you want to permanently delete this roadmap? This action cannot be undone.")) {
+      return;
+    }
+    setIsDeletingRoadmap(true);
+    try {
+      const res = await fetch(`/api/roadmaps/${id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        router.push("/roadmaps");
+      } else {
+        alert("Failed to delete roadmap.");
+      }
+    } catch {
+      alert("Failed to delete roadmap.");
+    } finally {
+      setIsDeletingRoadmap(false);
     }
   };
 
@@ -130,7 +170,10 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
   };
 
   const handleDeleteStage = async (stageId: string) => {
-    if (!confirm("Are you sure you want to delete this stage?")) return;
+    if (!confirm("Are you sure you want to delete this stage? All courses in this stage will be removed from the roadmap.")) {
+      return;
+    }
+    setDeletingStageId(stageId);
     try {
       const res = await fetch(`/api/roadmaps/${id}/stages`, {
         method: "DELETE",
@@ -144,6 +187,8 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
       }
     } catch {
       alert("Failed to delete stage.");
+    } finally {
+      setDeletingStageId(null);
     }
   };
 
@@ -167,10 +212,10 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
 
   const handleAddCourse = async (e: React.FormEvent, stageId: string) => {
     e.preventDefault();
-    if (!courseUrl.trim()) return;
+    const url = (courseUrlMap[stageId] || "").trim();
+    if (!url) return;
 
-    setIsAddingCourse(true);
-    setBuildingStatus("Building");
+    setAddingCourseStageId(stageId);
 
     try {
       const res = await fetch(`/api/roadmaps/${id}/courses`, {
@@ -178,30 +223,26 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           stageId,
-          url: courseUrl.trim(),
+          url,
         }),
       });
 
       if (res.ok) {
-        setCourseUrl("");
+        setCourseUrlMap((prev) => ({ ...prev, [stageId]: "" }));
         fetchRoadmap();
-        setTimeout(() => {
-          setBuildingStatus(null);
-        }, 3000);
       } else {
         const err = await res.json();
         alert(err.error || "Failed to add course.");
-        setBuildingStatus(null);
       }
     } catch {
       alert("Failed to add course.");
-      setBuildingStatus(null);
     } finally {
-      setIsAddingCourse(false);
+      setAddingCourseStageId(null);
     }
   };
 
   const handleRemoveCourse = async (stageId: string, courseId: string) => {
+    if (!confirm("Remove this course from this stage?")) return;
     try {
       const res = await fetch(`/api/roadmaps/${id}/courses`, {
         method: "DELETE",
@@ -225,10 +266,13 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
 
   if (loading) {
     return (
-      <div className="min-h-screen flex bg-paper text-ink">
+      <div className="min-h-screen flex flex-col md:flex-row bg-paper text-ink">
         <AppSidebar />
         <div className="flex-1 flex items-center justify-center p-12 text-sm text-ink-soft">
-          Loading roadmap...
+          <div className="flex items-center gap-3">
+            <div className="w-5 h-5 border-2 border-moss border-t-transparent rounded-full animate-spin" />
+            <span>Loading roadmap...</span>
+          </div>
         </div>
       </div>
     );
@@ -236,7 +280,7 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
 
   if (!data?.roadmap) {
     return (
-      <div className="min-h-screen flex bg-paper text-ink">
+      <div className="min-h-screen flex flex-col md:flex-row bg-paper text-ink">
         <AppSidebar />
         <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
           <h2 className="text-xl font-bold text-ink">Roadmap not found</h2>
@@ -263,7 +307,7 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
   );
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-paper text-ink">
+    <div className="min-h-screen flex flex-col md:flex-row bg-paper text-ink w-full overflow-x-hidden">
       {/* Left Application Shell Sidebar */}
       <AppSidebar />
 
@@ -290,45 +334,25 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
               </span>
             </div>
 
-            {/* Title styled with distinctive lime-moss font matching Screenshot 9 */}
-            {isEditingTitle ? (
-              <div className="flex items-center gap-2 mt-2">
-                <input
-                  type="text"
-                  value={titleDraft}
-                  onChange={(e) => setTitleDraft(e.target.value)}
-                  className="px-3 py-1.5 rounded-xl border border-moss bg-surface dark:bg-[#121815] text-xl font-bold text-ink dark:text-white outline-none w-full"
-                  autoFocus
-                />
-                <button
-                  onClick={handleSaveTitle}
-                  disabled={isSavingTitle}
-                  className="px-4 py-1.5 rounded-xl bg-[#b8c460] text-[#0f1611] text-xs font-semibold hover:bg-[#a6b350] transition-colors cursor-pointer shrink-0"
-                >
-                  {isSavingTitle ? "Saving..." : "Save"}
-                </button>
-                <button
-                  onClick={() => setIsEditingTitle(false)}
-                  className="px-3 py-1.5 rounded-xl border border-line text-xs text-ink-soft hover:text-ink transition-colors cursor-pointer shrink-0"
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <h1 className="text-3xl sm:text-4xl font-display font-medium text-[#b8c460] italic tracking-tight">
-                {roadmap.title}
-              </h1>
+            <h1 className="text-3xl sm:text-4xl font-display font-medium text-[#b8c460] italic tracking-tight">
+              {roadmap.title}
+            </h1>
+            {roadmap.description && (
+              <p className="text-xs sm:text-sm text-ink-soft line-clamp-2">
+                {roadmap.description}
+              </p>
             )}
           </div>
 
           {/* Top Right Action Buttons (Share & Edit) */}
           <div className="flex items-center gap-2">
             <button
-              onClick={handleShare}
-              className={`px-4 py-2 rounded-full border text-xs font-semibold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer ${shareCopied
+              onClick={handleShareClick}
+              className={`px-4 py-2 rounded-full border text-xs font-semibold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer ${
+                shareCopied
                   ? "border-[#b8c460] bg-[#b8c460] text-[#0f1611]"
                   : "border-line dark:border-white/10 bg-surface dark:bg-[#121815] text-ink hover:bg-black/5 dark:hover:bg-white/5"
-                }`}
+              }`}
             >
               {shareCopied ? (
                 <>
@@ -347,8 +371,9 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
 
             <button
               onClick={() => {
-                setIsEditingTitle(!isEditingTitle);
                 setTitleDraft(roadmap.title);
+                setDescriptionDraft(roadmap.description || "");
+                setShowEditModal(true);
               }}
               className="px-4 py-2 rounded-full border border-line dark:border-white/10 bg-surface dark:bg-[#121815] text-xs font-semibold text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
             >
@@ -363,29 +388,33 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
         {/* Content Layout: Left Stage Cards + Right Stats Card */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
           {/* Left Column: Stages */}
-          <div className="space-y-5">
+          <div className="space-y-5 min-w-0">
             {stages.map((stage: any, sIdx: number) => {
               const stageCourses = stage.courses || [];
               const hasCourses = stageCourses.length > 0;
               const isEditingThisStage = editingStageId === stage.id;
+              const isAddingToThisStage = addingCourseStageId === stage.id;
+              const isDeletingThisStage = deletingStageId === stage.id;
 
               return (
                 <div
                   key={stage.id || sIdx}
-                  className={`rounded-3xl p-6 sm:p-7 space-y-5 transition-all shadow-xs ${hasCourses
+                  className={`rounded-3xl p-6 sm:p-7 space-y-5 transition-all shadow-xs ${
+                    hasCourses
                       ? "border-2 border-[#b8c460] bg-surface dark:bg-[#0c120e]"
                       : "border border-line dark:border-white/10 bg-surface dark:bg-[#0c120e]"
-                    }`}
+                  }`}
                 >
                   {/* Stage Header Row */}
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       {/* Circle Number */}
                       <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold font-mono shrink-0 ${hasCourses
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold font-mono shrink-0 ${
+                          hasCourses
                             ? "bg-[#b8c460] text-[#0f1611]"
                             : "bg-black/10 dark:bg-[#1c2438] text-ink-soft dark:text-slate-300"
-                          }`}
+                        }`}
                       >
                         {sIdx + 1}
                       </div>
@@ -405,7 +434,7 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
                               disabled={isSavingStage}
                               className="px-3 py-1 rounded-lg bg-[#b8c460] text-[#0f1611] text-xs font-semibold cursor-pointer"
                             >
-                              ✓
+                              {isSavingStage ? "..." : "✓"}
                             </button>
                             <button
                               onClick={() => setEditingStageId(null)}
@@ -458,17 +487,22 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
                       {/* Trash Delete Icon */}
                       <button
                         onClick={() => handleDeleteStage(stage.id)}
+                        disabled={isDeletingThisStage}
                         className="text-ink-soft hover:text-red-400 p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                         title="Delete stage"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
+                        {isDeletingThisStage ? (
+                          <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        )}
                       </button>
                     </div>
                   </div>
 
-                  {/* List of Courses in this stage matching Screenshot 4 */}
+                  {/* List of Courses in this stage */}
                   {hasCourses && (
                     <div className="space-y-2 pt-1">
                       {stageCourses.map((c: any) => (
@@ -483,7 +517,7 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
                             <div className="relative aspect-video w-16 h-10 rounded-lg overflow-hidden bg-black shrink-0 border border-line">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
-                                src={c.thumbnailUrl || "https://i.ytimg.com/vi/J9BI0jGOds8/hqdefault.jpg"}
+                                src={c.thumbnailUrl || `https://img.youtube.com/vi/${c.youtubeId || "J9BI0jGOds8"}/hqdefault.jpg`}
                                 alt={c.title}
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                               />
@@ -493,30 +527,24 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
                                 {c.title}
                               </h4>
                               <p className="text-[0.7rem] text-ink-soft mt-0.5 truncate">
-                                {c.author || "Mayank Aggarwal"} · {formatDuration(c.totalDurationSeconds || 3600)}
+                                {c.author || c.source?.channelTitle || "Mayank Aggarwal"} · {formatDuration(c.totalDurationSeconds || 3600)}
                               </p>
                             </div>
                           </Link>
 
                           <div className="flex items-center gap-2 shrink-0">
-                            {/* Building status pill only when actively building or processing */}
-                            {buildingStatus ? (
+                            {c.status === "PROCESSING" && (
                               <span className="px-2.5 py-0.5 rounded-full bg-[#232918] text-[#b8c460] text-[0.68rem] font-semibold flex items-center gap-1 font-mono">
                                 <span>⟳</span>
-                                <span>{buildingStatus}</span>
+                                <span>Processing...</span>
                               </span>
-                            ) : c.status === "PROCESSING" ? (
-                              <span className="px-2.5 py-0.5 rounded-full bg-[#232918] text-[#b8c460] text-[0.68rem] font-semibold flex items-center gap-1 font-mono">
-                                <span>⟳</span>
-                                <span>Building</span>
-                              </span>
-                            ) : null}
+                            )}
 
                             {/* Remove Course Button */}
                             <button
                               onClick={() => handleRemoveCourse(stage.id, c.id)}
-                              className="text-ink-soft hover:text-red-400 p-1 transition-colors cursor-pointer"
-                              title="Remove course"
+                              className="text-ink-soft hover:text-red-400 p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs"
+                              title="Remove course from stage"
                             >
                               ✕
                             </button>
@@ -531,18 +559,32 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
                     <div className="flex items-center gap-2 p-1.5 rounded-full border border-line dark:border-[#263528] bg-white dark:bg-[#161c18] shadow-inner focus-within:border-moss focus-within:ring-2 focus-within:ring-moss/20 transition-all">
                       <input
                         type="url"
-                        value={courseUrl}
-                        onChange={(e) => setCourseUrl(e.target.value)}
+                        value={courseUrlMap[stage.id] || ""}
+                        onChange={(e) =>
+                          setCourseUrlMap((prev) => ({
+                            ...prev,
+                            [stage.id]: e.target.value,
+                          }))
+                        }
                         placeholder="Paste a YouTube video or playlist link"
                         className="w-full px-4 bg-transparent dark:bg-transparent text-xs sm:text-sm text-ink dark:text-white placeholder-ink-soft/60 outline-none border-none shadow-none"
                       />
                       <button
                         type="submit"
-                        disabled={isAddingCourse}
-                        className="shrink-0 px-4 py-2 rounded-full border border-line dark:border-white/10 bg-black/5 dark:bg-[#1b231c] text-xs font-semibold text-ink hover:bg-black/10 dark:hover:bg-white/10 transition-colors shadow-xs cursor-pointer flex items-center gap-1"
+                        disabled={isAddingToThisStage || !(courseUrlMap[stage.id] || "").trim()}
+                        className="shrink-0 px-4 py-2 rounded-full border border-line dark:border-white/10 bg-black/5 dark:bg-[#1b231c] text-xs font-semibold text-ink hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-40 transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
                       >
-                        <span>+</span>
-                        <span>{isAddingCourse ? "Adding..." : "Add course"}</span>
+                        {isAddingToThisStage ? (
+                          <>
+                            <div className="w-3 h-3 border-2 border-moss border-t-transparent rounded-full animate-spin" />
+                            <span>Analyzing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>+</span>
+                            <span>Add course</span>
+                          </>
+                        )}
                       </button>
                     </div>
                   </form>
@@ -557,8 +599,17 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
                 disabled={isAddingStage}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-line dark:border-white/10 bg-surface dark:bg-[#0c120e] text-xs sm:text-sm font-semibold text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors shadow-xs cursor-pointer"
               >
-                <span className="font-bold">+</span>
-                <span>{isAddingStage ? "Adding stage..." : "Add a stage"}</span>
+                {isAddingStage ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-moss border-t-transparent rounded-full animate-spin" />
+                    <span>Adding stage...</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="font-bold">+</span>
+                    <span>Add a stage</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -617,6 +668,131 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
           </div>
         </div>
       </main>
+
+      {/* SHARE ROADMAP MODAL */}
+      {showShareModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-surface dark:bg-[#101713] rounded-3xl border border-line dark:border-white/15 p-6 shadow-2xl space-y-5 text-ink">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-ink">Share this roadmap</h3>
+                <p className="text-xs text-ink-soft mt-0.5">Anyone with this link can view this learning journey.</p>
+              </div>
+              <button
+                onClick={() => setShowShareModal(false)}
+                className="w-8 h-8 rounded-full border border-line dark:border-white/10 flex items-center justify-center text-xs text-ink-soft hover:text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* URL Copy Row */}
+            <div className="flex items-center gap-2 p-2 rounded-2xl bg-black/5 dark:bg-[#16211a] border border-line dark:border-white/10">
+              <input
+                type="text"
+                readOnly
+                value={getShareUrl()}
+                className="w-full px-2 bg-transparent text-xs text-ink font-mono outline-none truncate"
+              />
+              <button
+                onClick={handleCopyLink}
+                className="px-3 py-1.5 rounded-xl bg-[#b8c460] text-[#0f1611] text-xs font-bold hover:bg-[#a6b350] transition-colors shrink-0 shadow-xs cursor-pointer"
+              >
+                {shareCopied ? "✓ Copied" : "Copy"}
+              </button>
+            </div>
+
+            {/* Quick Share Buttons */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(`Check out this learning roadmap on CourseIt: ${getShareUrl()}`)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-center gap-2 p-2.5 rounded-2xl border border-line dark:border-white/10 text-xs font-semibold hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+              >
+                <span>💬</span>
+                <span>WhatsApp</span>
+              </a>
+              <a
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Follow my learning roadmap on CourseIt: ${roadmap.title} ${getShareUrl()}`)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-center gap-2 p-2.5 rounded-2xl border border-line dark:border-white/10 text-xs font-semibold hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+              >
+                <span>𝕏</span>
+                <span>Share on X</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT ROADMAP MODAL */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-surface dark:bg-[#101713] rounded-3xl border border-line dark:border-white/15 p-6 shadow-2xl space-y-5 text-ink">
+            <div className="flex items-center justify-between border-b border-line dark:border-white/10 pb-3">
+              <h3 className="text-base font-bold text-ink">Edit Roadmap Settings</h3>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="w-8 h-8 rounded-full border border-line dark:border-white/10 flex items-center justify-center text-xs text-ink-soft hover:text-ink cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-ink-soft mb-1.5">Roadmap Title</label>
+                <input
+                  type="text"
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-2xl bg-black/5 dark:bg-[#16211a] border border-line dark:border-white/10 text-sm text-ink outline-none focus:border-moss"
+                  placeholder="e.g. Become an AI Engineer"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-ink-soft mb-1.5">Description</label>
+                <textarea
+                  value={descriptionDraft}
+                  onChange={(e) => setDescriptionDraft(e.target.value)}
+                  rows={3}
+                  className="w-full px-4 py-2.5 rounded-2xl bg-black/5 dark:bg-[#16211a] border border-line dark:border-white/10 text-sm text-ink outline-none focus:border-moss resize-none"
+                  placeholder="Describe the skills and goals of this roadmap..."
+                />
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-between border-t border-line dark:border-white/10">
+              <button
+                onClick={handleDeleteRoadmap}
+                disabled={isDeletingRoadmap}
+                className="text-xs font-semibold text-red-400 hover:text-red-300 transition-colors cursor-pointer px-2 py-1"
+              >
+                {isDeletingRoadmap ? "Deleting..." : "🗑️ Delete roadmap"}
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 rounded-full border border-line text-xs font-medium text-ink-soft hover:text-ink cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveRoadmap}
+                  disabled={isSavingRoadmap || !titleDraft.trim()}
+                  className="px-5 py-2 rounded-full bg-[#b8c460] text-[#0f1611] text-xs font-bold hover:bg-[#a6b350] transition-colors disabled:opacity-40 cursor-pointer shadow-xs"
+                >
+                  {isSavingRoadmap ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

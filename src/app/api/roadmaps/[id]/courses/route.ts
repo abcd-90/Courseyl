@@ -180,12 +180,18 @@ export async function POST(
           }
         }
       } else {
-        targetCourseId = "crs_krohn_agentic_ai";
+        return NextResponse.json(
+          { error: "Invalid YouTube link. Please paste a valid YouTube video URL." },
+          { status: 400 }
+        );
       }
     }
 
     if (!targetCourseId) {
-      targetCourseId = "crs_krohn_agentic_ai";
+      return NextResponse.json(
+        { error: "Failed to resolve or generate course from this link." },
+        { status: 400 }
+      );
     }
 
     // Check if course already in stage
