@@ -28,21 +28,15 @@ export default function DashboardPage() {
     fetch("/api/courses?enrolled=true")
       .then((res) => res.json())
       .then((data) => {
-        if (data.courses && data.courses.length > 0) {
+        if (data.courses && Array.isArray(data.courses) && data.courses.length > 0) {
           setMyCourses(data.courses);
         } else {
-          // Fallback: fetch available community courses so dashboard has courses to explore
-          fetch("/api/courses?limit=4")
-            .then((r) => r.json())
-            .then((d) => {
-              if (d.courses && d.courses.length > 0) {
-                setMyCourses(d.courses);
-              }
-            })
-            .catch(() => {});
+          setMyCourses([]);
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        setMyCourses([]);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -276,13 +270,23 @@ export default function DashboardPage() {
                 </Link>
               ))
             ) : (
-              <div className="col-span-full py-8 text-center bg-surface/50 rounded-2xl border border-line dark:border-white/5">
-                <p className="text-sm text-ink-soft">You have not started any courses yet.</p>
+              <div className="col-span-full py-12 px-6 text-center bg-surface dark:bg-[#0c120e] rounded-3xl border border-line dark:border-white/10 shadow-xs flex flex-col items-center justify-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-lime-soft dark:bg-[#182315] border border-line dark:border-[#26371a] text-moss dark:text-[#b8c460] flex items-center justify-center shadow-xs">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-ink">No courses started yet</h3>
+                  <p className="text-xs text-ink-soft max-w-sm mt-1 leading-relaxed">
+                    Paste a YouTube link in the banner above to create your first course, or pick from our community catalog below!
+                  </p>
+                </div>
                 <Link
                   href="/generate"
-                  className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-moss hover:underline"
+                  className="px-4 py-2 rounded-full bg-[#b8c460] text-[#0f1611] font-semibold text-xs hover:bg-[#a6b350] transition-colors cursor-pointer shadow-xs"
                 >
-                  + Generate a course from a YouTube link →
+                  + Build your first course
                 </Link>
               </div>
             )}

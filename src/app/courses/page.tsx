@@ -14,21 +14,13 @@ export default function MyCoursesPage() {
     fetch("/api/courses?enrolled=true")
       .then((res) => res.json())
       .then((data) => {
-        if (data.courses && data.courses.length > 0) {
+        if (data.courses && Array.isArray(data.courses) && data.courses.length > 0) {
           setCourses(data.courses);
         } else {
-          // Fallback: fetch public community courses so the page has rich content
-          fetch("/api/courses?limit=6")
-            .then((r) => r.json())
-            .then((d) => {
-              if (d.courses && d.courses.length > 0) {
-                setCourses(d.courses.slice(0, 2));
-              }
-            })
-            .catch(() => {});
+          setCourses([]);
         }
       })
-      .catch(() => {})
+      .catch(() => setCourses([]))
       .finally(() => setLoading(false));
   }, []);
 
@@ -56,8 +48,8 @@ export default function MyCoursesPage() {
           <button
             onClick={() => setActiveTab("all")}
             className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer ${activeTab === "all"
-                ? "bg-[#b8c460] text-[#0f1611]"
-                : "border border-line dark:border-white/10 text-ink-soft hover:text-ink"
+              ? "bg-[#b8c460] text-[#0f1611]"
+              : "border border-line dark:border-white/10 text-ink-soft hover:text-ink"
               }`}
           >
             <span>All</span>
@@ -67,8 +59,8 @@ export default function MyCoursesPage() {
           <button
             onClick={() => setActiveTab("private")}
             className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer ${activeTab === "private"
-                ? "bg-[#b8c460] text-[#0f1611]"
-                : "border border-line dark:border-white/10 text-ink-soft hover:text-ink"
+              ? "bg-[#b8c460] text-[#0f1611]"
+              : "border border-line dark:border-white/10 text-ink-soft hover:text-ink"
               }`}
           >
             <span>🔒</span>

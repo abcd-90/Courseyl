@@ -38,6 +38,10 @@ export default function LessonLearnPage({
 
   useEffect(() => {
     setLoading(true);
+
+    // Automatically enroll user in course when they start a lesson
+    fetch(`/api/courses/${resolvedParams.id}/enroll`, { method: "POST" }).catch(() => {});
+
     fetch(`/api/lessons/${resolvedParams.lessonId}`)
       .then((res) => res.json())
       .then((data) => {
@@ -53,6 +57,22 @@ export default function LessonLearnPage({
           setNavigation(data.navigation || null);
           setQuizQuestions(data.quizQuestions || []);
           setCompleted(data.progress?.isCompleted || false);
+
+          try {
+            // Save to local recents
+            const stored = localStorage.getItem("courseit_recent_courses");
+            const existing = stored ? JSON.parse(stored) : [];
+            const updated = [
+              {
+                title: data.lesson.courseTitle || resolvedParams.id,
+                slug: data.lesson.courseSlug || resolvedParams.id,
+                thumbnail: data.lesson.thumbnailUrl,
+                progress: data.progress?.isCompleted ? 100 : 0,
+              },
+              ...existing.filter((e: any) => e.slug !== (data.lesson.courseSlug || resolvedParams.id)),
+            ].slice(0, 5);
+            localStorage.setItem("courseit_recent_courses", JSON.stringify(updated));
+          } catch {}
         }
       })
       .catch(() => {})

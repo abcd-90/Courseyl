@@ -35,14 +35,6 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
               ...recents.filter((r: any) => r.slug !== data.course.slug && r.id !== data.course.id),
             ].slice(0, 5);
             localStorage.setItem("courseit_recent_courses", JSON.stringify(updated));
-
-            // Also ensure it is enrolled in local state
-            const enrolled = localStorage.getItem("courseit_enrolled_courses");
-            const enrolledList = enrolled ? JSON.parse(enrolled) : [];
-            if (!enrolledList.includes(data.course.slug)) {
-              enrolledList.push(data.course.slug);
-              localStorage.setItem("courseit_enrolled_courses", JSON.stringify(enrolledList));
-            }
           } catch {}
         }
       })
@@ -68,7 +60,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
 
   if (loading) {
     return (
-      <div className="min-h-screen flex bg-paper text-ink">
+      <div className="min-h-screen flex flex-col lg:flex-row bg-paper text-ink">
         <AppSidebar />
         <div className="flex-1 flex items-center justify-center p-12 text-sm text-ink-soft">
           Loading course syllabus...
@@ -79,7 +71,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
 
   if (!course) {
     return (
-      <div className="min-h-screen flex flex-col md:flex-row bg-paper text-ink w-full overflow-x-hidden">
+      <div className="min-h-screen flex flex-col lg:flex-row bg-paper text-ink w-full overflow-x-hidden">
         <AppSidebar />
         <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
           <h2 className="text-xl font-bold text-ink">Course not found</h2>
@@ -104,7 +96,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
   const completedLessonsCount = allLessons.filter((l: any) => l.isCompleted).length;
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-paper text-ink w-full overflow-x-hidden">
+    <div className="min-h-screen flex flex-col lg:flex-row bg-paper text-ink w-full overflow-x-hidden">
       {/* Application Shell Sidebar */}
       <AppSidebar />
 

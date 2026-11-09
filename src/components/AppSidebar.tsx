@@ -10,22 +10,10 @@ export function AppSidebar() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [enrolledCount, setEnrolledCount] = useState<number>(0);
 
-  // Dynamic recent courses matching user screenshots
-  const [recents, setRecents] = useState<any[]>([
-    {
-      title: "Agentic AI Engine...",
-      slug: "agentic-ai-engineering-workshop",
-      progress: 0,
-      thumbnail: "https://i.ytimg.com/vi/LSk5KaEGVK4/hqdefault.jpg",
-    },
-    {
-      title: "Full-Stack AI Engi...",
-      slug: "full-stack-ai-engineering-course",
-      progress: 0,
-      thumbnail: "https://i.ytimg.com/vi/XzjSx7u9mGw/maxresdefault.jpg",
-    },
-  ]);
+  // Dynamic recent courses from user's actual activity
+  const [recents, setRecents] = useState<any[]>([]);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -33,6 +21,15 @@ export function AppSidebar() {
       .then((data) => {
         if (data.authenticated && data.user) {
           setCurrentUser(data.user);
+          // Fetch user's real enrolled courses count
+          fetch("/api/courses?enrolled=true")
+            .then((r) => r.json())
+            .then((cd) => {
+              if (Array.isArray(cd.courses)) {
+                setEnrolledCount(cd.courses.length);
+              }
+            })
+            .catch(() => {});
         }
       })
       .catch(() => {});
@@ -75,7 +72,7 @@ export function AppSidebar() {
     {
       name: "My courses",
       href: "/courses",
-      badge: "2",
+      badge: enrolledCount > 0 ? String(enrolledCount) : undefined,
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -86,7 +83,6 @@ export function AppSidebar() {
     {
       name: "Roadmaps",
       href: "/roadmaps",
-      badge: "1",
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
@@ -107,8 +103,6 @@ export function AppSidebar() {
     {
       name: "Inbox",
       href: "/inbox",
-      badge: "1",
-      badgeVariant: "lime",
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -179,7 +173,7 @@ export function AppSidebar() {
               {item.badge && (
                 <span
                   className={`text-[0.68rem] px-2 py-0.5 rounded-full font-mono font-medium ${
-                    item.badgeVariant === "lime"
+                    (item as any).badgeVariant === "lime"
                       ? "bg-[#b8c460] text-[#0f1611] font-bold"
                       : "bg-black/10 dark:bg-white/10 text-ink-soft"
                   }`}
