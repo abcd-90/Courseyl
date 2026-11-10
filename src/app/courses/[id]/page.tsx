@@ -4,6 +4,7 @@ import React, { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/AppSidebar";
+import { getCleanThumbnailUrl } from "@/lib/thumbnail";
 
 export default function CourseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -25,11 +26,11 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
           try {
             const stored = localStorage.getItem("courseit_recent_courses");
             const recents = stored ? JSON.parse(stored) : [];
-            const thumb =
-              data.course.thumbnailUrl ||
-              (data.course.source?.youtubeId
-                ? `https://i.ytimg.com/vi/${data.course.source.youtubeId}/hqdefault.jpg`
-                : "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg");
+            const thumb = getCleanThumbnailUrl(
+              data.course.thumbnailUrl,
+              data.course.slug,
+              data.course.source?.youtubeId
+            );
             const updated = [
               {
                 id: data.course.id,
@@ -124,7 +125,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
           <div className="relative aspect-video w-full sm:w-44 md:w-52 rounded-xl overflow-hidden border border-line shrink-0 bg-surface shadow-xs">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={course.thumbnailUrl || "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800"}
+              src={getCleanThumbnailUrl(course.thumbnailUrl, course.slug, course.source?.youtubeId)}
               alt={course.title}
               className="w-full h-full object-cover"
             />

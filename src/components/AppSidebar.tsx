@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CourseItLogo } from "./CourseItLogo";
 import { useSiteSettings } from "./SiteSettingsProvider";
+import { getCleanThumbnailUrl } from "@/lib/thumbnail";
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -39,14 +40,17 @@ export function AppSidebar() {
                   // Auto-enrich recents with accurate thumbnails from database
                   setRecents((prev) => {
                     if (!prev || prev.length === 0) {
-                      const fallbackRecents = cd.courses.slice(0, 3).map((c: any) => ({
-                        id: c.id,
-                        slug: c.slug,
-                        title: c.title,
-                        thumbnail: c.thumbnailUrl || "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg",
-                        thumbnailUrl: c.thumbnailUrl || "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg",
-                        progress: c.progressPercentage || 0,
-                      }));
+                      const fallbackRecents = cd.courses.slice(0, 3).map((c: any) => {
+                        const cleanThumb = getCleanThumbnailUrl(c.thumbnailUrl, c.slug);
+                        return {
+                          id: c.id,
+                          slug: c.slug,
+                          title: c.title,
+                          thumbnail: cleanThumb,
+                          thumbnailUrl: cleanThumb,
+                          progress: c.progressPercentage || 0,
+                        };
+                      });
                       try {
                         localStorage.setItem("courseit_recent_courses", JSON.stringify(fallbackRecents));
                       } catch {}
@@ -55,16 +59,10 @@ export function AppSidebar() {
 
                     const enriched = prev.map((r: any) => {
                       const match = cd.courses.find((c: any) => c.slug === r.slug || c.id === r.id);
-                      const validThumb = (t?: string) => (t && typeof t === "string" && t.length > 5 && !t.includes("undefined")) ? t : null;
-                      const thumb =
-                        validThumb(match?.thumbnailUrl) ||
-                        validThumb(r.thumbnail) ||
-                        validThumb(r.thumbnailUrl) ||
-                        (r.slug?.includes("generative")
-                          ? "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg"
-                          : r.slug?.includes("python")
-                          ? "https://i.ytimg.com/vi/UrsmFxEIp5k/hqdefault.jpg"
-                          : "https://i.ytimg.com/vi/eynUbHweaQM/hqdefault.jpg");
+                      const thumb = getCleanThumbnailUrl(
+                        match?.thumbnailUrl || r.thumbnail || r.thumbnailUrl,
+                        r.slug || match?.slug
+                      );
 
                       return {
                         ...r,
@@ -106,7 +104,16 @@ export function AppSidebar() {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setRecents(parsed);
+          const cleaned = parsed.map((item: any) => {
+            const cleanThumb = getCleanThumbnailUrl(item.thumbnail || item.thumbnailUrl, item.slug);
+            return {
+              ...item,
+              thumbnail: cleanThumb,
+              thumbnailUrl: cleanThumb,
+            };
+          });
+          setRecents(cleaned);
+          localStorage.setItem("courseit_recent_courses", JSON.stringify(cleaned));
         }
       }
     } catch {}
@@ -265,15 +272,10 @@ export function AppSidebar() {
           {recents.length > 0 ? (
             <div className="space-y-1.5">
               {recents.slice(0, 3).map((r, idx) => {
-                const validThumb = (t?: string) => (t && typeof t === "string" && t.length > 5 && !t.includes("undefined")) ? t : null;
-                const thumb =
-                  validThumb(r.thumbnail) ||
-                  validThumb(r.thumbnailUrl) ||
-                  (r.slug?.includes("generative")
-                    ? "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg"
-                    : r.slug?.includes("python")
-                    ? "https://i.ytimg.com/vi/UrsmFxEIp5k/hqdefault.jpg"
-                    : "https://i.ytimg.com/vi/eynUbHweaQM/hqdefault.jpg");
+                const thumb = getCleanThumbnailUrl(
+                  r.thumbnail || r.thumbnailUrl,
+                  r.slug
+                );
 
                 return (
                   <Link

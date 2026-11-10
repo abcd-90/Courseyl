@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppSidebar } from "@/components/AppSidebar";
+import { getCleanThumbnailUrl } from "@/lib/thumbnail";
 
 export default function MyCoursesPage() {
   const [courses, setCourses] = useState<any[]>([]);
@@ -115,7 +116,7 @@ export default function MyCoursesPage() {
                   <div className="relative aspect-video rounded-xl overflow-hidden bg-black">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={course.thumbnailUrl || "https://i.ytimg.com/vi/XzjSx7u9mGw/maxresdefault.jpg"}
+                      src={getCleanThumbnailUrl(course.thumbnailUrl, course.slug)}
                       alt={course.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />

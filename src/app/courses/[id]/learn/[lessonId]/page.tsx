@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef, use, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/AppSidebar";
+import { getCleanThumbnailUrl } from "@/lib/thumbnail";
 
 export default function LessonLearnPage({
   params,
@@ -87,11 +88,11 @@ export default function LessonLearnPage({
           try {
             const stored = localStorage.getItem("courseit_recent_courses");
             const existing = stored ? JSON.parse(stored) : [];
-            const thumb =
-              data.lesson.thumbnailUrl ||
-              (data.lesson.youtubeVideoId
-                ? `https://i.ytimg.com/vi/${data.lesson.youtubeVideoId}/hqdefault.jpg`
-                : "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg");
+            const thumb = getCleanThumbnailUrl(
+              data.lesson.thumbnailUrl,
+              data.lesson.courseSlug || resolvedParams.id,
+              data.lesson.youtubeVideoId
+            );
             const updated = [
               {
                 id: resolvedParams.id,

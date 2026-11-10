@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/AppSidebar";
 import { LandscapeIllustration } from "@/components/LandscapeHero";
+import { getCleanThumbnailUrl } from "@/lib/thumbnail";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -151,7 +152,7 @@ export default function DashboardPage() {
           duration: c.duration,
           addedBy: c.creatorName || "Creator",
           learningCount: c.enrollmentCount || 1,
-          thumbnail: c.thumbnailUrl || "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg",
+          thumbnail: getCleanThumbnailUrl(c.thumbnailUrl, c.slug, c.source?.youtubeId || c.youtubeId),
           slug: c.slug,
         }))
       : sampleCourses;

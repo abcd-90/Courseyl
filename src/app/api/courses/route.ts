@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getCleanThumbnailUrl } from "@/lib/thumbnail";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -64,7 +65,7 @@ export async function GET(req: Request) {
             slug: c.slug,
             description: c.description,
             difficulty: c.difficulty,
-            thumbnailUrl: c.thumbnailUrl,
+            thumbnailUrl: getCleanThumbnailUrl(c.thumbnailUrl, c.slug, c.source?.youtubeId),
             totalDurationSeconds: c.totalDurationSeconds,
             estimatedStudyMinutes: c.estimatedStudyMinutes,
             enrollmentCount: c.enrollmentCount,
@@ -181,7 +182,7 @@ export async function GET(req: Request) {
         slug: c.slug,
         description: c.description,
         difficulty: c.difficulty,
-        thumbnailUrl: c.thumbnailUrl || (c.source?.youtubeId ? `https://i.ytimg.com/vi/${c.source.youtubeId}/hqdefault.jpg` : "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg"),
+        thumbnailUrl: getCleanThumbnailUrl(c.thumbnailUrl, c.slug, c.source?.youtubeId),
         totalDurationSeconds: c.totalDurationSeconds,
         estimatedStudyMinutes: c.estimatedStudyMinutes,
         enrollmentCount: c.enrollmentCount || 1,

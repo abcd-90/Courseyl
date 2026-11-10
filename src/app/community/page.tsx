@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppSidebar } from "@/components/AppSidebar";
+import { getCleanThumbnailUrl } from "@/lib/thumbnail";
 
 export default function CommunityPage() {
   const [courses, setCourses] = useState<any[]>([]);
@@ -180,7 +181,7 @@ export default function CommunityPage() {
                 <div className="w-full aspect-video rounded-2xl overflow-hidden relative bg-black shrink-0">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={c.thumbnailUrl}
+                    src={getCleanThumbnailUrl(c.thumbnailUrl, c.slug)}
                     alt={c.title}
                     className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
                     onError={(e) => {
