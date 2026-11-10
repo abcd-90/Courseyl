@@ -85,8 +85,9 @@ export function CourseItLogo({
   const Content = (
     <div className={`inline-flex items-center gap-2 font-display font-bold tracking-tight ${className}`}>
       {renderIcon()}
-      <span className={`${textSizes[size]} text-[#0f1611] dark:text-white font-bold tracking-tight`}>
-        Courseyl
+      <span className={`${textSizes[size]} font-bold tracking-tight`}>
+        <span className="text-[#0f1611] dark:text-white">Course</span>
+        <span className="text-[#8a948c] dark:text-[#646f66]">yl</span>
       </span>
     </div>
   );
