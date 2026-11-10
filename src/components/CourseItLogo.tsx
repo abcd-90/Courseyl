@@ -32,31 +32,31 @@ export function CourseItLogo({
   const renderIcon = () => {
     if (logoIcon === "sparkles") {
       return (
-        <span className="text-[#0f1611] dark:text-white text-lg leading-none shrink-0">✨</span>
+        <span className="text-[#0f1611] dark:text-[#f1f3ea] text-lg leading-none shrink-0">✨</span>
       );
     }
     if (logoIcon === "code") {
       return (
-        <span className="text-[#0f1611] dark:text-white text-lg font-mono font-bold leading-none shrink-0">&lt;/&gt;</span>
+        <span className="text-[#0f1611] dark:text-[#f1f3ea] text-lg font-mono font-bold leading-none shrink-0">&lt;/&gt;</span>
       );
     }
     if (logoIcon === "rocket") {
       return (
-        <span className="text-[#0f1611] dark:text-white text-lg leading-none shrink-0">🚀</span>
+        <span className="text-[#0f1611] dark:text-[#f1f3ea] text-lg leading-none shrink-0">🚀</span>
       );
     }
     if (logoIcon === "video") {
       return (
-        <span className="text-[#0f1611] dark:text-white text-lg leading-none shrink-0">▶</span>
+        <span className="text-[#0f1611] dark:text-[#f1f3ea] text-lg leading-none shrink-0">▶</span>
       );
     }
 
-    // Default: Official Graduation Cap + Play button SVG in Dark (light mode) / Pure White (dark mode)
+    // Default: Official Graduation Cap + Play button SVG in Dark (light mode) / Crisp Ivory White (dark mode)
     return (
       <svg
         viewBox="2 6 60 44"
         aria-hidden="true"
-        className={`${iconSizes[size]} fill-current text-[#0f1611] dark:text-white shrink-0`}
+        className={`${iconSizes[size]} fill-current text-[#0f1611] dark:text-[#f1f3ea] shrink-0`}
       >
         <path
           fillRule="evenodd"
@@ -86,8 +86,8 @@ export function CourseItLogo({
     <div className={`inline-flex items-center gap-2 font-display font-bold tracking-tight ${className}`}>
       {renderIcon()}
       <span className={`${textSizes[size]} font-bold tracking-tight`}>
-        <span className="text-[#0f1611] dark:text-white">Course</span>
-        <span className="text-[#8a948c] dark:text-[#646f66]">yl</span>
+        <span className="text-[#0f1611] dark:text-[#f1f3ea]">Course</span>
+        <span className="text-[#4b5e1e]">yl</span>
       </span>
     </div>
   );
