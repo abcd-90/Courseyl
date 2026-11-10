@@ -54,14 +54,15 @@ export function AppSidebar() {
 
                   const enriched = prev.map((r: any) => {
                     const match = cd.courses.find((c: any) => c.slug === r.slug || c.id === r.id);
+                    const validThumb = (t?: string) => (t && typeof t === "string" && t.length > 5 && !t.includes("undefined")) ? t : null;
                     const thumb =
-                      r.thumbnail ||
-                      r.thumbnailUrl ||
-                      match?.thumbnailUrl ||
+                      validThumb(match?.thumbnailUrl) ||
+                      validThumb(r.thumbnail) ||
+                      validThumb(r.thumbnailUrl) ||
                       (r.slug?.includes("generative")
                         ? "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg"
                         : r.slug?.includes("python")
-                        ? "https://i.ytimg.com/vi/J9BI0jGOds8/hqdefault.jpg"
+                        ? "https://i.ytimg.com/vi/UrsmFxEIp5k/hqdefault.jpg"
                         : "https://i.ytimg.com/vi/eynUbHweaQM/hqdefault.jpg");
 
                     return {
@@ -244,13 +245,14 @@ export function AppSidebar() {
           {recents.length > 0 ? (
             <div className="space-y-1.5">
               {recents.slice(0, 3).map((r, idx) => {
+                const validThumb = (t?: string) => (t && typeof t === "string" && t.length > 5 && !t.includes("undefined")) ? t : null;
                 const thumb =
-                  r.thumbnail ||
-                  r.thumbnailUrl ||
+                  validThumb(r.thumbnail) ||
+                  validThumb(r.thumbnailUrl) ||
                   (r.slug?.includes("generative")
                     ? "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg"
                     : r.slug?.includes("python")
-                    ? "https://i.ytimg.com/vi/J9BI0jGOds8/hqdefault.jpg"
+                    ? "https://i.ytimg.com/vi/UrsmFxEIp5k/hqdefault.jpg"
                     : "https://i.ytimg.com/vi/eynUbHweaQM/hqdefault.jpg");
 
                 return (
@@ -551,8 +553,9 @@ export function AppSidebar() {
         {renderSidebarContent(true)}
       </aside>
 
-      {/* 3. DESKTOP PERMANENT SIDEBAR (Visible ONLY on screens >= lg) */}
-      <aside className="hidden lg:flex lg:w-64 lg:shrink-0 bg-sidebar border-r border-sidebar-border flex-col justify-between h-screen sticky top-0 p-4 text-sidebar-foreground">
+      {/* 3. DESKTOP PERMANENT SIDEBAR (Fixed to viewport matching reference site) */}
+      <div className="hidden lg:block lg:w-64 lg:shrink-0" aria-hidden="true" />
+      <aside className="hidden lg:flex fixed inset-y-0 left-0 z-30 w-64 bg-sidebar border-r border-sidebar-border flex-col justify-between h-screen p-4 text-sidebar-foreground">
         {renderSidebarContent(false)}
       </aside>
     </>

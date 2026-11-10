@@ -87,7 +87,7 @@ export function CourseItLogo({
       {renderIcon()}
       <span className={`${textSizes[size]} font-bold tracking-tight`}>
         <span className="text-[#0f1611] dark:text-[#f1f3ea]">Course</span>
-        <span className="text-[#4b5e1e]">yl</span>
+        <span className="text-[#4b5e1e] dark:text-[#78903c]">yl</span>
       </span>
     </div>
   );

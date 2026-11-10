@@ -78,7 +78,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
 
   if (!course) {
     return (
-      <div className="min-h-screen flex flex-col lg:flex-row bg-paper text-ink w-full overflow-x-hidden">
+      <div className="min-h-screen flex flex-col lg:flex-row bg-paper text-ink w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
           <h2 className="text-xl font-bold text-ink">Course not found</h2>
@@ -103,7 +103,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
   const completedLessonsCount = allLessons.filter((l: any) => l.isCompleted).length;
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-paper text-ink w-full overflow-x-hidden">
+    <div className="min-h-screen flex flex-col lg:flex-row bg-paper text-ink w-full">
       {/* Application Shell Sidebar */}
       <AppSidebar />
 

@@ -44,18 +44,23 @@ export async function getSession(): Promise<SessionPayload | null> {
 }
 
 export async function getCurrentUser() {
-  const session = await getSession();
-  if (!session) return null;
+  try {
+    const session = await getSession();
+    if (!session) return null;
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId },
-    include: {
-      profile: true,
-      subscription: true,
-    },
-  });
+    const user = await prisma.user.findUnique({
+      where: { id: session.userId },
+      include: {
+        profile: true,
+        subscription: true,
+      },
+    });
 
-  return user;
+    return user;
+  } catch (err) {
+    console.error("[getCurrentUser] DB lookup error, returning null:", err);
+    return null;
+  }
 }
 
 export function getAuthCookieOptions() {
