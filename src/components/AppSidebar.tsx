@@ -32,8 +32,52 @@ export function AppSidebar() {
           fetch("/api/courses?enrolled=true")
             .then((r) => r.json())
             .then((cd) => {
-              if (Array.isArray(cd.courses)) {
+              if (Array.isArray(cd.courses) && cd.courses.length > 0) {
                 setEnrolledCount(cd.courses.length);
+
+                // Auto-enrich recents with accurate thumbnails from database
+                setRecents((prev) => {
+                  if (!prev || prev.length === 0) {
+                    const fallbackRecents = cd.courses.slice(0, 3).map((c: any) => ({
+                      id: c.id,
+                      slug: c.slug,
+                      title: c.title,
+                      thumbnail: c.thumbnailUrl || "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg",
+                      thumbnailUrl: c.thumbnailUrl || "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg",
+                      progress: c.progressPercentage || 0,
+                    }));
+                    try {
+                      localStorage.setItem("courseit_recent_courses", JSON.stringify(fallbackRecents));
+                    } catch {}
+                    return fallbackRecents;
+                  }
+
+                  const enriched = prev.map((r: any) => {
+                    const match = cd.courses.find((c: any) => c.slug === r.slug || c.id === r.id);
+                    const thumb =
+                      r.thumbnail ||
+                      r.thumbnailUrl ||
+                      match?.thumbnailUrl ||
+                      (r.slug?.includes("generative")
+                        ? "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg"
+                        : r.slug?.includes("python")
+                        ? "https://i.ytimg.com/vi/J9BI0jGOds8/hqdefault.jpg"
+                        : "https://i.ytimg.com/vi/eynUbHweaQM/hqdefault.jpg");
+
+                    return {
+                      ...r,
+                      title: r.title || match?.title,
+                      thumbnail: thumb,
+                      thumbnailUrl: thumb,
+                      progress: typeof r.progress === "number" ? r.progress : (match?.progressPercentage || 0),
+                    };
+                  });
+
+                  try {
+                    localStorage.setItem("courseit_recent_courses", JSON.stringify(enriched));
+                  } catch {}
+                  return enriched;
+                });
               }
             })
             .catch(() => {});
@@ -199,31 +243,46 @@ export function AppSidebar() {
           </h5>
           {recents.length > 0 ? (
             <div className="space-y-1.5">
-              {recents.slice(0, 2).map((r, idx) => (
-                <Link
-                  key={r.slug || idx}
-                  href={`/courses/${r.slug}`}
-                  onClick={() => isMobile && setIsMobileOpen(false)}
-                  className="flex items-center justify-between p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors group cursor-pointer text-xs"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-6 h-6 rounded-md overflow-hidden bg-black shrink-0 border border-line">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={r.thumbnail || "https://i.ytimg.com/vi/LSk5KaEGVK4/hqdefault.jpg"}
-                        alt={r.title}
-                        className="w-full h-full object-cover"
-                      />
+              {recents.slice(0, 3).map((r, idx) => {
+                const thumb =
+                  r.thumbnail ||
+                  r.thumbnailUrl ||
+                  (r.slug?.includes("generative")
+                    ? "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg"
+                    : r.slug?.includes("python")
+                    ? "https://i.ytimg.com/vi/J9BI0jGOds8/hqdefault.jpg"
+                    : "https://i.ytimg.com/vi/eynUbHweaQM/hqdefault.jpg");
+
+                return (
+                  <Link
+                    key={r.slug || idx}
+                    href={`/courses/${r.slug}`}
+                    onClick={() => isMobile && setIsMobileOpen(false)}
+                    className="flex items-center justify-between p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors group cursor-pointer text-xs"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-6 h-6 rounded-md overflow-hidden bg-black shrink-0 border border-line">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={thumb}
+                          alt={r.title || "Course thumbnail"}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src =
+                              "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg";
+                          }}
+                        />
+                      </div>
+                      <span className="truncate text-ink-soft group-hover:text-ink transition-colors font-medium">
+                        {r.title}
+                      </span>
                     </div>
-                    <span className="truncate text-ink-soft group-hover:text-ink transition-colors font-medium">
-                      {r.title}
+                    <span className="text-[0.68rem] font-mono text-ink-soft shrink-0 ml-1">
+                      {r.progress || 0}%
                     </span>
-                  </div>
-                  <span className="text-[0.68rem] font-mono text-ink-soft shrink-0 ml-1">
-                    {r.progress || 0}%
-                  </span>
-                </Link>
-              ))}
+                  </Link>
+                );
+              })}
             </div>
           ) : (
             <p className="text-xs text-ink-soft/60 px-1 leading-snug">

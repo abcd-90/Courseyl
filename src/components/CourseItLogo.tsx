@@ -32,31 +32,31 @@ export function CourseItLogo({
   const renderIcon = () => {
     if (logoIcon === "sparkles") {
       return (
-        <span className="text-[#4b5e1e] text-lg leading-none shrink-0">✨</span>
+        <span className="text-[#0f1611] dark:text-white text-lg leading-none shrink-0">✨</span>
       );
     }
     if (logoIcon === "code") {
       return (
-        <span className="text-[#4b5e1e] text-lg font-mono font-bold leading-none shrink-0">&lt;/&gt;</span>
+        <span className="text-[#0f1611] dark:text-white text-lg font-mono font-bold leading-none shrink-0">&lt;/&gt;</span>
       );
     }
     if (logoIcon === "rocket") {
       return (
-        <span className="text-[#4b5e1e] text-lg leading-none shrink-0">🚀</span>
+        <span className="text-[#0f1611] dark:text-white text-lg leading-none shrink-0">🚀</span>
       );
     }
     if (logoIcon === "video") {
       return (
-        <span className="text-[#4b5e1e] text-lg leading-none shrink-0">▶</span>
+        <span className="text-[#0f1611] dark:text-white text-lg leading-none shrink-0">▶</span>
       );
     }
 
-    // Default: Official Graduation Cap + Play button SVG in Moss Green
+    // Default: Official Graduation Cap + Play button SVG in Dark (light mode) / Pure White (dark mode)
     return (
       <svg
         viewBox="2 6 60 44"
         aria-hidden="true"
-        className={`${iconSizes[size]} fill-current text-[#4b5e1e] shrink-0`}
+        className={`${iconSizes[size]} fill-current text-[#0f1611] dark:text-white shrink-0`}
       >
         <path
           fillRule="evenodd"
@@ -85,10 +85,8 @@ export function CourseItLogo({
   const Content = (
     <div className={`inline-flex items-center gap-2 font-display font-bold tracking-tight ${className}`}>
       {renderIcon()}
-      <span className={`${textSizes[size]} font-semibold`}>
-        {/* "Course" in Black, "yl" in place of "It" */}
-        <span className="text-[#0f1611] dark:text-white font-bold">Course</span>
-        <span className="text-[#4b5e1e] dark:text-[#b8c460] font-bold">yl</span>
+      <span className={`${textSizes[size]} text-[#0f1611] dark:text-white font-bold tracking-tight`}>
+        Courseyl
       </span>
     </div>
   );

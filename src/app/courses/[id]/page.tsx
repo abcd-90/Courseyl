@@ -25,12 +25,19 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
           try {
             const stored = localStorage.getItem("courseit_recent_courses");
             const recents = stored ? JSON.parse(stored) : [];
+            const thumb =
+              data.course.thumbnailUrl ||
+              (data.course.source?.youtubeId
+                ? `https://i.ytimg.com/vi/${data.course.source.youtubeId}/hqdefault.jpg`
+                : "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg");
             const updated = [
               {
                 id: data.course.id,
                 slug: data.course.slug,
                 title: data.course.title,
-                thumbnailUrl: data.course.thumbnailUrl,
+                thumbnail: thumb,
+                thumbnailUrl: thumb,
+                progress: data.userState?.progressPercentage || 0,
               },
               ...recents.filter((r: any) => r.slug !== data.course.slug && r.id !== data.course.id),
             ].slice(0, 5);

@@ -87,11 +87,18 @@ export default function LessonLearnPage({
           try {
             const stored = localStorage.getItem("courseit_recent_courses");
             const existing = stored ? JSON.parse(stored) : [];
+            const thumb =
+              data.lesson.thumbnailUrl ||
+              (data.lesson.youtubeVideoId
+                ? `https://i.ytimg.com/vi/${data.lesson.youtubeVideoId}/hqdefault.jpg`
+                : "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg");
             const updated = [
               {
+                id: resolvedParams.id,
                 title: data.lesson.courseTitle || resolvedParams.id,
                 slug: data.lesson.courseSlug || resolvedParams.id,
-                thumbnail: data.lesson.thumbnailUrl,
+                thumbnail: thumb,
+                thumbnailUrl: thumb,
                 progress: data.progress?.isCompleted ? 100 : 0,
               },
               ...existing.filter((e: any) => e.slug !== (data.lesson.courseSlug || resolvedParams.id)),
