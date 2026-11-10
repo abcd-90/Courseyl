@@ -134,9 +134,9 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
           <div className="flex-1 min-w-0 w-full">
             <div className="flex items-center justify-between gap-2">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-lime-soft dark:bg-[#1c2717] text-moss dark:text-[#b8c460] text-xs font-semibold border border-line dark:border-[#2b3a1d]">
-                <span>{course.source?.channelTitle || course.creator?.profile?.displayName || "Krish Naik"}</span>
+                <span>{course.channelTitle || course.source?.channelTitle || course.creatorName || "CodeWithHarry"}</span>
                 <span>·</span>
-                <span>{formatDuration(course.totalDurationSeconds || 40380)}</span>
+                <span>{formatDuration(course.totalDurationSeconds || 39240)}</span>
                 <span>·</span>
                 <span>{allLessons.length} lessons</span>
               </div>
@@ -233,13 +233,15 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                   <div className="w-8 h-8 rounded-full bg-lime-soft dark:bg-[#1b2716] text-moss dark:text-[#b8c460] font-bold text-xs flex items-center justify-center shrink-0">
                     {lIdx + 1}
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <h4 className="text-sm sm:text-base font-semibold text-ink group-hover:text-moss transition-colors truncate sm:whitespace-normal">
                       {lesson.title}
                     </h4>
-                    <p className="text-xs text-ink-soft line-clamp-1 mt-0.5">
-                      {lesson.description}
-                    </p>
+                    {(lesson.description || lesson.summary) && (
+                      <p className="text-xs text-ink-soft/90 line-clamp-1 mt-0.5 font-normal tracking-tight">
+                        {lesson.description || lesson.summary}
+                      </p>
+                    )}
                   </div>
                 </div>
 

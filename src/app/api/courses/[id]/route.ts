@@ -36,6 +36,7 @@ export async function GET(
                 orderIndex: true,
                 title: true,
                 description: true,
+                summary: true,
                 durationSeconds: true,
                 startSeconds: true,
                 endSeconds: true,
@@ -72,6 +73,7 @@ export async function GET(
                   orderIndex: true,
                   title: true,
                   description: true,
+                  summary: true,
                   durationSeconds: true,
                   startSeconds: true,
                   endSeconds: true,
@@ -142,6 +144,8 @@ export async function GET(
 
         return {
           ...l,
+          description: l.description || l.summary || "",
+          summary: l.summary || l.description || "",
           isCompleted,
           isSkipped,
           lastPlaybackSeconds: prog?.lastPlaybackSeconds ?? 0,
@@ -178,6 +182,16 @@ export async function GET(
           course.creator?.profile?.displayName ||
           (course.creator?.email ? course.creator.email.split("@")[0] : "") ||
           "Sheikhsami3082",
+        source: course.source
+          ? {
+              channelTitle: course.source.channelTitle,
+              youtubeId: course.source.youtubeId,
+            }
+          : null,
+        channelTitle:
+          course.source?.channelTitle ||
+          course.creator?.profile?.displayName ||
+          "CodeWithHarry",
         hasPlacementTest: course.placementQuestions.length > 0,
         chapters: formattedChapters,
       },
