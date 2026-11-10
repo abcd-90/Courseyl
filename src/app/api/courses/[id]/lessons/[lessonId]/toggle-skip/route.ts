@@ -7,13 +7,14 @@ export async function POST(
   { params }: { params: Promise<{ id: string; lessonId: string }> }
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+    const user = await getCurrentUser().catch(() => null);
     const { id, lessonId } = await params;
     const { isSkipped } = await req.json();
+
+    if (!user) {
+      // Allow guest to toggle skip without throwing error
+      return NextResponse.json({ success: true, isSkipped: !!isSkipped, guest: true });
+    }
 
     const course = await prisma.course.findFirst({
       where: { OR: [{ id }, { slug: id }] },
@@ -23,7 +24,7 @@ export async function POST(
       return NextResponse.json({ error: "Course not found" }, { status: 404 });
     }
 
-    const enrollment = await prisma.enrollment.findUnique({
+    let enrollment = await prisma.enrollment.findUnique({
       where: {
         userId_courseId: {
           userId: user.id,
@@ -33,7 +34,12 @@ export async function POST(
     });
 
     if (!enrollment) {
-      return NextResponse.json({ error: "You are not enrolled in this course" }, { status: 400 });
+      enrollment = await prisma.enrollment.create({
+        data: {
+          userId: user.id,
+          courseId: course.id,
+        },
+      });
     }
 
     const progress = await prisma.lessonProgress.upsert({

@@ -48,7 +48,7 @@ export default function PlacementTestPage({ params }: { params: Promise<{ id: st
 
   const fetchQuestions = () => {
     setLoading(true);
-    fetch(`/api/courses/${courseSlug}/placement-test`)
+    fetch(`/api/courses/${courseSlug}/placement-test`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         if (data.questions) {

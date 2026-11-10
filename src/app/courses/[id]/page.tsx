@@ -14,7 +14,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
 
   const fetchCourseData = () => {
-    fetch(`/api/courses/${resolvedParams.id}`)
+    fetch(`/api/courses/${resolvedParams.id}`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         if (data.course) {

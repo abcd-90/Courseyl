@@ -13,8 +13,8 @@ export default function CommunityPage() {
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetch("/api/courses?limit=100")
+  const fetchCommunityCourses = () => {
+    fetch("/api/courses?limit=100", { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data.courses)) {
@@ -26,6 +26,13 @@ export default function CommunityPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchCommunityCourses();
+    const handleFocus = () => fetchCommunityCourses();
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
   }, []);
 
   const filteredCourses = courses.filter((c) => {

@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -18,6 +21,7 @@ export async function GET(
       include: {
         creator: {
           select: {
+            email: true,
             profile: { select: { displayName: true, avatarUrl: true } },
           },
         },
@@ -53,6 +57,7 @@ export async function GET(
         include: {
           creator: {
             select: {
+              email: true,
               profile: { select: { displayName: true, avatarUrl: true } },
             },
           },
@@ -169,7 +174,10 @@ export async function GET(
         status: course.status,
         isPublic: course.isPublic,
         enrollmentCount: course.enrollmentCount,
-        creatorName: course.creator?.profile?.displayName || "CourseIt Creator",
+        creatorName:
+          course.creator?.profile?.displayName ||
+          (course.creator?.email ? course.creator.email.split("@")[0] : "") ||
+          "Sheikhsami3082",
         hasPlacementTest: course.placementQuestions.length > 0,
         chapters: formattedChapters,
       },

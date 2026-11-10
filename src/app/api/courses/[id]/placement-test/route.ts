@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -73,11 +76,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+    const user = await getCurrentUser().catch(() => null);
     const { id } = await params;
     const { answers } = await req.json(); // { [questionId: string]: number }
 
@@ -97,20 +96,25 @@ export async function POST(
       return NextResponse.json({ error: "Course not found" }, { status: 404 });
     }
 
-    // Ensure enrollment
-    const enrollment = await prisma.enrollment.upsert({
-      where: {
-        userId_courseId: {
-          userId: user.id,
-          courseId: course.id,
-        },
-      },
-      update: {},
-      create: {
-        userId: user.id,
-        courseId: course.id,
-      },
-    });
+    // Ensure enrollment if user is logged in
+    let enrollment: any = null;
+    if (user) {
+      try {
+        enrollment = await prisma.enrollment.upsert({
+          where: {
+            userId_courseId: {
+              userId: user.id,
+              courseId: course.id,
+            },
+          },
+          update: {},
+          create: {
+            userId: user.id,
+            courseId: course.id,
+          },
+        });
+      } catch {}
+    }
 
     // Evaluate answers
     let correctCount = 0;
@@ -162,36 +166,44 @@ export async function POST(
         if (matchesMasteredTopic && scorePercentage >= 60) {
           skippedLessonIds.push(lesson.id);
 
-          await prisma.lessonProgress.upsert({
-            where: {
-              enrollmentId_lessonId: {
-                enrollmentId: enrollment.id,
-                lessonId: lesson.id,
-              },
-            },
-            update: {
-              isSkipped: true,
-            },
-            create: {
-              enrollmentId: enrollment.id,
-              lessonId: lesson.id,
-              isSkipped: true,
-              isCompleted: false,
-            },
-          });
+          if (enrollment) {
+            try {
+              await prisma.lessonProgress.upsert({
+                where: {
+                  enrollmentId_lessonId: {
+                    enrollmentId: enrollment.id,
+                    lessonId: lesson.id,
+                  },
+                },
+                update: {
+                  isSkipped: true,
+                },
+                create: {
+                  enrollmentId: enrollment.id,
+                  lessonId: lesson.id,
+                  isSkipped: true,
+                  isCompleted: false,
+                },
+              });
+            } catch {}
+          }
         }
       }
     }
 
-    // Save placement attempt
-    await prisma.placementAttempt.create({
-      data: {
-        enrollmentId: enrollment.id,
-        courseId: course.id,
-        scorePercentage,
-        skippedLessonsCount: skippedLessonIds.length,
-      },
-    });
+    // Save placement attempt if user is logged in
+    if (enrollment) {
+      try {
+        await prisma.placementAttempt.create({
+          data: {
+            enrollmentId: enrollment.id,
+            courseId: course.id,
+            scorePercentage,
+            skippedLessonsCount: skippedLessonIds.length,
+          },
+        });
+      } catch {}
+    }
 
     const allLessons = course.chapters.flatMap((ch) =>
       ch.lessons.map((l) => ({

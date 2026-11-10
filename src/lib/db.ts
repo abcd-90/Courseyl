@@ -8,30 +8,41 @@ const globalForPrisma = globalThis as unknown as {
   pool: Pool | undefined;
 };
 
+function getConnectionString(): string {
+  let conn = process.env.DATABASE_URL || "";
+  // Auto-switch Supabase pooler from session mode (5432) to transaction mode (6543)
+  // to avoid (EMAXCONNSESSION) max clients reached in session mode
+  if (conn.includes(".pooler.supabase.com:5432")) {
+    conn = conn.replace(".pooler.supabase.com:5432", ".pooler.supabase.com:6543");
+  }
+  return conn;
+}
+
 function createPrismaClient() {
-  const connectionString = process.env.DATABASE_URL;
+  if (globalForPrisma.prisma) {
+    return globalForPrisma.prisma;
+  }
+
+  const connectionString = getConnectionString();
   const pool =
     globalForPrisma.pool ??
     new Pool({
       connectionString,
       ssl: { rejectUnauthorized: false },
-      max: process.env.NODE_ENV === "production" ? 2 : 5,
-      idleTimeoutMillis: 15000,
+      max: process.env.NODE_ENV === "production" ? 1 : 3,
+      idleTimeoutMillis: 10000,
       connectionTimeoutMillis: 10000,
     });
 
-  if (process.env.NODE_ENV !== "production") {
-    globalForPrisma.pool = pool;
-  }
+  globalForPrisma.pool = pool;
 
   const adapter = new PrismaPg(pool);
-  return new PrismaClient({ adapter });
+  const client = new PrismaClient({ adapter });
+
+  globalForPrisma.prisma = client;
+  return client;
 }
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
-}
 
 export default prisma;

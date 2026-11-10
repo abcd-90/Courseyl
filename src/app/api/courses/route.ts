@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -104,10 +107,11 @@ export async function GET(req: Request) {
         where,
         take: limit,
         skip,
-        orderBy: { enrollmentCount: "desc" },
+        orderBy: [{ createdAt: "desc" }, { enrollmentCount: "desc" }],
         include: {
           creator: {
             select: {
+              email: true,
               profile: {
                 select: { displayName: true, avatarUrl: true },
               },
@@ -180,8 +184,11 @@ export async function GET(req: Request) {
         thumbnailUrl: c.thumbnailUrl || (c.source?.youtubeId ? `https://i.ytimg.com/vi/${c.source.youtubeId}/hqdefault.jpg` : "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg"),
         totalDurationSeconds: c.totalDurationSeconds,
         estimatedStudyMinutes: c.estimatedStudyMinutes,
-        enrollmentCount: c.enrollmentCount || 42,
-        creatorName: c.creator?.profile?.displayName || "Learner",
+        enrollmentCount: c.enrollmentCount || 1,
+        creatorName:
+          c.creator?.profile?.displayName ||
+          (c.creator?.email ? c.creator.email.split("@")[0] : "") ||
+          "Creator",
         creator: c.source?.channelTitle || c.creator?.profile?.displayName || "Instructor",
         duration: `${Math.floor(c.totalDurationSeconds / 3600)}h ${String(Math.floor((c.totalDurationSeconds % 3600) / 60)).padStart(2, "0")}m`,
         lessonCount,
