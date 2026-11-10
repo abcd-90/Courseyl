@@ -5,6 +5,22 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/AppSidebar";
 
+const cleanDisplay = (str: string) => {
+  if (!str) return "";
+  return str
+    .replace(/\\u0026/g, "&")
+    .replace(/\\u003c/g, "<")
+    .replace(/\\u003e/g, ">")
+    .replace(/\\u0027/g, "'")
+    .replace(/\\u0022/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .trim();
+};
+
 export default function PlacementTestPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const router = useRouter();
@@ -94,39 +110,41 @@ export default function PlacementTestPage({ params }: { params: Promise<{ id: st
               const options = typeof q.options === "string" ? JSON.parse(q.options) : q.options;
 
               return (
-                <div key={q.id} className="bg-surface rounded-3xl border border-line p-6 sm:p-7 shadow-sm space-y-4">
+                <div key={q.id} className="bg-surface dark:bg-[#121815] rounded-3xl border border-line dark:border-white/10 p-6 sm:p-7 shadow-sm space-y-4">
                   <div className="flex items-center justify-between text-xs text-ink-soft">
-                    <span className="font-semibold text-moss">{q.topicName || `Concept ${idx + 1}`}</span>
-                    <span>1 Point</span>
+                    <span className="font-semibold text-moss dark:text-[#b8c460] font-mono text-[0.72rem] tracking-wide uppercase">
+                      {cleanDisplay(q.topicName) || `Concept ${idx + 1}`}
+                    </span>
+                    <span className="font-mono text-xs">1 Point</span>
                   </div>
-                  <h3 className="text-sm sm:text-base font-bold text-ink">
-                    {q.questionText || q.question}
+                  <h3 className="text-sm sm:text-base font-bold text-ink leading-snug">
+                    {cleanDisplay(q.questionText || q.question)}
                   </h3>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2.5">
                     {options.map((opt: any, optIdx: number) => {
                       const optIndex = typeof opt === "object" && opt.optionIndex !== undefined ? opt.optionIndex : optIdx;
-                      const optText = typeof opt === "string" ? opt : opt.optionText || opt.text || String(opt);
+                      const optText = cleanDisplay(typeof opt === "string" ? opt : opt.optionText || opt.text || String(opt));
                       const isSelected = answers[q.id] === optIndex;
                       return (
                         <button
                           key={optIndex}
                           type="button"
                           onClick={() => setAnswers({ ...answers, [q.id]: optIndex })}
-                          className={`w-full p-3 rounded-2xl border text-left text-xs sm:text-sm transition-all flex items-center gap-3 cursor-pointer ${
+                          className={`w-full p-3.5 rounded-2xl border text-left text-xs sm:text-sm transition-all flex items-center gap-3 cursor-pointer ${
                             isSelected
-                              ? "border-moss bg-lime-soft/80 text-pill-ink font-semibold shadow-xs"
-                              : "border-line bg-surface text-ink hover:bg-muted"
+                              ? "border-moss bg-lime-soft/90 dark:bg-[#202d18] text-pill-ink dark:text-[#b8c460] font-semibold shadow-xs"
+                              : "border-line dark:border-white/10 bg-surface dark:bg-[#0c120e] text-ink hover:bg-muted dark:hover:bg-white/5"
                           }`}
                         >
                           <span
                             className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
-                              isSelected ? "border-moss bg-moss text-on-moss" : "border-line"
+                              isSelected ? "border-moss bg-moss text-on-moss" : "border-line dark:border-white/20"
                             }`}
                           >
                             {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-current" />}
                           </span>
-                          <span>{optText}</span>
+                          <span className="leading-relaxed">{optText}</span>
                         </button>
                       );
                     })}
