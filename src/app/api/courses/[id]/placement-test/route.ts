@@ -193,6 +193,20 @@ export async function POST(
       },
     });
 
+    const allLessons = course.chapters.flatMap((ch) =>
+      ch.lessons.map((l) => ({
+        id: l.id,
+        title: l.title,
+        durationSeconds: l.durationSeconds || 600,
+        isSkipped: skippedLessonIds.includes(l.id),
+      }))
+    );
+
+    const totalDurationSeconds = allLessons.reduce((acc, l) => acc + l.durationSeconds, 0);
+    const skippedDurationSeconds = allLessons
+      .filter((l) => l.isSkipped)
+      .reduce((acc, l) => acc + l.durationSeconds, 0);
+
     return NextResponse.json({
       success: true,
       scorePercentage,
@@ -203,6 +217,12 @@ export async function POST(
       skippedLessonCount: skippedLessonIds.length,
       skippedLessonIds,
       courseSlug: course.slug,
+      courseTitle: course.title,
+      totalLessons: allLessons.length,
+      totalDurationSeconds,
+      skippedDurationSeconds,
+      lessons: allLessons,
+      firstActiveLessonId: allLessons.find((l) => !l.isSkipped)?.id || allLessons[0]?.id,
       message:
         skippedLessonIds.length > 0
           ? `Great job! You mastered ${skippedLessonIds.length} lesson(s) and shaved off study time.`

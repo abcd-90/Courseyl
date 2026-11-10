@@ -85,14 +85,20 @@ export default function MyCoursesPage() {
                 No courses yet
               </h3>
               <p className="mt-2 text-xs sm:text-sm text-ink-soft max-w-md leading-relaxed">
-                Paste a YouTube video or playlist and it becomes a course with lessons, quizzes and a daily plan.
+                Explore existing community courses or paste a YouTube video to build your own personalized curriculum.
               </p>
-              <div className="mt-6">
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                <Link
+                  href="/community"
+                  className="inline-flex items-center justify-center px-5 py-2.5 rounded-full bg-[#4b5e1e] dark:bg-[#b8c460] text-white dark:text-[#0f1611] text-xs sm:text-sm font-semibold hover:bg-[#3d4c18] dark:hover:bg-[#a6b350] transition-colors shadow-xs cursor-pointer"
+                >
+                  Explore community courses
+                </Link>
                 <Link
                   href="/generate"
-                  className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-[#b8c460] text-[#0f1611] text-sm font-semibold hover:bg-[#a6b350] transition-colors shadow-xs cursor-pointer"
+                  className="inline-flex items-center justify-center px-5 py-2.5 rounded-full border border-line dark:border-white/10 bg-surface dark:bg-white/5 text-xs sm:text-sm font-semibold text-ink hover:bg-black/5 dark:hover:bg-white/10 transition-colors shadow-xs cursor-pointer"
                 >
-                  Build your first course
+                  + Build your own course
                 </Link>
               </div>
             </div>

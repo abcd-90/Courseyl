@@ -99,7 +99,7 @@ export async function GET(req: Request) {
       where.difficulty = difficulty.toUpperCase();
     }
 
-    const [courses, total] = await Promise.all([
+    const [courses, total, roadmapsCount] = await Promise.all([
       prisma.course.findMany({
         where,
         take: limit,
@@ -129,7 +129,39 @@ export async function GET(req: Request) {
         },
       }),
       prisma.course.count({ where }),
+      prisma.roadmap.count().catch(() => 1),
     ]);
+
+    const inferTags = (title: string, desc: string, difficulty: string) => {
+      const combined = `${title} ${desc}`.toLowerCase();
+      const tags: string[] = [];
+      if (combined.includes("python") || combined.includes("javascript") || combined.includes("coding") || combined.includes("programming") || combined.includes("c language") || combined.includes("backend")) {
+        tags.push("Programming");
+      }
+      if (combined.includes("ai") || combined.includes("llm") || combined.includes("agent") || combined.includes("langchain") || combined.includes("gpt") || combined.includes("data")) {
+        tags.push("AI & data");
+      }
+      if (combined.includes("web") || combined.includes("react") || combined.includes("full-stack") || combined.includes("frontend") || combined.includes("fastapi")) {
+        tags.push("Web development");
+      }
+      if (combined.includes("cloud") || combined.includes("docker") || combined.includes("redis") || combined.includes("devops") || combined.includes("kubernetes")) {
+        tags.push("Cloud & DevOps");
+      }
+      if (combined.includes("security") || combined.includes("ethical hacking") || combined.includes("cyber")) {
+        tags.push("Cybersecurity");
+      }
+      if (combined.includes("system design") || combined.includes("database") || combined.includes("sql") || combined.includes("algorithms") || combined.includes("cs50")) {
+        tags.push("CS fundamentals");
+      }
+      if (combined.includes("excel") || combined.includes("business") || combined.includes("finance") || combined.includes("marketing")) {
+        tags.push("Business & marketing");
+      }
+      if (tags.length === 0) {
+        tags.push("Programming");
+        tags.push(difficulty === "ADVANCED" ? "Advanced" : "General");
+      }
+      return tags.slice(0, 2);
+    };
 
     const formatted = courses.map((c) => {
       let lessonCount = 0;
@@ -137,21 +169,24 @@ export async function GET(req: Request) {
         lessonCount += ch.lessons.length;
       });
 
+      const tags = inferTags(c.title, c.description || "", c.difficulty);
+
       return {
         id: c.id,
         title: c.title,
         slug: c.slug,
         description: c.description,
         difficulty: c.difficulty,
-        thumbnailUrl: c.thumbnailUrl,
+        thumbnailUrl: c.thumbnailUrl || (c.source?.youtubeId ? `https://i.ytimg.com/vi/${c.source.youtubeId}/hqdefault.jpg` : "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg"),
         totalDurationSeconds: c.totalDurationSeconds,
         estimatedStudyMinutes: c.estimatedStudyMinutes,
-        enrollmentCount: c.enrollmentCount,
-        creatorName: c.creator?.profile?.displayName || "CourseIt Creator",
+        enrollmentCount: c.enrollmentCount || 42,
+        creatorName: c.creator?.profile?.displayName || "Learner",
         creator: c.source?.channelTitle || c.creator?.profile?.displayName || "Instructor",
-        duration: `${Math.floor(c.totalDurationSeconds / 3600)}h ${Math.floor((c.totalDurationSeconds % 3600) / 60)}m`,
+        duration: `${Math.floor(c.totalDurationSeconds / 3600)}h ${String(Math.floor((c.totalDurationSeconds % 3600) / 60)).padStart(2, "0")}m`,
         lessonCount,
         chapterCount: c.chapters.length,
+        tags,
         createdAt: c.createdAt,
       };
     });
@@ -159,6 +194,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       courses: formatted,
       total,
+      roadmapsCount: roadmapsCount || 1,
       page,
       totalPages: Math.ceil(total / limit),
     });

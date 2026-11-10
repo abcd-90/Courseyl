@@ -111,7 +111,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
       <main className="w-full min-w-0 flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto max-w-5xl">
         {/* Back navigation */}
         <Link
-          href="/courses"
+          href="/community"
           className="inline-flex items-center gap-2 text-xs sm:text-sm text-ink-soft hover:text-ink transition-colors mb-6 group cursor-pointer"
         >
           <span className="transition-transform group-hover:-translate-x-0.5 font-bold">←</span>

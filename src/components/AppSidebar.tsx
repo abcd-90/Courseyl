@@ -349,11 +349,17 @@ export function AppSidebar() {
           <Link
             href="/community"
             onClick={() => isMobile && setIsMobileOpen(false)}
-            className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-ink-soft hover:bg-black/5 dark:hover:bg-white/5 hover:text-ink transition-colors"
+            className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+              pathname === "/community"
+                ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
+                : "text-ink-soft hover:bg-black/5 dark:hover:bg-white/5 hover:text-ink"
+            }`}
           >
-            <svg className="w-4 h-4 text-ink-soft" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
+            <span className={pathname === "/community" ? "text-moss dark:text-[#b8c460]" : "text-ink-soft"}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </span>
             <span>Community</span>
           </Link>
         </div>
