@@ -466,10 +466,14 @@ export default function LessonLearnPage({
 
   const selectedChapter = chapters[selectedDayIndex] || chapters[0];
   const dayLessons = selectedChapter?.lessons || [];
-  const videoId = lesson?.youtubeVideoId || "J9BI0jGOds8";
+  const videoId =
+    (lesson?.youtubeVideoId && lesson.youtubeVideoId !== "urbkF3zPpxw" ? lesson.youtubeVideoId : null) ||
+    course?.source?.youtubeId ||
+    "UrsmFxEIp5k";
 
-  // URL with controls=0 to strictly disable YouTube's 8h native control bar
-  const embedUrl = `https://www.youtube.com/embed/${videoId}?start=${startSec}&end=${endSec}&controls=0&enablejsapi=1&rel=0&modestbranding=1&iv_load_policy=3&fs=0&playsinline=1&origin=${typeof window !== "undefined" ? encodeURIComponent(window.location.origin) : ""}`;
+  // URL with controls=0 to strictly disable YouTube's native control bar
+  const hasValidEnd = endSec && endSec > startSec;
+  const embedUrl = `https://www.youtube.com/embed/${videoId}?start=${startSec}${hasValidEnd ? `&end=${endSec}` : ""}&controls=0&enablejsapi=1&rel=0&modestbranding=1&iv_load_policy=3&playsinline=1`;
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-paper text-ink w-full overflow-x-hidden">

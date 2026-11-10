@@ -147,12 +147,19 @@ export async function GET(
       importantDefinitions = [];
     }
 
+    const resolvedVideoId =
+      lesson.youtubeVideoId && lesson.youtubeVideoId !== "urbkF3zPpxw"
+        ? lesson.youtubeVideoId
+        : (lesson.chapter.course as any).source?.youtubeId || "UrsmFxEIp5k";
+    const resolvedChannelTitle =
+      (lesson.chapter.course as any).source?.channelTitle || "CodeWithHarry";
+
     return NextResponse.json({
       lesson: {
         id: lesson.id,
         title: lesson.title,
         description: lesson.description,
-        youtubeVideoId: lesson.youtubeVideoId,
+        youtubeVideoId: resolvedVideoId,
         startSeconds: lesson.startSeconds,
         endSeconds: lesson.endSeconds,
         durationSeconds: lesson.durationSeconds,
@@ -163,8 +170,8 @@ export async function GET(
         courseId: lesson.chapter.course.id,
         courseTitle: lesson.chapter.course.title,
         courseSlug: lesson.chapter.course.slug,
-        channelTitle: (lesson.chapter.course as any).source?.channelTitle || "Mayank Aggarwal",
-        thumbnailUrl: lesson.chapter.course.thumbnailUrl || `https://img.youtube.com/vi/${lesson.youtubeVideoId}/hqdefault.jpg`,
+        channelTitle: resolvedChannelTitle,
+        thumbnailUrl: lesson.chapter.course.thumbnailUrl || `https://img.youtube.com/vi/${resolvedVideoId}/hqdefault.jpg`,
       },
       navigation: {
         prevLesson,
