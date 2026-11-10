@@ -2,10 +2,12 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import { CourseItLogo } from "./CourseItLogo";
 
 export function MarketingNavbar() {
+  const pathname = usePathname();
   const [isDark, setIsDark] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
 
@@ -23,6 +25,17 @@ export function MarketingNavbar() {
         setIsAuthenticated(false);
       });
   }, []);
+
+  const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
+    if (pathname === "/") {
+      e.preventDefault();
+      const el = document.getElementById(targetId);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        window.history.pushState(null, "", `/#${targetId}`);
+      }
+    }
+  };
 
   const toggleTheme = () => {
     const isCurrentlyDark = document.documentElement.classList.contains("dark");
@@ -49,16 +62,28 @@ export function MarketingNavbar() {
 
         {/* Navigation Links (Desktop) */}
         <nav aria-label="Main" className="ml-auto hidden gap-6 text-[0.92rem] text-ink-soft md:flex items-center">
-          <Link className="transition-colors hover:text-ink" href="/#features">
+          <Link
+            className="transition-colors hover:text-ink cursor-pointer"
+            href="/#features"
+            onClick={(e) => scrollToSection(e, "features")}
+          >
             Features
           </Link>
-          <Link className="transition-colors hover:text-ink" href="/#courses">
+          <Link
+            className="transition-colors hover:text-ink cursor-pointer"
+            href="/#courses"
+            onClick={(e) => scrollToSection(e, "courses")}
+          >
             Courses
           </Link>
-          <Link className="transition-colors hover:text-ink" href="/#how-it-works">
+          <Link
+            className="transition-colors hover:text-ink cursor-pointer"
+            href="/#how-it-works"
+            onClick={(e) => scrollToSection(e, "how-it-works")}
+          >
             How it works
           </Link>
-          <Link className="transition-colors hover:text-ink" href="/pricing">
+          <Link className="transition-colors hover:text-ink cursor-pointer" href="/pricing">
             Pricing
           </Link>
         </nav>

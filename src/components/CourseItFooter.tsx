@@ -2,11 +2,24 @@
 
 import React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useSiteSettings } from "./SiteSettingsProvider";
 
 export function CourseItFooter() {
+  const pathname = usePathname();
   const { settings } = useSiteSettings();
   const brandName = settings.branding?.brandName || "Courseyl";
+
+  const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
+    if (pathname === "/") {
+      e.preventDefault();
+      const el = document.getElementById(targetId);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        window.history.pushState(null, "", `/#${targetId}`);
+      }
+    }
+  };
   return (
     <footer className="bg-[#b8c460] !text-[#0f1611] mt-auto">
       <div className="mx-auto max-w-[1200px] px-6 pt-16 pb-7">
@@ -105,17 +118,29 @@ export function CourseItFooter() {
               <h2 className="font-mono text-label font-medium tracking-[0.2em] uppercase text-[#0f1611]">Product</h2>
               <ul className="mt-6 flex flex-col gap-4 text-[0.95rem] text-[#0f1611]/75">
                 <li>
-                  <Link className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline" href="/#features">
+                  <Link
+                    className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline cursor-pointer"
+                    href="/#features"
+                    onClick={(e) => scrollToSection(e, "features")}
+                  >
                     Features
                   </Link>
                 </li>
                 <li>
-                  <Link className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline" href="/#courses">
+                  <Link
+                    className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline cursor-pointer"
+                    href="/#courses"
+                    onClick={(e) => scrollToSection(e, "courses")}
+                  >
                     Courses
                   </Link>
                 </li>
                 <li>
-                  <Link className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline" href="/#how-it-works">
+                  <Link
+                    className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline cursor-pointer"
+                    href="/#how-it-works"
+                    onClick={(e) => scrollToSection(e, "how-it-works")}
+                  >
                     How it works
                   </Link>
                 </li>

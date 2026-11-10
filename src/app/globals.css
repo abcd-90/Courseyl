@@ -46,6 +46,10 @@
   --radius-panel: 32px;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 :root {
   /* Exact CourseIt Design Foundations */
   --font-family-primary: 'Instrument Sans', 'Instrument Sans Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
