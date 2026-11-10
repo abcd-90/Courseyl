@@ -692,39 +692,89 @@ function generateFallbackCurriculum(
   const duration = Math.max(1200, meta.durationSeconds);
   const cleanTitle = meta.title.replace(/[|:-].*$/, "").trim();
 
-  // Determine number of Days based on duration (~1.5 to 2.5 hours per day)
-  const daysCount = Math.min(8, Math.max(1, Math.ceil(duration / (2 * 3600))));
+  // Determine number of Days based on duration (~1.2 to 2.0 hours per day)
+  const daysCount = Math.min(10, Math.max(1, Math.ceil(duration / (1.75 * 3600))));
   const dayDuration = duration / daysCount;
 
-  // Each day has 3 to 5 bite-sized lessons
-  const lessonsPerDay = Math.min(5, Math.max(3, Math.round(dayDuration / 900)));
+  // Each day has 6 to 9 bite-sized micro-lessons (each ~10 to 18 minutes)
+  const lessonsPerDay = Math.min(9, Math.max(5, Math.round(dayDuration / 720)));
   const totalLessonsCount = daysCount * lessonsPerDay;
   const singleLessonDuration = Math.floor(duration / totalLessonsCount);
 
   const dayThematicTitles = [
     "Core Fundamentals & Setup",
-    "Core Architecture & Workflow",
-    "Hands-on Implementation & Practice",
-    "Advanced Patterns & Logic",
-    "Integration & Optimization",
-    "Testing, Debugging & Real-world Scenarios",
-    "Production Readiness & System Scaling",
-    "Capstone Project & Final Mastery",
+    "Data Types & Foundational Mechanics",
+    "Operators, Slicing & Expressions",
+    "Control Flow, Loops & Conditionals",
+    "Data Structures, Collections & Mutability",
+    "Functions, Scope & Modularity",
+    "Object-Oriented Architecture & Inheritance",
+    "Files, I/O & Exception Handling",
+    "Advanced Paradigms & Industry Tooling",
+    "Production Systems & Capstone Project",
   ];
 
   const lessonSubtopics = [
-    "Introduction, Motivation & Mental Models",
-    "Environment Setup & Tooling Configuration",
-    "Core Syntax, Data Contracts & Primitive Types",
-    "Underlying Execution Flow & Architecture",
-    "Component Lifecycle & Resource Allocation",
-    "Practical Coding Patterns & Live Walkthrough",
-    "Resilient Error Handling & Exception Management",
-    "Performance Optimization, Caching & Bottlenecks",
-    "Security Hardening & Best Practices",
-    "End-to-End Testing & Verification Strategy",
-    "Production Deployment & Ongoing Observability",
-    "Real-World Capstone Integration & Next Steps",
+    "Course Introduction & Development Environment Setup",
+    "Core Syntax, Indentation & Interpreted Execution",
+    "Variables, Data Types & Type Conversion",
+    "Arithmetic, Logical & Comparison Operators",
+    "String Manipulation, Slicing & Format Sequences",
+    "Conditional Logic: Branching & Truthy Values",
+    "While Loops & Iteration Bounds",
+    "For Loops, Range Sequences & Iterables",
+    "Break, Continue & Pass Statements",
+    "List Operations, Indexing & Mutability",
+    "List Methods: Append, Insert, Pop & Sort",
+    "Tuples & Immutable Sequence Mechanics",
+    "Dictionaries: Key-Value Hash Maps & Queries",
+    "Dictionary Methods: Keys, Values, Items & Defaults",
+    "Sets: Mathematical Uniqueness & Operations",
+    "Functions: Definition, Invocation & Parameters",
+    "Positional vs Keyword Arguments & Defaults",
+    "Return Values, NoneType & Variable Scope",
+    "Recursion: Call Stack & Base Termination",
+    "Lambda Functions, Map, Filter & List Comprehensions",
+    "File I/O: Reading Text & Binary Streams",
+    "File Writing, Appending & Resource Management",
+    "Context Managers with with-Statement Syntax",
+    "Object-Oriented Programming: Classes & Instances",
+    "Self Reference, Attributes & Instance Methods",
+    "Constructor Methods with __init__ Dunder",
+    "Class Attributes vs Instance Attribute Resolution",
+    "Static Methods & @staticmethod Decorator",
+    "Class Methods & @classmethod Architecture",
+    "Property Decorators: Managed Getters & Setters",
+    "Single & Multilevel Class Inheritance",
+    "Super Method & Base Constructor Invocations",
+    "Multiple Inheritance & Method Resolution Order",
+    "Operator Overloading & Magic Dunder Methods",
+    "Exception Handling: Try, Except & Finally Blocks",
+    "Raising Custom Exceptions & Error Hierarchies",
+    "Modules, Packages & Pip Dependency Ecosystem",
+    "Virtual Environments & Project Isolation",
+    "Standard Library: Datetime, Math & Random",
+    "JSON Serialization, APIs & Network Requests",
+    "Regular Expressions & String Pattern Matching",
+    "Generators, Iterators & Memory Optimization",
+    "Decorators & Functional Composition Patterns",
+    "Type Annotations, Type Hinting & Static Checking",
+    "Unit Testing, Assertions & Test Frameworks",
+    "Debugging Strategies, Breakpoints & Stack Traces",
+    "Asynchronous Programming with Async & Await",
+    "Concurrency, Threads & Multiprocessing Models",
+    "Database Connectivity, CRUD Operations & ORMs",
+    "Web Frameworks: Routing, Endpoints & Middleware",
+    "Security Best Practices & Input Sanitization",
+    "Packaging, Publishing & Distribution",
+    "Docker Containerization & Environment Consistency",
+    "Continuous Integration, Linting & Formatting",
+    "Cloud Deployment & Serverless Integration",
+    "Performance Profiling, Benchmarking & Bottlenecks",
+    "Production Logging, Telemetry & Observability",
+    "Capstone Project: Architecture & System Setup",
+    "Capstone Project: Core Implementation & Workflows",
+    "Course Recap, Portfolio Presentation & Next Steps",
   ];
 
   const chapters: RawChapter[] = [];

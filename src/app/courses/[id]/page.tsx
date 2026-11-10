@@ -154,21 +154,21 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
               </button>
             </div>
 
-            {/* Title styled with distinctive lime-moss font matching Screenshot 2 */}
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-display font-bold text-moss dark:text-[#b8c460] tracking-tight leading-snug mt-3">
+            {/* Title styled with distinctive serif italic font matching reference site */}
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-[2.6rem] font-serif italic text-[#2c3e1b] dark:text-[#b8c460] tracking-tight leading-[1.2] mt-3 font-normal">
               {course.title}
             </h1>
           </div>
         </div>
 
-        {/* Diagnostic Placement Test Banner matching Screenshot 2 */}
+        {/* Diagnostic Placement Test Banner matching reference site */}
         <div className="mt-8 bg-lime-soft/40 dark:bg-[#162111] border border-line dark:border-[#26371a] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <p className="text-sm sm:text-base text-ink font-medium">
             Already know some of this? A 2-minute test skips the lessons you know.
           </p>
           <Link
             href={`/courses/${course.slug || course.id}/placement-test`}
-            className="px-5 py-2.5 rounded-full bg-[#b8c460] text-[#0f1611] font-semibold text-xs sm:text-sm hover:bg-[#a6b350] transition-colors shrink-0 text-center shadow-xs"
+            className="px-5 py-2.5 rounded-full bg-[#2d3a14] dark:bg-[#b8c460] text-white dark:text-[#0f1611] font-semibold text-xs sm:text-sm hover:bg-[#202a0e] dark:hover:bg-[#a6b350] transition-colors shrink-0 text-center shadow-xs cursor-pointer"
           >
             Take the placement test
           </Link>
@@ -184,7 +184,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
             </span>
           </div>
 
-          {/* Day Selection Tab Bar */}
+          {/* Day Selection Tab Bar (Clean Day 1, Day 2 pills matching reference site) */}
           <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
             {chapters.map((chapter: any, idx: number) => {
               const isSelected = selectedDayIndex === idx;
@@ -192,14 +192,14 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                 <button
                   key={chapter.id || idx}
                   onClick={() => setSelectedDayIndex(idx)}
-                  className={`px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-5 py-2 rounded-full text-xs sm:text-sm transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
                     isSelected
-                      ? "bg-[#b8c460] text-[#0f1611] font-semibold shadow-xs"
-                      : "bg-surface border border-line text-ink-soft hover:text-ink hover:border-moss/40"
+                      ? "bg-[#2d3a14] dark:bg-[#b8c460] text-white dark:text-[#0f1611] font-semibold shadow-xs"
+                      : "bg-surface dark:bg-[#121815] border border-line dark:border-white/10 text-ink font-normal hover:border-ink/40"
                   }`}
                 >
-                  <span>{chapter.title || `Day ${idx + 1}`}</span>
-                  {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-[#0f1611]" />}
+                  <span>Day {idx + 1}</span>
+                  {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white dark:bg-[#0f1611]" />}
                 </button>
               );
             })}
@@ -208,13 +208,13 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
           {/* Active Day Sub-Header */}
           <div className="flex items-center gap-3 mt-6 mb-4">
             <h3 className="font-bold text-base text-ink">
-              {activeChapter?.title || `Day ${selectedDayIndex + 1}`}
+              Day {selectedDayIndex + 1}
             </h3>
             <span className="text-xs sm:text-sm text-ink-soft">
               {activeChapterLessons.length} lessons · {formatDuration(dayDurationSeconds)}
             </span>
             {selectedDayIndex === 0 && (
-              <span className="px-2.5 py-0.5 rounded-full bg-lime-soft text-moss font-semibold text-[0.68rem]">
+              <span className="px-2.5 py-0.5 rounded-full bg-[#2d3a14] dark:bg-[#b8c460] text-white dark:text-[#0f1611] font-semibold text-[0.68rem]">
                 Today
               </span>
             )}
