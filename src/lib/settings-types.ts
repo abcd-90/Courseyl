@@ -16,6 +16,7 @@ export interface SiteBrandingSettings {
 export interface SitePlanSettings {
   freeHoursLimit: number;
   freeGenerationsLimit: number;
+  unlimitedFreeMode?: boolean; // When true: 5-hour limit and generation quotas are completely switched OFF for testing
   proPriceMonthly: number;
   proHoursLimit: number;
   proGenerationsLimit: number;
@@ -57,8 +58,9 @@ export const DEFAULT_SETTINGS: FullSiteSettings = {
     customLogoUrl: "",
   },
   plans: {
-    freeHoursLimit: 5,
-    freeGenerationsLimit: 3,
+    freeHoursLimit: 9999,
+    freeGenerationsLimit: 9999,
+    unlimitedFreeMode: true,
     proPriceMonthly: 12,
     proHoursLimit: 40,
     proGenerationsLimit: 25,

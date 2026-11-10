@@ -54,6 +54,7 @@ export async function getPublicSettings() {
     branding: full.branding,
     plans: {
       freeHoursLimit: full.plans.freeHoursLimit,
+      unlimitedFreeMode: full.plans.unlimitedFreeMode ?? true,
       proPriceMonthly: full.plans.proPriceMonthly,
       maxPriceMonthly: full.plans.maxPriceMonthly,
       maintenanceMode: full.plans.maintenanceMode,

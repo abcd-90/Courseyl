@@ -4,13 +4,20 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CourseItLogo } from "./CourseItLogo";
+import { useSiteSettings } from "./SiteSettingsProvider";
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { settings } = useSiteSettings();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [enrolledCount, setEnrolledCount] = useState<number>(0);
+
+  const isUnlimitedMode =
+    settings?.plans?.unlimitedFreeMode ||
+    (settings?.plans?.freeHoursLimit && settings.plans.freeHoursLimit >= 999);
+  const effectiveFreeHours = settings?.plans?.freeHoursLimit || 5;
 
   // Dynamic recent courses from user's actual activity
   const [recents, setRecents] = useState<any[]>([]);
@@ -229,37 +236,49 @@ export function AppSidebar() {
         <div className="bg-surface dark:bg-[#121a15] rounded-2xl border border-line dark:border-white/10 p-3.5 space-y-2 shadow-xs">
           <div className="flex items-center justify-between text-xs font-medium">
             <span className="text-ink">Hours left</span>
-            <span className="text-ink-soft font-mono">
-              {currentUser?.subscription
-                ? `${Math.max(0, 5 - Math.floor((currentUser.subscription.monthlyHoursUsedSeconds || 0) / 3600))}h / 5h`
-                : "5h / 5h"}
-            </span>
+            {isUnlimitedMode ? (
+              <span className="px-2 py-0.5 rounded-full bg-[#e4e9c6] dark:bg-[#283117] text-[#4b5e1e] dark:text-[#b8c460] text-[0.68rem] font-bold font-mono">
+                Unlimited
+              </span>
+            ) : (
+              <span className="text-ink-soft font-mono">
+                {currentUser?.subscription
+                  ? `${Math.max(0, effectiveFreeHours - Math.floor((currentUser.subscription.monthlyHoursUsedSeconds || 0) / 3600))}h / ${effectiveFreeHours}h`
+                  : `${effectiveFreeHours}h / ${effectiveFreeHours}h`}
+              </span>
+            )}
           </div>
           <div className="w-full bg-lime-soft dark:bg-[#1a2517] h-1.5 rounded-full overflow-hidden">
             <div
               className="bg-moss dark:bg-[#b8c460] h-full rounded-full transition-all duration-500"
               style={{
-                width: `${
-                  currentUser?.subscription
-                    ? Math.max(
-                        5,
-                        100 -
-                          Math.min(
-                            100,
-                            Math.round(
-                              ((currentUser.subscription.monthlyHoursUsedSeconds || 0) / (5 * 3600)) * 100
-                            )
+                width: isUnlimitedMode
+                  ? "100%"
+                  : `${
+                      currentUser?.subscription
+                        ? Math.max(
+                            5,
+                            100 -
+                              Math.min(
+                                100,
+                                Math.round(
+                                  ((currentUser.subscription.monthlyHoursUsedSeconds || 0) /
+                                    (effectiveFreeHours * 3600)) *
+                                    100
+                                )
+                              )
                           )
-                      )
-                    : 100
-                }%`,
+                        : 100
+                    }%`,
               }}
             />
           </div>
           <p className="text-[0.7rem] text-ink-soft/80">
-            {currentUser?.subscription?.tier === "PRO" || currentUser?.subscription?.tier === "MAX"
+            {isUnlimitedMode
+              ? "Testing mode active · Unlimited video hours & courses"
+              : currentUser?.subscription?.tier === "PRO" || currentUser?.subscription?.tier === "MAX"
               ? `${currentUser.subscription.tier} plan active · Unlimited courses`
-              : "Courses up to 5h · Free tier"}
+              : `Courses up to ${effectiveFreeHours}h · Free tier`}
           </p>
         </div>
 
@@ -351,6 +370,25 @@ export function AppSidebar() {
                   <span>💳</span>
                   <span>Subscription</span>
                 </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const isDark = document.documentElement.classList.contains("dark");
+                    if (isDark) {
+                      document.documentElement.classList.remove("dark");
+                      document.documentElement.classList.add("light");
+                      localStorage.setItem("theme", "light");
+                    } else {
+                      document.documentElement.classList.add("dark");
+                      document.documentElement.classList.remove("light");
+                      localStorage.setItem("theme", "dark");
+                    }
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-left"
+                >
+                  <span>🌓</span>
+                  <span>Toggle Light / Dark Mode</span>
+                </button>
                 <button
                   onClick={handleLogout}
                   className="w-full flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer text-left"

@@ -52,6 +52,7 @@ export default function StudioHubAdminPage() {
   const [savingBranding, setSavingBranding] = useState(false);
 
   // 2. Plans & Monetization State
+  const [unlimitedFreeMode, setUnlimitedFreeMode] = useState(true);
   const [freeHoursLimit, setFreeHoursLimit] = useState(5);
   const [freeGenerationsLimit, setFreeGenerationsLimit] = useState(3);
   const [proPriceMonthly, setProPriceMonthly] = useState(12);
@@ -140,6 +141,7 @@ export default function StudioHubAdminPage() {
         }
         const p = sData.settings?.plans;
         if (p) {
+          setUnlimitedFreeMode(p.unlimitedFreeMode ?? true);
           setFreeHoursLimit(p.freeHoursLimit ?? 5);
           setFreeGenerationsLimit(p.freeGenerationsLimit ?? 3);
           setProPriceMonthly(p.proPriceMonthly ?? 12);
@@ -278,6 +280,7 @@ export default function StudioHubAdminPage() {
     setSavingPlans(true);
     try {
       const payload = {
+        unlimitedFreeMode: Boolean(unlimitedFreeMode),
         freeHoursLimit: Number(freeHoursLimit),
         freeGenerationsLimit: Number(freeGenerationsLimit),
         proPriceMonthly: Number(proPriceMonthly),
@@ -1025,6 +1028,48 @@ export default function StudioHubAdminPage() {
               </div>
 
               <form onSubmit={handleSavePlans} className="space-y-6">
+                {/* VIP Testing Mode: Switch off 5-Hour Limit & Quotas */}
+                <div className={`p-6 rounded-3xl border transition-all ${
+                  unlimitedFreeMode
+                    ? "bg-[#182315] border-[#b8c460]/40 shadow-xl shadow-[#b8c460]/5"
+                    : "bg-[#121815] border-white/10"
+                }`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">🚀</span>
+                        <h3 className="text-base font-bold text-white">
+                          Unlimited Free Testing Mode (5-Hour Limit Bypass)
+                        </h3>
+                        {unlimitedFreeMode ? (
+                          <span className="px-2.5 py-0.5 rounded-full bg-[#b8c460] text-[#0f1611] text-[0.68rem] font-bold font-mono">
+                            ACTIVE · NO LIMITS
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded-full bg-white/10 text-[#b3b7a3] text-[0.68rem] font-mono">
+                            ENFORCING TIERS
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-[#b3b7a3] max-w-2xl leading-relaxed">
+                        When enabled, the 5-hour video duration limit and monthly course generation quotas are completely switched OFF for all users. Anyone can generate courses of any length (e.g. 13h+ YouTube masterclasses) 100% free with unlimited lessons.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setUnlimitedFreeMode(!unlimitedFreeMode)}
+                      className={`shrink-0 px-5 py-2.5 rounded-full font-bold text-xs cursor-pointer transition-all ${
+                        unlimitedFreeMode
+                          ? "bg-[#b8c460] text-[#0f1611] hover:bg-[#a6b350] shadow-md"
+                          : "bg-white/10 text-white hover:bg-white/20"
+                      }`}
+                    >
+                      {unlimitedFreeMode ? "Switch OFF Limits" : "Enable Unlimited Mode"}
+                    </button>
+                  </div>
+                </div>
+
                 {/* Free Tier Controls */}
                 <div className="p-6 rounded-3xl bg-[#121815] border border-white/10 space-y-4">
                   <div className="flex items-center justify-between">

@@ -240,7 +240,7 @@ export default function DashboardPage() {
                 <Link
                   key={c.id || c.slug}
                   href={`/courses/${c.slug}`}
-                  className="group bg-surface dark:bg-[#0c120e] rounded-2xl border border-line dark:border-white/10 p-3 shadow-xs hover:border-moss/40 hover:shadow-md transition-all flex flex-col text-ink w-full"
+                  className="group bg-white dark:bg-[#141b16] rounded-2xl border border-line dark:border-white/10 p-3.5 shadow-sm hover:border-[#4b5e1e]/40 dark:hover:border-[#b8c460]/40 hover:shadow-md transition-all flex flex-col text-ink w-full"
                 >
                   <div className="relative aspect-video rounded-xl overflow-hidden bg-black">
                     {/* eslint-disable-next-line @next/next/no-img-element */}

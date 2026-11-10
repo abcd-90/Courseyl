@@ -8,6 +8,7 @@ import {
   VideoChapter,
 } from "../youtube";
 import { getAIProvider, NemotronAIProvider, OpenAIProvider } from "./aiProvider";
+import { getFullSettings } from "../settings";
 
 export interface GenerateCourseParams {
   url: string;
@@ -109,7 +110,14 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
 
   const currentLimit = tierLimits[tier as keyof typeof tierLimits] || tierLimits.FREE;
 
-  if (role !== "ADMIN") {
+  // Check if admin has enabled unlimited free testing mode
+  const siteSettings = await getFullSettings().catch(() => null);
+  const isUnlimitedMode =
+    siteSettings?.plans?.unlimitedFreeMode ||
+    (siteSettings?.plans?.freeHoursLimit && siteSettings.plans.freeHoursLimit >= 999) ||
+    role === "ADMIN";
+
+  if (!isUnlimitedMode) {
     if (sub && sub.monthlyGenerationsUsed >= currentLimit.maxCourses) {
       throw new Error(
         `Monthly generation quota exceeded for your ${tier} plan (${sub.monthlyGenerationsUsed}/${currentLimit.maxCourses} courses used). Please upgrade to generate more courses.`
@@ -120,7 +128,7 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
   // 4. Ingest video metadata
   const meta = await fetchYouTubeMetadata(parsedUrl.videoId);
 
-  if (role !== "ADMIN" && meta.durationSeconds > currentLimit.maxDurationSec) {
+  if (!isUnlimitedMode && meta.durationSeconds > currentLimit.maxDurationSec) {
     throw new Error(
       `Video duration (${formatDuration(meta.durationSeconds)}) exceeds your ${tier} plan limit of ${
         currentLimit.maxDurationSec / 3600
