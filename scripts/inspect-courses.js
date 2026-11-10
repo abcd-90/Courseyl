@@ -30,7 +30,17 @@ async function main() {
   console.log("\nALL ENROLLMENTS IN DB:");
   console.log(enrollmentsRes.rows);
 
+  const lessonsRes = await client.query(`
+    SELECT l.id, l.title, l."startSeconds", l."endSeconds", l."durationSeconds"
+    FROM "Lesson" l
+    ORDER BY l."startSeconds" ASC
+    LIMIT 6
+  `);
+  console.log("\nSAMPLE LESSONS IN DB:");
+  console.log(lessonsRes.rows);
+
   await client.end();
 }
 
 main().catch(console.error);
+
