@@ -40,6 +40,17 @@ export async function GET(
                         channelTitle: true,
                       },
                     },
+                    chapters: {
+                      select: {
+                        id: true,
+                        title: true,
+                        _count: {
+                          select: {
+                            lessons: true,
+                          },
+                        },
+                      },
+                    },
                   },
                 },
               },
@@ -89,6 +100,8 @@ export async function GET(
 
     let totalCoursesCount = 0;
     let sumProgress = 0;
+    let totalRoadmapDurationSeconds = 0;
+    let totalRoadmapLessonsCount = 0;
 
     const formattedStages = roadmap.stages.map((st) => {
       const stageCourses = st.courses.map((sc) => {
@@ -96,9 +109,19 @@ export async function GET(
         const prog = courseProgressMap[sc.course.id] || 0;
         sumProgress += prog;
 
+        const courseChapters = sc.course.chapters || [];
+        const lessonCount = courseChapters.reduce(
+          (sum: number, ch: any) => sum + (ch._count?.lessons || 0),
+          0
+        );
+
+        totalRoadmapDurationSeconds += sc.course.totalDurationSeconds || 0;
+        totalRoadmapLessonsCount += lessonCount;
+
         return {
           ...sc.course,
-          author: sc.course.source?.channelTitle || "Mayank Aggarwal",
+          lessonCount,
+          author: sc.course.source?.channelTitle || "Educational Creator",
           userProgressPercentage: prog,
           isCompleted: prog >= 100,
         };
@@ -126,6 +149,9 @@ export async function GET(
         enrollmentCount: roadmap.enrollmentCount,
         creatorName: roadmap.creator?.profile?.displayName || "CourseIt Curator",
         stages: formattedStages,
+        totalDurationSeconds: totalRoadmapDurationSeconds,
+        totalLessonsCount: totalRoadmapLessonsCount,
+        totalCoursesCount,
       },
       userState: {
         isEnrolled,

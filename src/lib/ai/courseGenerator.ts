@@ -274,68 +274,86 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
       },
     });
 
-    // 9. Process remaining lessons in Chapter 1 and subsequent chapters
+    // 9. Process remaining lessons in Chapter 1 and subsequent chapters using high-speed nested creates
     for (let cIdx = 0; cIdx < curriculumData.chapters.length; cIdx++) {
       const c = curriculumData.chapters[cIdx];
-      let chapterRecord = createdFirstChapter;
 
-      if (cIdx > 0) {
-        chapterRecord = await prisma.chapter.create({
+      if (cIdx === 0) {
+        // Add remaining lessons for Chapter 1 (from index 1 onwards)
+        for (let lIdx = 1; lIdx < c.lessons.length; lIdx++) {
+          const l = c.lessons[lIdx];
+          await prisma.lesson.create({
+            data: {
+              chapterId: createdFirstChapter.id,
+              orderIndex: lIdx,
+              title: l.title,
+              description: l.description,
+              youtubeVideoId: parsedUrl.videoId,
+              startSeconds: l.startSeconds,
+              endSeconds: l.endSeconds,
+              durationSeconds: Math.max(60, l.endSeconds - l.startSeconds),
+              summary: l.summary,
+              keyTakeaways: JSON.stringify(l.keyTakeaways || []),
+              importantDefinitions: JSON.stringify(l.importantDefinitions || []),
+              status: "READY",
+              quizQuestions: {
+                create: (l.quizQuestions || []).map((q, qIdx) => ({
+                  orderIndex: qIdx,
+                  questionText: q.questionText,
+                  correctOptionIndex: q.correctOptionIndex,
+                  explanation: q.explanation,
+                  replayTimestampSeconds: q.replayTimestampSeconds || l.startSeconds,
+                  options: {
+                    create: (q.options || []).map((opt, optIdx) => ({
+                      optionIndex: optIdx,
+                      optionText: opt,
+                    })),
+                  },
+                })),
+              },
+            },
+          });
+        }
+      } else {
+        // Create full subsequent chapters with all nested lessons, quizzes, and options in 1 query per chapter
+        await prisma.chapter.create({
           data: {
             courseId: course.id,
             orderIndex: cIdx,
             title: c.title,
             description: c.description,
-          },
-        });
-      }
-
-      const startingLessonIdx = cIdx === 0 ? 1 : 0;
-      for (let lIdx = startingLessonIdx; lIdx < c.lessons.length; lIdx++) {
-        const l = c.lessons[lIdx];
-        const createdLesson = await prisma.lesson.create({
-          data: {
-            chapterId: chapterRecord.id,
-            orderIndex: lIdx,
-            title: l.title,
-            description: l.description,
-            youtubeVideoId: parsedUrl.videoId,
-            startSeconds: l.startSeconds,
-            endSeconds: l.endSeconds,
-            durationSeconds: Math.max(60, l.endSeconds - l.startSeconds),
-            summary: l.summary,
-            keyTakeaways: JSON.stringify(l.keyTakeaways || []),
-            importantDefinitions: JSON.stringify(l.importantDefinitions || []),
-            status: "READY",
-          },
-        });
-
-        // Add quiz questions
-        if (l.quizQuestions && l.quizQuestions.length > 0) {
-          for (let qIdx = 0; qIdx < l.quizQuestions.length; qIdx++) {
-            const q = l.quizQuestions[qIdx];
-            const quizQ = await prisma.quizQuestion.create({
-              data: {
-                lessonId: createdLesson.id,
-                orderIndex: qIdx,
-                questionText: q.questionText,
-                correctOptionIndex: q.correctOptionIndex,
-                explanation: q.explanation,
-                replayTimestampSeconds: q.replayTimestampSeconds || createdLesson.startSeconds,
-              },
-            });
-
-            for (let optIdx = 0; optIdx < q.options.length; optIdx++) {
-              await prisma.quizOption.create({
-                data: {
-                  questionId: quizQ.id,
-                  optionIndex: optIdx,
-                  optionText: q.options[optIdx],
+            lessons: {
+              create: c.lessons.map((l, lIdx) => ({
+                orderIndex: lIdx,
+                title: l.title,
+                description: l.description,
+                youtubeVideoId: parsedUrl.videoId,
+                startSeconds: l.startSeconds,
+                endSeconds: l.endSeconds,
+                durationSeconds: Math.max(60, l.endSeconds - l.startSeconds),
+                summary: l.summary,
+                keyTakeaways: JSON.stringify(l.keyTakeaways || []),
+                importantDefinitions: JSON.stringify(l.importantDefinitions || []),
+                status: "READY",
+                quizQuestions: {
+                  create: (l.quizQuestions || []).map((q, qIdx) => ({
+                    orderIndex: qIdx,
+                    questionText: q.questionText,
+                    correctOptionIndex: q.correctOptionIndex,
+                    explanation: q.explanation,
+                    replayTimestampSeconds: q.replayTimestampSeconds || l.startSeconds,
+                    options: {
+                      create: (q.options || []).map((opt, optIdx) => ({
+                        optionIndex: optIdx,
+                        optionText: opt,
+                      })),
+                    },
+                  })),
                 },
-              });
-            }
-          }
-        }
+              })),
+            },
+          },
+        });
       }
     }
 

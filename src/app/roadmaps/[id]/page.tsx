@@ -527,7 +527,15 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
                                 {c.title}
                               </h4>
                               <p className="text-[0.7rem] text-ink-soft mt-0.5 truncate">
-                                {c.author || c.source?.channelTitle || "Mayank Aggarwal"} · {formatDuration(c.totalDurationSeconds || 3600)}
+                                <span>{c.author || c.source?.channelTitle || "Educational Creator"}</span>
+                                {c.lessonCount ? (
+                                  <>
+                                    <span> · </span>
+                                    <span className="font-medium text-ink dark:text-white/80">{c.lessonCount} lessons</span>
+                                  </>
+                                ) : null}
+                                <span> · </span>
+                                <span>{formatDuration(c.totalDurationSeconds || 3600)}</span>
                               </p>
                             </div>
                           </Link>
@@ -628,8 +636,15 @@ export default function RoadmapDetailPage({ params }: { params: Promise<{ id: st
                 </h3>
               </div>
 
-              <div className="text-[0.72rem] text-[#0f1611]/85 font-medium">
-                {totalCoursesCount} of {totalCoursesCount} courses · stage 1 of {stages.length || 1}
+              <div className="text-[0.72rem] text-[#0f1611]/85 font-medium space-y-0.5">
+                <div>
+                  {totalCoursesCount} {totalCoursesCount === 1 ? "course" : "courses"}
+                  {roadmap.totalLessonsCount ? ` · ${roadmap.totalLessonsCount} lessons` : ""}
+                  {roadmap.totalDurationSeconds ? ` · ${formatDuration(roadmap.totalDurationSeconds)}` : ""}
+                </div>
+                <div className="text-[0.68rem] opacity-75">
+                  Stage 1 of {stages.length || 1}
+                </div>
               </div>
 
               {/* Puzzle notch cutouts */}
