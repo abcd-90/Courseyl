@@ -14,18 +14,21 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Fetch live authenticated user
-    fetch("/api/auth/me")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.authenticated && data.user) {
-          setCurrentUser(data.user);
-        }
-      })
-      .catch(() => {});
+    const fetchUserData = () => {
+      fetch("/api/auth/me", { cache: "no-store" })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.authenticated && data.user) {
+            setCurrentUser(data.user);
+          }
+        })
+        .catch(() => {});
+    };
+
+    fetchUserData();
 
     // 2. Fetch live enrolled courses
-    fetch("/api/courses?enrolled=true")
+    fetch("/api/courses?enrolled=true", { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         if (data.courses && Array.isArray(data.courses) && data.courses.length > 0) {
@@ -38,6 +41,21 @@ export default function DashboardPage() {
         setMyCourses([]);
       })
       .finally(() => setLoading(false));
+
+    const handleUserUpdated = (e: any) => {
+      if (e.detail) {
+        setCurrentUser(e.detail);
+      } else {
+        fetchUserData();
+      }
+    };
+
+    window.addEventListener("user-updated", handleUserUpdated);
+    window.addEventListener("focus", fetchUserData);
+    return () => {
+      window.removeEventListener("user-updated", handleUserUpdated);
+      window.removeEventListener("focus", fetchUserData);
+    };
   }, []);
 
   const handleGenerate = (e: React.FormEvent) => {
@@ -51,8 +69,10 @@ export default function DashboardPage() {
 
   const displayName =
     currentUser?.profile?.displayName ||
+    currentUser?.displayName ||
+    currentUser?.name ||
     currentUser?.email?.split("@")[0] ||
-    "12.";
+    "Learner";
   const streakDays = currentUser?.profile?.currentStreakDays || 1;
 
   const sampleCourses = [

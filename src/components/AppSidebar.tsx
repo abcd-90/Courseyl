@@ -23,68 +23,83 @@ export function AppSidebar() {
   const [recents, setRecents] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.authenticated && data.user) {
-          setCurrentUser(data.user);
-          // Fetch user's real enrolled courses count
-          fetch("/api/courses?enrolled=true")
-            .then((r) => r.json())
-            .then((cd) => {
-              if (Array.isArray(cd.courses) && cd.courses.length > 0) {
-                setEnrolledCount(cd.courses.length);
+    const fetchUserData = () => {
+      fetch("/api/auth/me", { cache: "no-store" })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.authenticated && data.user) {
+            setCurrentUser(data.user);
+            // Fetch user's real enrolled courses count
+            fetch("/api/courses?enrolled=true", { cache: "no-store" })
+              .then((r) => r.json())
+              .then((cd) => {
+                if (Array.isArray(cd.courses) && cd.courses.length > 0) {
+                  setEnrolledCount(cd.courses.length);
 
-                // Auto-enrich recents with accurate thumbnails from database
-                setRecents((prev) => {
-                  if (!prev || prev.length === 0) {
-                    const fallbackRecents = cd.courses.slice(0, 3).map((c: any) => ({
-                      id: c.id,
-                      slug: c.slug,
-                      title: c.title,
-                      thumbnail: c.thumbnailUrl || "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg",
-                      thumbnailUrl: c.thumbnailUrl || "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg",
-                      progress: c.progressPercentage || 0,
-                    }));
+                  // Auto-enrich recents with accurate thumbnails from database
+                  setRecents((prev) => {
+                    if (!prev || prev.length === 0) {
+                      const fallbackRecents = cd.courses.slice(0, 3).map((c: any) => ({
+                        id: c.id,
+                        slug: c.slug,
+                        title: c.title,
+                        thumbnail: c.thumbnailUrl || "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg",
+                        thumbnailUrl: c.thumbnailUrl || "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg",
+                        progress: c.progressPercentage || 0,
+                      }));
+                      try {
+                        localStorage.setItem("courseit_recent_courses", JSON.stringify(fallbackRecents));
+                      } catch {}
+                      return fallbackRecents;
+                    }
+
+                    const enriched = prev.map((r: any) => {
+                      const match = cd.courses.find((c: any) => c.slug === r.slug || c.id === r.id);
+                      const validThumb = (t?: string) => (t && typeof t === "string" && t.length > 5 && !t.includes("undefined")) ? t : null;
+                      const thumb =
+                        validThumb(match?.thumbnailUrl) ||
+                        validThumb(r.thumbnail) ||
+                        validThumb(r.thumbnailUrl) ||
+                        (r.slug?.includes("generative")
+                          ? "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg"
+                          : r.slug?.includes("python")
+                          ? "https://i.ytimg.com/vi/UrsmFxEIp5k/hqdefault.jpg"
+                          : "https://i.ytimg.com/vi/eynUbHweaQM/hqdefault.jpg");
+
+                      return {
+                        ...r,
+                        title: r.title || match?.title,
+                        thumbnail: thumb,
+                        thumbnailUrl: thumb,
+                        progress: typeof r.progress === "number" ? r.progress : (match?.progressPercentage || 0),
+                      };
+                    });
+
                     try {
-                      localStorage.setItem("courseit_recent_courses", JSON.stringify(fallbackRecents));
+                      localStorage.setItem("courseit_recent_courses", JSON.stringify(enriched));
                     } catch {}
-                    return fallbackRecents;
-                  }
-
-                  const enriched = prev.map((r: any) => {
-                    const match = cd.courses.find((c: any) => c.slug === r.slug || c.id === r.id);
-                    const validThumb = (t?: string) => (t && typeof t === "string" && t.length > 5 && !t.includes("undefined")) ? t : null;
-                    const thumb =
-                      validThumb(match?.thumbnailUrl) ||
-                      validThumb(r.thumbnail) ||
-                      validThumb(r.thumbnailUrl) ||
-                      (r.slug?.includes("generative")
-                        ? "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg"
-                        : r.slug?.includes("python")
-                        ? "https://i.ytimg.com/vi/UrsmFxEIp5k/hqdefault.jpg"
-                        : "https://i.ytimg.com/vi/eynUbHweaQM/hqdefault.jpg");
-
-                    return {
-                      ...r,
-                      title: r.title || match?.title,
-                      thumbnail: thumb,
-                      thumbnailUrl: thumb,
-                      progress: typeof r.progress === "number" ? r.progress : (match?.progressPercentage || 0),
-                    };
+                    return enriched;
                   });
+                }
+              })
+              .catch(() => {});
+          }
+        })
+        .catch(() => {});
+    };
 
-                  try {
-                    localStorage.setItem("courseit_recent_courses", JSON.stringify(enriched));
-                  } catch {}
-                  return enriched;
-                });
-              }
-            })
-            .catch(() => {});
-        }
-      })
-      .catch(() => {});
+    fetchUserData();
+
+    const handleUserUpdated = (e: any) => {
+      if (e.detail) {
+        setCurrentUser(e.detail);
+      } else {
+        fetchUserData();
+      }
+    };
+
+    window.addEventListener("user-updated", handleUserUpdated);
+    window.addEventListener("focus", fetchUserData);
 
     try {
       const stored = localStorage.getItem("courseit_recent_courses");
@@ -95,6 +110,11 @@ export function AppSidebar() {
         }
       }
     } catch {}
+
+    return () => {
+      window.removeEventListener("user-updated", handleUserUpdated);
+      window.removeEventListener("focus", fetchUserData);
+    };
   }, []);
 
   // Close mobile drawer on route change
@@ -376,17 +396,26 @@ export function AppSidebar() {
               className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-left"
             >
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-8 h-8 rounded-full bg-[#f97316] text-white flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden">
-                  {currentUser.profile?.avatarUrl ? (
+                <div className="w-8 h-8 rounded-full bg-[#f97316] text-white flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden shadow-xs">
+                  {currentUser.profile?.avatarUrl && !currentUser.profile.avatarUrl.includes("dicebear.com") ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={currentUser.profile.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                   ) : (
-                    <span>{(currentUser.profile?.displayName || currentUser.email || "S").charAt(0).toUpperCase()}</span>
+                    <span>
+                      {(
+                        (currentUser.profile?.displayName || currentUser.name || currentUser.email || "S")
+                          .replace(/^(mr|dr|ms|mrs)\.?\s+/i, "")
+                          .trim()
+                          .charAt(0) ||
+                        (currentUser.profile?.displayName || currentUser.name || "S").charAt(0) ||
+                        "S"
+                      ).toUpperCase()}
+                    </span>
                   )}
                 </div>
                 <div className="text-left min-w-0">
                   <p className="text-sm font-semibold text-ink leading-tight truncate">
-                    {currentUser.profile?.displayName || currentUser.email.split("@")[0]}
+                    {currentUser.profile?.displayName || currentUser.name || currentUser.displayName || currentUser.email.split("@")[0]}
                   </p>
                   <p className="text-xs text-ink-soft leading-tight">
                     {currentUser.subscription?.tier ? `${currentUser.subscription.tier.charAt(0) + currentUser.subscription.tier.slice(1).toLowerCase()} plan` : "Free plan"}
@@ -402,7 +431,9 @@ export function AppSidebar() {
               <div className="absolute bottom-16 left-0 right-0 bg-surface dark:bg-[#121a15] rounded-2xl border border-line dark:border-white/10 p-2 shadow-2xl space-y-1 z-30">
                 <div className="px-3 py-2 border-b border-line dark:border-white/5">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold text-ink truncate">{currentUser.profile?.displayName || "Learner"}</p>
+                    <p className="text-xs font-bold text-ink truncate">
+                      {currentUser.profile?.displayName || currentUser.name || currentUser.displayName || "Learner"}
+                    </p>
                     {currentUser.role === "ADMIN" && (
                       <span className="px-1.5 py-0.5 rounded-md bg-[#b8c460] text-[#0f1611] font-mono font-bold text-[0.6rem]">
                         ADMIN
@@ -519,11 +550,20 @@ export function AppSidebar() {
               className="w-8 h-8 rounded-full bg-[#f97316] text-white flex items-center justify-center font-bold text-xs overflow-hidden border border-moss/30 cursor-pointer"
               title="Open profile"
             >
-              {currentUser.profile?.avatarUrl ? (
+              {currentUser.profile?.avatarUrl && !currentUser.profile.avatarUrl.includes("dicebear.com") ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={currentUser.profile.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
-                (currentUser.profile?.displayName || currentUser.email || "S").charAt(0).toUpperCase()
+                <span>
+                  {(
+                    (currentUser.profile?.displayName || currentUser.name || currentUser.email || "S")
+                      .replace(/^(mr|dr|ms|mrs)\.?\s+/i, "")
+                      .trim()
+                      .charAt(0) ||
+                    (currentUser.profile?.displayName || currentUser.name || "S").charAt(0) ||
+                    "S"
+                  ).toUpperCase()}
+                </span>
               )}
             </button>
           ) : (

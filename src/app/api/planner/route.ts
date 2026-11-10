@@ -157,3 +157,6 @@ export async function PUT(req: Request) {
   }
 }
 
+export const POST = PUT;
+
+
