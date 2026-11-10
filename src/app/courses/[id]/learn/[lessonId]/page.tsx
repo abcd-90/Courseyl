@@ -469,7 +469,8 @@ export default function LessonLearnPage({
   const videoId =
     (lesson?.youtubeVideoId && lesson.youtubeVideoId !== "urbkF3zPpxw" ? lesson.youtubeVideoId : null) ||
     course?.source?.youtubeId ||
-    "UrsmFxEIp5k";
+    (course as any)?.sourceYoutubeId ||
+    "3iFMc6ELt7k";
 
   // URL with controls=0 to strictly disable YouTube's native control bar
   const hasValidEnd = endSec && endSec > startSec;

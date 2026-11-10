@@ -11,6 +11,7 @@ export default function DashboardPage() {
   const [url, setUrl] = useState("");
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [myCourses, setMyCourses] = useState<any[]>([]);
+  const [popularCourses, setPopularCourses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -41,6 +42,16 @@ export default function DashboardPage() {
         setMyCourses([]);
       })
       .finally(() => setLoading(false));
+
+    // 3. Fetch real popular community courses
+    fetch("/api/courses?limit=6", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.courses && Array.isArray(data.courses) && data.courses.length > 0) {
+          setPopularCourses(data.courses);
+        }
+      })
+      .catch(() => {});
 
     const handleUserUpdated = (e: any) => {
       if (e.detail) {
@@ -83,7 +94,7 @@ export default function DashboardPage() {
       addedBy: "ABHISHEK",
       learningCount: 54,
       thumbnail: "https://i.ytimg.com/vi/ygXn5nV5qFc/maxresdefault.jpg",
-      slug: "python-for-ai-full-beginner-course",
+      slug: "python-for-ai-full-beginner-course-py81a",
     },
     {
       title: "Complete Agentic AI Course In 10 Hours- Langchain, Langgraph, RAG,Vectorless RAG, Guardrails,Evals",
@@ -91,8 +102,8 @@ export default function DashboardPage() {
       duration: "11h 13m",
       addedBy: "Bhanuranjan",
       learningCount: 29,
-      thumbnail: "https://i.ytimg.com/vi/rV3HJ4LEZ7k/maxresdefault.jpg",
-      slug: "complete-agentic-ai-course-in-10-hours",
+      thumbnail: "https://i.ytimg.com/vi/eynUbHweaQM/maxresdefault.jpg",
+      slug: "complete-agentic-ai-course-in-10-hours-langchain-langgraph-rag-mcp-ag92f",
     },
     {
       title: "Full-Stack AI Engineering Course (FastAPI, LLMs, Docker...)",
@@ -100,37 +111,50 @@ export default function DashboardPage() {
       duration: "3h 10m",
       addedBy: "Manish",
       learningCount: 26,
-      thumbnail: "https://i.ytimg.com/vi/XzjSx7u9mGw/maxresdefault.jpg",
-      slug: "full-stack-ai-engineering-course",
-    },
-    {
-      title: "Python Full Course for Beginners",
-      author: "Programming with Mosh",
-      duration: "2h 02m",
-      addedBy: "twotakesonly",
-      learningCount: 11,
-      thumbnail: "https://i.ytimg.com/vi/kqtD5dpn9C8/maxresdefault.jpg",
-      slug: "python-full-course-for-beginners-mosh",
-    },
-    {
-      title: "Python Full Course for free 🐍",
-      author: "Bro Code",
-      duration: "12h 00m",
-      addedBy: "Prince",
-      learningCount: 8,
-      thumbnail: "https://i.ytimg.com/vi/ix9cRaBkVe0/maxresdefault.jpg",
-      slug: "python-full-course-for-free-bro-code",
+      thumbnail: "https://i.ytimg.com/vi/i_LwzRVP7bg/maxresdefault.jpg",
+      slug: "full-stack-ai-engineering-course-fastapi-llms-docker-supabase-fs77m",
     },
     {
       title: "Harvard CS50's Introduction to Programming with Python ...",
       author: "freeCodeCamp.org",
       duration: "15h 58m",
       addedBy: "Durvesh",
-      learningCount: 7,
+      learningCount: 120,
       thumbnail: "https://i.ytimg.com/vi/nLRL_NcnK-4/maxresdefault.jpg",
-      slug: "harvard-cs50-introduction-to-programming-with-python",
+      slug: "harvard-cs50s-introduction-to-programming-with-python-cs50p",
+    },
+    {
+      title: "Learn Ethical Hacking from ZERO to ADVANCED | 35+ Hours Practical Course",
+      author: "Cyber Mind Space",
+      duration: "35h 00m",
+      addedBy: "Security Expert",
+      learningCount: 16,
+      thumbnail: "https://i.ytimg.com/vi/3Kq1MIfTWCE/hqdefault.jpg",
+      slug: "learn-ethical-hacking-from-zero-to-advanced-35-hours-dgwh",
+    },
+    {
+      title: "Generative AI Full Course 2026 | LLMs, RAG, AI Agents & Projects",
+      author: "Coding With Sagar",
+      duration: "10h 30m",
+      addedBy: "Sami",
+      learningCount: 18,
+      thumbnail: "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg",
+      slug: "generative-ai-full-course-2026-llms-rag-ai-agents-projects-sagar-chouksey-ictge",
     },
   ];
+
+  const displayedPopular =
+    popularCourses.length > 0
+      ? popularCourses.map((c) => ({
+          title: c.title,
+          author: c.creator || "Instructor",
+          duration: c.duration,
+          addedBy: c.creatorName || "Creator",
+          learningCount: c.enrollmentCount || 1,
+          thumbnail: c.thumbnailUrl || "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg",
+          slug: c.slug,
+        }))
+      : sampleCourses;
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-paper text-ink">
@@ -328,7 +352,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {sampleCourses.map((course, idx) => (
+            {displayedPopular.map((course, idx) => (
               <Link
                 key={idx}
                 href={`/courses/${course.slug}`}

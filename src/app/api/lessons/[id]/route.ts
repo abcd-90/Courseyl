@@ -18,7 +18,7 @@ export async function GET(
             course: {
               include: {
                 source: {
-                  select: { channelTitle: true },
+                  select: { channelTitle: true, youtubeId: true },
                 },
                 chapters: {
                   orderBy: { orderIndex: "asc" },
@@ -44,39 +44,6 @@ export async function GET(
         },
       },
     });
-
-    if (!lesson) {
-      lesson = await prisma.lesson.findFirst({
-        include: {
-          chapter: {
-            include: {
-              course: {
-                include: {
-                  chapters: {
-                    orderBy: { orderIndex: "asc" },
-                    include: {
-                      lessons: {
-                        orderBy: { orderIndex: "asc" },
-                        select: { id: true, title: true, orderIndex: true, durationSeconds: true },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          quizQuestions: {
-            orderBy: { orderIndex: "asc" },
-            include: {
-              options: {
-                orderBy: { optionIndex: "asc" },
-                select: { optionIndex: true, optionText: true },
-              },
-            },
-          },
-        },
-      });
-    }
 
     if (!lesson) {
       return NextResponse.json({ error: "Lesson not found" }, { status: 404 });
@@ -147,12 +114,13 @@ export async function GET(
       importantDefinitions = [];
     }
 
+    const courseSource = lesson.chapter?.course?.source;
     const resolvedVideoId =
       lesson.youtubeVideoId && lesson.youtubeVideoId !== "urbkF3zPpxw"
         ? lesson.youtubeVideoId
-        : (lesson.chapter.course as any).source?.youtubeId || "UrsmFxEIp5k";
+        : courseSource?.youtubeId || "3iFMc6ELt7k";
     const resolvedChannelTitle =
-      (lesson.chapter.course as any).source?.channelTitle || "CodeWithHarry";
+      courseSource?.channelTitle || "Instructor";
 
     return NextResponse.json({
       lesson: {

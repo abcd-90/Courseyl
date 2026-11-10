@@ -11,35 +11,32 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    let course = await prisma.course.findFirst({
-      where: { OR: [{ id }, { slug: id }] },
-      include: {
-        placementQuestions: {
-          orderBy: { orderIndex: "asc" },
-          include: {
-            options: {
-              orderBy: { optionIndex: "asc" },
-              select: { optionIndex: true, optionText: true },
-            },
+    const placementIncludes = {
+      placementQuestions: {
+        orderBy: { orderIndex: "asc" as const },
+        include: {
+          options: {
+            orderBy: { optionIndex: "asc" as const },
+            select: { optionIndex: true, optionText: true },
           },
         },
       },
+    };
+
+    let course = await prisma.course.findFirst({
+      where: { OR: [{ id }, { slug: id }] },
+      include: placementIncludes,
     });
 
     if (!course) {
       course = await prisma.course.findFirst({
-        orderBy: { enrollmentCount: "desc" },
-        include: {
-          placementQuestions: {
-            orderBy: { orderIndex: "asc" },
-            include: {
-              options: {
-                orderBy: { optionIndex: "asc" },
-                select: { optionIndex: true, optionText: true },
-              },
-            },
-          },
+        where: {
+          OR: [
+            { slug: { startsWith: id } },
+            { slug: { contains: id } },
+          ],
         },
+        include: placementIncludes,
       });
     }
 

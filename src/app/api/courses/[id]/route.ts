@@ -13,79 +13,56 @@ export async function GET(
     const { id } = await params;
     const user = await getCurrentUser();
 
-    // Query course by id or by slug
+    const courseIncludes = {
+      creator: {
+        select: {
+          email: true,
+          profile: { select: { displayName: true, avatarUrl: true } },
+        },
+      },
+      source: true,
+      chapters: {
+        orderBy: { orderIndex: "asc" as const },
+        include: {
+          lessons: {
+            orderBy: { orderIndex: "asc" as const },
+            select: {
+              id: true,
+              orderIndex: true,
+              title: true,
+              description: true,
+              summary: true,
+              durationSeconds: true,
+              startSeconds: true,
+              endSeconds: true,
+              status: true,
+            },
+          },
+        },
+      },
+      placementQuestions: {
+        select: { id: true },
+      },
+    };
+
+    // 1. Query course by exact id or slug
     let course = await prisma.course.findFirst({
       where: {
         OR: [{ id }, { slug: id }],
       },
-      include: {
-        creator: {
-          select: {
-            email: true,
-            profile: { select: { displayName: true, avatarUrl: true } },
-          },
-        },
-        source: true,
-        chapters: {
-          orderBy: { orderIndex: "asc" },
-          include: {
-            lessons: {
-              orderBy: { orderIndex: "asc" },
-              select: {
-                id: true,
-                orderIndex: true,
-                title: true,
-                description: true,
-                summary: true,
-                durationSeconds: true,
-                startSeconds: true,
-                endSeconds: true,
-                status: true,
-              },
-            },
-          },
-        },
-        placementQuestions: {
-          select: { id: true },
-        },
-      },
+      include: courseIncludes,
     });
 
+    // 2. If no exact match, try smart prefix or keyword match on slug
     if (!course) {
-      // Graceful fallback to first matching or default course
       course = await prisma.course.findFirst({
-        orderBy: { enrollmentCount: "desc" },
-        include: {
-          creator: {
-            select: {
-              email: true,
-              profile: { select: { displayName: true, avatarUrl: true } },
-            },
-          },
-          source: true,
-          chapters: {
-            orderBy: { orderIndex: "asc" },
-            include: {
-              lessons: {
-                orderBy: { orderIndex: "asc" },
-                select: {
-                  id: true,
-                  orderIndex: true,
-                  title: true,
-                  description: true,
-                  summary: true,
-                  durationSeconds: true,
-                  startSeconds: true,
-                  endSeconds: true,
-                  status: true,
-                },
-              },
-            },
-          },
-          placementQuestions: {
-            select: { id: true },
-          },
+        where: {
+          OR: [
+            { slug: { startsWith: id } },
+            { slug: { contains: id } },
+          ],
         },
+        include: courseIncludes,
       });
     }
 
