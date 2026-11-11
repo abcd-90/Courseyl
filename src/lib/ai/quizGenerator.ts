@@ -626,7 +626,8 @@ const TOPIC_QUESTION_BANKS: TopicQuestionBank[] = [
       "string",
       "slicing",
       "slice",
-      "indexing",
+      "string indexing",
+      "character index",
       "negative index",
       "escape sequence",
       "f-string",
@@ -2341,6 +2342,42 @@ const TOPIC_QUESTION_BANKS: TopicQuestionBank[] = [
         ],
         explanation: "Queues absorb traffic spikes gracefully and isolate poison messages in DLQs for inspection.",
       },
+      {
+        subtopic: "cdn & edge caching",
+        keywords: ["cdn", "edge", "cache", "latency"],
+        prompt: "How does a **CDN (Content Delivery Network)** cut latency and protect origin servers under global traffic?",
+        correct: "It caches static assets and cacheable API responses at geographically close edge PoPs, reducing RTT and origin load.",
+        distractors: [
+          "It compiles server SQLite queries into browser CSS rules",
+          "It routes every image fetch directly back to a single primary database",
+          "It disables TLS encryption on edge servers automatically",
+        ],
+        explanation: "CDNs serve cacheable content from edge locations close to end users, relieving origin infrastructure.",
+      },
+      {
+        subtopic: "consistent hashing",
+        keywords: ["consistent hashing", "sharding", "ring", "partition"],
+        prompt: "Why do distributed caches and sharded stores use **Consistent Hashing** instead of `hash(key) % N`?",
+        correct: "Adding or removing a server only remaps roughly `1/N` keys instead of triggering a near-total cache miss storm across every node.",
+        distractors: [
+          "Because `%` fails to return integers inside modern CPUs",
+          "Consistent hashing replicates 100% of every key onto every single shard",
+          "It eliminates network sockets completely between microservices",
+        ],
+        explanation: "Consistent hashing minimizes key movement when cluster topology scales up or down.",
+      },
+      {
+        subtopic: "cap theorem & trade-offs",
+        keywords: ["cap theorem", "consistency", "availability", "partition"],
+        prompt: "Under **CAP Theorem** during a network partition (`P`), what trade-off must a distributed store choose?",
+        correct: "Between strict linearizable **Consistency (CP)** (rejecting stale writes/reads) and high **Availability (AP)** (serving possibly stale replicas).",
+        distractors: [
+          "Between SQL table names and camelCase JSON keys",
+          "Disabling both disk storage and TCP connections permanently",
+          "Requiring every microservice to run in a single browser tab",
+        ],
+        explanation: "Network partitions are unavoidable in distributed systems, forcing explicit CP vs AP design choices.",
+      },
     ],
   },
   {
@@ -2413,6 +2450,42 @@ const TOPIC_QUESTION_BANKS: TopicQuestionBank[] = [
           "Deleting raw data tabs immediately after prompting AI",
         ],
         explanation: "AI speeds formula drafting, while human validation ensures column boundaries and edge cases stay exact.",
+      },
+      {
+        subtopic: "excel tables & dynamic ranges",
+        keywords: ["table", "structured reference", "pivot", "refresh"],
+        prompt: "Why format source data as an **Excel Table (`Ctrl+T`)** before building PivotTables or formulas?",
+        correct: "Structured Tables expand automatically when new rows arrive so PivotTables and SUMIFS/XLOOKUP formulas include fresh records on refresh.",
+        distractors: [
+          "Tables prevent sorting or filtering numeric columns cleanly",
+          "Tables convert every cell value into static text strings",
+          "PivotTables require deleting headers before summarizing data",
+        ],
+        explanation: "Excel Tables auto-expand range boundaries, eliminating broken hardcoded ranges like `A1:D50`.",
+      },
+      {
+        subtopic: "iferror & data validation",
+        keywords: ["iferror", "sumifs", "countifs", "formula"],
+        prompt: "How do `SUMIFS` / `COUNTIFS` paired with `IFERROR` improve dashboard reliability?",
+        correct: "`SUMIFS`/`COUNTIFS` aggregate multi-criteria slices dynamically while `IFERROR` replaces noisy `#N/A` or `#DIV/0!` errors with clean defaults.",
+        distractors: [
+          "`IFERROR` silently alters non-error math calculations",
+          "`SUMIFS` supports only one condition column maximum",
+          "`#DIV/0!` errors automatically delete surrounding worksheet charts",
+        ],
+        explanation: "Multi-criteria aggregations with clean error fallback prevent cascading `#N/A` dashboard breaks.",
+      },
+      {
+        subtopic: "pivot grouping & calculated fields",
+        keywords: ["pivot", "grouping", "timeline", "date"],
+        prompt: "Why use **Timeline Slicers** and **Date Grouping** (Months, Quarters, Years) inside a PivotTable?",
+        correct: "They aggregate daily transaction dates cleanly into time periods without cluttering raw tables with helper columns.",
+        distractors: [
+          "Grouping converts dates permanently into binary images",
+          "Timelines overwrite every formula on separate summary sheets",
+          "PivotTables can group dates only if stored alphabetically as weekday names",
+        ],
+        explanation: "Native Pivot date grouping and Timelines streamline time-series reporting interactively.",
       },
     ],
   },
@@ -2496,6 +2569,42 @@ const TOPIC_QUESTION_BANKS: TopicQuestionBank[] = [
           "Privilege escalation only works via physical USB keyloggers",
         ],
         explanation: "Auditing SUID binaries, `sudo` permissions, and scheduled root jobs catches common vertical escalation flaws.",
+      },
+      {
+        subtopic: "xss & browser security",
+        keywords: ["xss", "web exploitation", "csp", "sanitize"],
+        prompt: "How does **Cross-Site Scripting (XSS)** occur in web apps, and what blocks it effectively?",
+        correct: "Unsanitized user text injected into HTML/DOM executes arbitrary JavaScript in victims' browsers; **context-aware output encoding**, CSP, and `HttpOnly` cookies mitigate it.",
+        distractors: [
+          "XSS happens exclusively when SQL passwords lack uppercase symbols",
+          "Renaming routes from `.html` to `.php` eliminates DOM injection risks",
+          "Removing HTTPS certificates stops reflected XSS scripts cleanly",
+        ],
+        explanation: "Escaping untrusted output per context (HTML/attribute/JS) paired with CSP stops script execution.",
+      },
+      {
+        subtopic: "authentication & broken access control (idor)",
+        keywords: ["idor", "access control", "vulnerability", "authorization"],
+        prompt: "What vulnerability allows `?invoice_id=1042` to expose another customer's invoice when **authorization checks** only verify login?",
+        correct: "**Broken Object Level Authorization (IDOR)** — the server checks authentication (`who you are`) but fails to enforce ownership (`what you may access`).",
+        distractors: [
+          "Purely a harmless CSS layout alignment bug",
+          "Buffer overflow inside the user's GPU monitor driver",
+          "DNS cache poisoning at the local Wi-Fi router",
+        ],
+        explanation: "Every resource endpoint must verify object ownership or RBAC permissions server-side, never just login state.",
+      },
+      {
+        subtopic: "tls & least privilege hardening",
+        keywords: ["vulnerability", "hardening", "least privilege", "defense"],
+        prompt: "Why does enforcing the **Principle of Least Privilege (PoLP)** contain breach blast radius after an initial compromise?",
+        correct: "Compromised services and accounts hold only minimal scoped permissions needed for their task, blocking trivial lateral movement or root takeover.",
+        distractors: [
+          "Granting every microservice `Administrator`/`root` simplifies firewall auditing cleanly",
+          "Least privilege disables encrypted HTTPS connections inside internal subnets",
+          "PoLP exposes plaintext passwords inside environment backups",
+        ],
+        explanation: "Strict permission scoping restricts what an attacker can reach even if one component falls.",
       },
     ],
   },
@@ -2615,15 +2724,28 @@ function buildContextDerivedFallbackQuestions(
   const courseHead = (ctx.courseTitle || "this course").split(/[|–—]/)[0].trim();
   const takeaways = (ctx.keyTakeaways || []).filter((t) => typeof t === "string" && t.trim().length > 10);
   const definitions = (ctx.importantDefinitions || []).filter((d) => typeof d === "string" && d.trim().length > 10);
+
   const summarySource = [ctx.summary || "", ctx.description || "", ctx.transcriptExcerpt || ""]
     .join(" ")
+    .replace(/Spoken highlights from video:\s*/gi, "")
+    .replace(/["“”]/g, (m) => (m === '"' ? '"' : '"'))
     .replace(/\s+/g, " ")
     .trim();
 
+  const isTemplateFluff = (sentence: string) =>
+    /^(in this lesson,?\s*master|segment overview\s*\[|this \d+-minute lesson breaks down|curriculum progression:|key focus areas include|connects directly into|core module taught from|explore .+?\(\d+:\d+)/i.test(
+      sentence.trim()
+    );
+
   const summarySentences = summarySource
     .split(/(?<=[.!?])\s+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length >= 28 && s.length <= 210);
+    .map((s) => s.replace(/^["']+|["']+$/g, "").trim())
+    .filter((s) => s.length >= 28 && s.length <= 210 && !isTemplateFluff(s));
+
+  const isTechDomain =
+    /\b(python|javascript|typescript|react|next\.?js|fastapi|sql|postgres|redis|docker|api|code|coding|programming|algorithm|function|variable|git|linux|backend|frontend|agent|llm|ai|cybersecurity|exploit|nmap|sharding|database|excel|formula|power query)\b/i.test(
+      `${cleanTitle} ${courseHead} ${summarySource}`
+    );
 
   const candidates: RawTopicMCQ[] = [];
 
@@ -2634,77 +2756,120 @@ function buildContextDerivedFallbackQuestions(
     candidates.push({
       prompt: `In "${cleanTitle}", what accurately defines **${term}**?`,
       correct: defBody,
-      distractors: [
-        `An anti-pattern that bypasses input checks and stores everything in unvalidated global state`,
-        `A deprecated legacy syntax disallowed inside modern ${courseHead} modules`,
-        `A purely cosmetic label unrelated to how ${cleanTitle} operates`,
-      ],
+      distractors: isTechDomain
+        ? [
+            `An anti-pattern that bypasses input checks and stores everything in unvalidated global state`,
+            `A deprecated legacy syntax disallowed inside modern ${courseHead} modules`,
+            `A purely cosmetic label unrelated to how ${cleanTitle} operates`,
+          ]
+        : [
+            `An outdated myth that ignores the core principles taught in "${cleanTitle}"`,
+            `A decorative label with no practical effect on ${courseHead} outcomes`,
+            `A shortcut that skips foundational accuracy and core context in "${cleanTitle}"`,
+          ],
       explanation: `${term}: ${defBody}`,
     });
   }
 
   for (const tk of takeaways.slice(0, 4)) {
     candidates.push({
-      prompt: `Which engineering practice reflects a key takeaway from "${cleanTitle}"?`,
+      prompt: isTechDomain
+        ? `Which engineering practice reflects a key takeaway from "${cleanTitle}"?`
+        : `Which key takeaway accurately reflects what is taught in "${cleanTitle}"?`,
       correct: tk,
-      distractors: [
-        `Skipping validation constraints and ignoring edge cases under production traffic`,
-        `Duplicating unstructured scripts rather than designing modular boundaries`,
-        `Swallowing exceptions silently so faults remain invisible to callers`,
-      ],
+      distractors: isTechDomain
+        ? [
+            `Skipping validation constraints and ignoring edge cases under production traffic`,
+            `Duplicating unstructured scripts rather than designing modular boundaries`,
+            `Swallowing exceptions silently so faults remain invisible to callers`,
+          ]
+        : [
+            `Skipping foundational steps and applying concepts without checking the surrounding context`,
+            `Ignoring quality criteria and feedback signals covered in ${courseHead}`,
+            `Relying on guesswork rather than the structured methods shown in "${cleanTitle}"`,
+          ],
       explanation: `Key takeaway highlighted in this lesson: ${tk}`,
     });
   }
 
-  for (let sIdx = 0; sIdx < Math.min(3, summarySentences.length); sIdx++) {
+  for (let sIdx = 0; sIdx < Math.min(4, summarySentences.length); sIdx++) {
     const sent = summarySentences[sIdx];
     candidates.push({
-      prompt: `According to "${cleanTitle}" (${sIdx === 0 ? "overview" : `section ${sIdx + 1}`}), which point is taught directly?`,
+      prompt: `According to "${cleanTitle}" (${sIdx === 0 ? "overview" : `key point ${sIdx + 1}`}), which statement is accurate?`,
       correct: sent,
-      distractors: [
-        `Relying strictly on hardcoded trial-and-error without structured verification`,
-        `Removing error handling and boundaries once basic syntax parses cleanly`,
-        `Mixing unrelated presentation logic and unvalidated credentials inline`,
-      ],
+      distractors: isTechDomain
+        ? [
+            `Relying strictly on hardcoded trial-and-error without structured verification`,
+            `Removing error handling and boundaries once basic syntax runs once`,
+            `Mixing unrelated concerns and unvalidated inputs inline`,
+          ]
+        : [
+            `Avoiding structured steps altogether in favor of unverified assumptions`,
+            `Treating "${cleanTitle}" as irrelevant to real-world outcomes in ${courseHead}`,
+            `Ignoring primary constraints and context emphasized by the instructor`,
+          ],
       explanation: sent,
     });
   }
 
-  for (const sub of subtopics.slice(0, 4)) {
+  for (const sub of subtopics.slice(0, 5)) {
     candidates.push({
-      prompt: `When applying **${sub}** covered inside "${cleanTitle}", what principle keeps implementations reliable?`,
-      correct: `Structuring ${sub} with clear contracts, explicit boundary/edge-case handling, and testable verification.`,
-      distractors: [
-        `Leaving ${sub} unvalidated and relying on accidental side effects across files`,
-        `Bypassing documentation and ignoring failure conditions in ${sub}`,
-        `Duplicating raw ${sub} state globally without clear boundaries`,
-      ],
-      explanation: `Every component covered in ${cleanTitle} (including ${sub}) benefits from clean structure and edge-case checks.`,
+      prompt: isTechDomain
+        ? `When applying **${sub}** covered inside "${cleanTitle}", what principle keeps implementations reliable?`
+        : `How should you apply **${sub}** effectively when studying "${cleanTitle}"?`,
+      correct: isTechDomain
+        ? `Structuring ${sub} with clear contracts, explicit boundary/edge-case handling, and testable verification.`
+        : `Understanding the purpose of ${sub}, checking key constraints and context, and applying it consistently in practice.`,
+      distractors: isTechDomain
+        ? [
+            `Leaving ${sub} unvalidated and relying on accidental side effects across files`,
+            `Bypassing documentation and ignoring failure conditions in ${sub}`,
+            `Duplicating raw ${sub} state globally without clear boundaries`,
+          ]
+        : [
+            `Using ${sub} randomly without checking goals, audience, or context`,
+            `Ignoring core constraints and best practices demonstrated for ${sub}`,
+            `Skipping verification or review after applying ${sub}`,
+          ],
+      explanation: `Every topic covered in ${cleanTitle} (including ${sub}) relies on structured application and context checks.`,
     });
   }
 
   candidates.push(
     {
       prompt: `What is the central objective of "${cleanTitle}" in ${courseHead}?`,
-      correct: summarySource && summarySource.length <= 180
-        ? summarySource
-        : `Understanding core mechanics, practical syntax, and verifiable workflows behind ${cleanTitle}.`,
-      distractors: [
-        `Skipping foundational behavior and copying unverified snippets blindly`,
-        `Disabling runtime validation and ignoring error paths altogether`,
-        `Treating ${cleanTitle} as isolated theory disconnected from project structure`,
-      ],
-      explanation: `Mastering ${cleanTitle} strengthens both conceptual understanding and real-world engineering accuracy.`,
+      correct:
+        summarySentences[0] && summarySentences[0].length <= 180
+          ? summarySentences[0]
+          : isTechDomain
+            ? `Understanding core mechanics, practical patterns, and verifiable workflows behind ${cleanTitle}.`
+            : `Mastering the core concepts, principles, and practical application behind ${cleanTitle}.`,
+      distractors: isTechDomain
+        ? [
+            `Skipping foundational behavior and copying unverified snippets blindly`,
+            `Disabling runtime validation and ignoring error paths altogether`,
+            `Treating ${cleanTitle} as isolated theory disconnected from project structure`,
+          ]
+        : [
+            `Memorizing isolated buzzwords without understanding practical application`,
+            `Skipping core principles and ignoring feedback or constraints`,
+            `Treating ${cleanTitle} as unrelated to broader ${courseHead} goals`,
+          ],
+      explanation: `Mastering ${cleanTitle} builds both conceptual clarity and practical execution across ${courseHead}.`,
     },
     {
-      prompt: `When testing or debugging implementations after "${cleanTitle}", what engineering habit catches regressions fastest?`,
-      correct: `Checking boundary inputs, inspecting intermediate states, and validating outputs systematically across realistic cases.`,
+      prompt: isTechDomain
+        ? `When testing or reviewing work after "${cleanTitle}", what habit catches mistakes fastest?`
+        : `When reviewing or applying skills from "${cleanTitle}", what habit ensures strong results?`,
+      correct: isTechDomain
+        ? `Checking boundary inputs, inspecting intermediate states, and validating outputs systematically across realistic cases.`
+        : `Checking requirements against real examples, verifying edge cases, and iterating based on concrete outcomes.`,
       distractors: [
-        `Ignoring failure cases so exceptions remain hidden during normal runs`,
-        `Modifying unrelated files blindly until warnings disappear`,
-        `Deleting diagnostic assertions once code compiles a single time`,
+        `Ignoring failure or feedback cases so subtle mistakes remain hidden`,
+        `Changing unrelated parts blindly without testing what actually broke`,
+        `Skipping review checks completely after a single quick attempt`,
       ],
-      explanation: `Systematic edge-case testing uncovers subtle bugs quickly when applying ${cleanTitle}.`,
+      explanation: `Systematic review and validation catch subtle mistakes quickly when applying ${cleanTitle}.`,
     }
   );
 
@@ -2756,12 +2921,17 @@ export function synthesizeLessonQuizQuestions(
     .join(" ")
     .toLowerCase();
 
-  const rankedBanks = TOPIC_QUESTION_BANKS.map((bank) => ({
+  const rawRanked = TOPIC_QUESTION_BANKS.map((bank) => ({
     bank,
     bankScore: scoreBankMatch(bank, normalizedTitle, fullBody),
   }))
     .filter((item) => item.bankScore >= 4)
     .sort((a, b) => b.bankScore - a.bankScore);
+
+  const topBankScore = rawRanked[0]?.bankScore ?? 0;
+  const rankedBanks = rawRanked.filter(
+    (item) => topBankScore < 14 || item.bankScore >= 8
+  );
 
   interface ScoredCandidate {
     raw: RawTopicMCQ;

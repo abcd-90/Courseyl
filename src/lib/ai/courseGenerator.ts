@@ -10,7 +10,11 @@ import {
   VideoMetadata,
 } from "../youtube";
 import { getAIProvider, NemotronAIProvider, OpenAIProvider } from "./aiProvider";
-import { computeRecommendedQuizCount, synthesizeLessonQuizQuestions } from "./quizGenerator";
+import {
+  computeRecommendedQuizCount,
+  generateLessonQuizQuestions,
+  synthesizeLessonQuizQuestions,
+} from "./quizGenerator";
 import { getFullSettings } from "../settings";
 
 export interface GenerateCourseParams {
@@ -28,13 +32,13 @@ export interface GenerationResult {
   message: string;
 }
 
-function resolveLessonQuizzes(
+function buildLessonQuizContext(
   l: RawLesson,
   courseTitle: string,
   chapterTitle?: string,
   lessonIndex = 0
-): RawQuizQuestion[] {
-  const ctx = {
+) {
+  return {
     title: l.title,
     description: l.description,
     summary: l.summary,
@@ -46,7 +50,17 @@ function resolveLessonQuizzes(
     endSeconds: l.endSeconds,
     durationSeconds: Math.max(60, l.endSeconds - l.startSeconds),
     lessonIndex,
+    transcriptExcerpt: l.transcriptExcerpt,
   };
+}
+
+function resolveLessonQuizzes(
+  l: RawLesson,
+  courseTitle: string,
+  chapterTitle?: string,
+  lessonIndex = 0
+): RawQuizQuestion[] {
+  const ctx = buildLessonQuizContext(l, courseTitle, chapterTitle, lessonIndex);
   const expectedCount = computeRecommendedQuizCount(ctx);
   if (Array.isArray(l.quizQuestions) && l.quizQuestions.length >= expectedCount) {
     return l.quizQuestions;
@@ -54,13 +68,36 @@ function resolveLessonQuizzes(
   return synthesizeLessonQuizQuestions(ctx, expectedCount);
 }
 
-function buildQuizCreatePayload(
+async function resolveLessonQuizzesAsync(
   l: RawLesson,
   courseTitle: string,
   chapterTitle?: string,
-  lessonIndex = 0
+  lessonIndex = 0,
+  useExternalLLM = false
+): Promise<RawQuizQuestion[]> {
+  if (!useExternalLLM) {
+    return resolveLessonQuizzes(l, courseTitle, chapterTitle, lessonIndex);
+  }
+  const ctx = buildLessonQuizContext(l, courseTitle, chapterTitle, lessonIndex);
+  const expectedCount = computeRecommendedQuizCount(ctx);
+  return generateLessonQuizQuestions(ctx, expectedCount);
+}
+
+async function buildQuizCreatePayloadAsync(
+  l: RawLesson,
+  courseTitle: string,
+  chapterTitle?: string,
+  lessonIndex = 0,
+  useExternalLLM = false
 ) {
-  return resolveLessonQuizzes(l, courseTitle, chapterTitle, lessonIndex).map((q, qIdx) => ({
+  const quizzes = await resolveLessonQuizzesAsync(
+    l,
+    courseTitle,
+    chapterTitle,
+    lessonIndex,
+    useExternalLLM
+  );
+  return quizzes.map((q, qIdx) => ({
     orderIndex: qIdx,
     questionText: q.questionText,
     correctOptionIndex: q.correctOptionIndex,
@@ -310,11 +347,14 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
     });
 
     // Create quiz for Lesson 1 with nested options
-    const firstLessonQuizzes = resolveLessonQuizzes(
+    const llmQuizDeadlineMs = Date.now() + 34000;
+    const isExternalProvider = provider.name !== "Local Deterministic Synthesizer";
+    const firstLessonQuizzes = await resolveLessonQuizzesAsync(
       firstLessonData,
       meta.title,
       firstChapterData.title,
-      0
+      0,
+      isExternalProvider
     );
     if (firstLessonQuizzes.length > 0) {
       await Promise.all(
@@ -357,8 +397,15 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
     const firstChapter = curriculumData.chapters[0];
     if (firstChapter.lessons.length > 1) {
       await Promise.all(
-        firstChapter.lessons.slice(1).map((l, sliceIdx) =>
-          prisma.lesson.create({
+        firstChapter.lessons.slice(1).map(async (l, sliceIdx) => {
+          const quizCreate = await buildQuizCreatePayloadAsync(
+            l,
+            meta.title,
+            firstChapter.title,
+            sliceIdx + 1,
+            isExternalProvider && Date.now() < llmQuizDeadlineMs
+          );
+          return prisma.lesson.create({
             data: {
               chapterId: createdFirstChapter.id,
               orderIndex: sliceIdx + 1,
@@ -373,11 +420,11 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
               importantDefinitions: JSON.stringify(l.importantDefinitions || []),
               status: "READY",
               quizQuestions: {
-                create: buildQuizCreatePayload(l, meta.title, firstChapter.title, sliceIdx + 1),
+                create: quizCreate,
               },
             },
-          })
-        )
+          });
+        })
       );
     }
 
@@ -386,8 +433,20 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
     for (let i = 0; i < remainingChapters.length; i += CHAPTER_CONCURRENCY) {
       const wave = remainingChapters.slice(i, i + CHAPTER_CONCURRENCY);
       await Promise.all(
-        wave.map((c, waveIdx) => {
+        wave.map(async (c, waveIdx) => {
           const cIdx = i + waveIdx + 1;
+          const lessonsWithQuizzes = await Promise.all(
+            c.lessons.map(async (l, lIdx) => ({
+              l,
+              quizCreate: await buildQuizCreatePayloadAsync(
+                l,
+                meta.title,
+                c.title,
+                lIdx,
+                isExternalProvider && Date.now() < llmQuizDeadlineMs
+              ),
+            }))
+          );
           return prisma.chapter.create({
             data: {
               courseId: course.id,
@@ -395,7 +454,7 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
               title: c.title,
               description: c.description,
               lessons: {
-                create: c.lessons.map((l, lIdx) => ({
+                create: lessonsWithQuizzes.map(({ l, quizCreate }, lIdx) => ({
                   orderIndex: lIdx,
                   title: l.title,
                   description: l.description || l.summary || `Comprehensive lesson on ${l.title}.`,
@@ -408,7 +467,7 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
                   importantDefinitions: JSON.stringify(l.importantDefinitions || []),
                   status: "READY",
                   quizQuestions: {
-                    create: buildQuizCreatePayload(l, meta.title, c.title, lIdx),
+                    create: quizCreate,
                   },
                 })),
               },
@@ -519,6 +578,7 @@ export interface RawLesson {
   keyTakeaways: string[];
   importantDefinitions: string[];
   quizQuestions: RawQuizQuestion[];
+  transcriptExcerpt?: string;
 }
 
 export interface RawChapter {
@@ -1109,6 +1169,7 @@ function buildDetailedLessonContent(params: {
     keyTakeaways: Array.from(takeawaysSet).slice(0, 4),
     importantDefinitions: definitions.slice(0, 3),
     quizQuestions,
+    transcriptExcerpt: transcriptSnippet || undefined,
   };
 }
 
