@@ -58,6 +58,7 @@ export default function LoginPage() {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [verifySynced, setVerifySynced] = useState(false);
   const pollInFlightRef = useRef(false);
+  const redirectTargetRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -102,21 +103,16 @@ export default function LoginPage() {
         const res = await fetch("/api/auth/email/status", {
           method: "GET",
           cache: "no-store",
+          credentials: "same-origin",
         });
         if (!res.ok) return;
         const data = await res.json();
         if (data?.verified && !cancelled) {
+          redirectTargetRef.current = data.redirectTo || getNextUrl();
           setVerifySynced(true);
           setError("");
           setSuccessMsg("");
           window.dispatchEvent(new Event("user-updated"));
-          const destination = data.redirectTo || getNextUrl();
-          setTimeout(() => {
-            if (!cancelled) {
-              router.push(destination);
-              router.refresh();
-            }
-          }, 550);
         }
       } catch {
         // Transient network hiccup; next interval retries cleanly
@@ -141,7 +137,16 @@ export default function LoginPage() {
       window.removeEventListener("focus", onFocusOrVisible);
       document.removeEventListener("visibilitychange", onFocusOrVisible);
     };
-  }, [step, verifySynced, router]);
+  }, [step, verifySynced]);
+
+  useEffect(() => {
+    if (!verifySynced) return;
+    const destination = redirectTargetRef.current || getNextUrl();
+    const timer = window.setTimeout(() => {
+      window.location.assign(destination);
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [verifySynced]);
 
   const getNextUrl = () => {
     if (typeof window !== "undefined") {
