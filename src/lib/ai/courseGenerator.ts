@@ -10,6 +10,7 @@ import {
   VideoMetadata,
 } from "../youtube";
 import { getAIProvider, NemotronAIProvider, OpenAIProvider } from "./aiProvider";
+import { synthesizeLessonQuizQuestions } from "./quizGenerator";
 import { getFullSettings } from "../settings";
 
 export interface GenerateCourseParams {
@@ -25,6 +26,53 @@ export interface GenerationResult {
   course?: { id: string; slug: string; title: string };
   isExisting: boolean;
   message: string;
+}
+
+function resolveLessonQuizzes(
+  l: RawLesson,
+  courseTitle: string,
+  chapterTitle?: string,
+  lessonIndex = 0
+): RawQuizQuestion[] {
+  if (Array.isArray(l.quizQuestions) && l.quizQuestions.length >= 4) {
+    return l.quizQuestions;
+  }
+  return synthesizeLessonQuizQuestions(
+    {
+      title: l.title,
+      description: l.description,
+      summary: l.summary,
+      keyTakeaways: l.keyTakeaways || [],
+      importantDefinitions: l.importantDefinitions || [],
+      chapterTitle,
+      courseTitle,
+      startSeconds: l.startSeconds,
+      endSeconds: l.endSeconds,
+      lessonIndex,
+    },
+    4
+  );
+}
+
+function buildQuizCreatePayload(
+  l: RawLesson,
+  courseTitle: string,
+  chapterTitle?: string,
+  lessonIndex = 0
+) {
+  return resolveLessonQuizzes(l, courseTitle, chapterTitle, lessonIndex).map((q, qIdx) => ({
+    orderIndex: qIdx,
+    questionText: q.questionText,
+    correctOptionIndex: q.correctOptionIndex,
+    explanation: q.explanation,
+    replayTimestampSeconds: q.replayTimestampSeconds || l.startSeconds,
+    options: {
+      create: (q.options || []).map((opt, optIdx) => ({
+        optionIndex: optIdx,
+        optionText: opt,
+      })),
+    },
+  }));
 }
 
 function slugify(text: string): string {
@@ -262,9 +310,15 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
     });
 
     // Create quiz for Lesson 1 with nested options
-    if (firstLessonData.quizQuestions && firstLessonData.quizQuestions.length > 0) {
+    const firstLessonQuizzes = resolveLessonQuizzes(
+      firstLessonData,
+      meta.title,
+      firstChapterData.title,
+      0
+    );
+    if (firstLessonQuizzes.length > 0) {
       await Promise.all(
-        firstLessonData.quizQuestions.map((q, qIdx) =>
+        firstLessonQuizzes.map((q, qIdx) =>
           prisma.quizQuestion.create({
             data: {
               lessonId: createdFirstLesson.id,
@@ -319,19 +373,7 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
               importantDefinitions: JSON.stringify(l.importantDefinitions || []),
               status: "READY",
               quizQuestions: {
-                create: (l.quizQuestions || []).map((q, qIdx) => ({
-                  orderIndex: qIdx,
-                  questionText: q.questionText,
-                  correctOptionIndex: q.correctOptionIndex,
-                  explanation: q.explanation,
-                  replayTimestampSeconds: q.replayTimestampSeconds || l.startSeconds,
-                  options: {
-                    create: (q.options || []).map((opt, optIdx) => ({
-                      optionIndex: optIdx,
-                      optionText: opt,
-                    })),
-                  },
-                })),
+                create: buildQuizCreatePayload(l, meta.title, firstChapter.title, sliceIdx + 1),
               },
             },
           })
@@ -366,19 +408,7 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
                   importantDefinitions: JSON.stringify(l.importantDefinitions || []),
                   status: "READY",
                   quizQuestions: {
-                    create: (l.quizQuestions || []).map((q, qIdx) => ({
-                      orderIndex: qIdx,
-                      questionText: q.questionText,
-                      correctOptionIndex: q.correctOptionIndex,
-                      explanation: q.explanation,
-                      replayTimestampSeconds: q.replayTimestampSeconds || l.startSeconds,
-                      options: {
-                        create: (q.options || []).map((opt, optIdx) => ({
-                          optionIndex: optIdx,
-                          optionText: opt,
-                        })),
-                      },
-                    })),
+                    create: buildQuizCreatePayload(l, meta.title, c.title, lIdx),
                   },
                 })),
               },
@@ -1056,73 +1086,20 @@ function buildDetailedLessonContent(params: {
     );
   }
 
-  const quizQuestions: RawQuizQuestion[] = [];
-  const span = Math.max(20, endSeconds - startSeconds);
-  const conceptWithQ = concepts.find((c) => c.question);
-
-  const rotateQuiz = (
-    qText: string,
-    correct: string,
-    wrongs: [string, string, string],
-    explanation: string,
-    qIdx: number
-  ): RawQuizQuestion => {
-    const targetIdx = (lessonIndex + qIdx) % 4;
-    const options: string[] = [];
-    let wCursor = 0;
-    for (let i = 0; i < 4; i++) {
-      if (i === targetIdx) options.push(correct);
-      else options.push(wrongs[wCursor++]);
-    }
-    return {
-      questionText: qText,
-      options,
-      correctOptionIndex: targetIdx,
-      explanation,
-      replayTimestampSeconds: Math.floor(startSeconds + span * (qIdx === 0 ? 0.25 : 0.6)),
-    };
-  };
-
-  if (conceptWithQ?.question) {
-    quizQuestions.push(
-      rotateQuiz(
-        conceptWithQ.question.prompt,
-        conceptWithQ.question.correct,
-        conceptWithQ.question.distractors,
-        conceptWithQ.question.explanation,
-        0
-      )
-    );
-  } else {
-    quizQuestions.push(
-      rotateQuiz(
-        `What is the primary learning outcome of "${cleanTopic}"?`,
-        `Designing, implementing, and verifying ${cleanTopic} using clean interfaces and structured data flow.`,
-        [
-          `Bypassing input validation and relying on hardcoded global state throughout`,
-          `Replacing modular components with duplicated copy-pasted scripts`,
-          `Suppressing runtime exceptions so failures remain invisible`,
-        ],
-        `This module focuses on mastering ${cleanTopic} with maintainable patterns and clear validation.`,
-        0
-      )
-    );
-  }
-
-  quizQuestions.push(
-    rotateQuiz(
-      `When applying "${cleanTopic}" in a real-world workflow, which practice ensures stability?`,
-      concepts[0]
-        ? `${concepts[0].takeaway}`
-        : `Validating edge cases, documenting assumptions, and verifying outputs before downstream integration.`,
-      [
-        `Skipping automated verification and ignoring schema constraints`,
-        `Hardcoding credentials directly inside source files`,
-        `Disabling logging and observability hooks in production`,
-      ],
-      `Applying ${cleanTopic} reliably requires explicit contracts, clear boundaries, and testable validation.`,
-      1
-    )
+  const quizQuestions: RawQuizQuestion[] = synthesizeLessonQuizQuestions(
+    {
+      title: cleanTopic,
+      description: descriptionParts.join(" "),
+      summary: summaryParts.join(" "),
+      keyTakeaways: Array.from(takeawaysSet).slice(0, 4),
+      importantDefinitions: definitions.slice(0, 3),
+      courseTitle,
+      startSeconds,
+      endSeconds,
+      lessonIndex,
+      transcriptExcerpt: transcriptSnippet,
+    },
+    4
   );
 
   return {

@@ -65,6 +65,9 @@ export default function LessonLearnPage({
     setLessonCurrentTime(0);
     setCurrentTime(0);
     setIsPlaying(false);
+    setQuizAnswers({});
+    setQuizSubmitted(false);
+    setShowQuizModal(false);
 
     // Enroll automatically
     fetch(`/api/courses/${resolvedParams.id}/enroll`, { method: "POST" }).catch(() => {});
@@ -1132,6 +1135,11 @@ export default function LessonLearnPage({
                   if (!quizSubmitted) {
                     setQuizSubmitted(true);
                     setCompleted(true);
+                    fetch(`/api/lessons/${resolvedParams.lessonId}/quiz/submit`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ answers: quizAnswers }),
+                    }).catch(() => {});
                   } else {
                     setShowQuizModal(false);
                   }

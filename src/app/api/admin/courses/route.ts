@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { hashPassword } from "@/lib/auth";
 import { generateCourse } from "@/lib/ai/courseGenerator";
+import { synthesizeLessonQuizQuestions } from "@/lib/ai/quizGenerator";
 import { getCleanThumbnailUrl } from "@/lib/thumbnail";
 import { parseYouTubeUrl } from "@/lib/youtube";
 
@@ -268,46 +269,60 @@ export async function POST(req: Request) {
         const endSeconds =
           globalIdx === totalLessons - 1 ? totalSeconds : (globalIdx + 1) * baseLessonDuration;
         const durationSeconds = Math.max(60, endSeconds - startSeconds);
+        const lessonTitle = `${cleanTitle.split(" ")[0]} Module ${chIdx + 1}.${lIdx + 1}: ${topicLabel}`;
+        const lessonDescription = `Interactive walkthrough covering essential concepts from ${cleanTitle} (${topicLabel}).`;
+        const lessonSummary = `In this lesson, you will master key techniques inside ${cleanTitle}, understand core trade-offs, and test recall with interactive exercises.`;
+        const takeawaysList = [
+          `Understand core workflow principles for ${topicLabel}`,
+          `Apply practical patterns in real projects`,
+          `Recognize common mistakes and debug them systematically`,
+        ];
+        const definitionEntry = {
+          term: topicLabel.split(" ")[0] + " Workflow",
+          definition: `Structured approach introduced in ${cleanTitle} to keep implementation modular and reliable.`,
+        };
+        const synthesizedQuizzes = synthesizeLessonQuizQuestions(
+          {
+            title: lessonTitle,
+            description: lessonDescription,
+            summary: lessonSummary,
+            keyTakeaways: takeawaysList,
+            importantDefinitions: [`${definitionEntry.term}: ${definitionEntry.definition}`],
+            chapterTitle: `Module ${chIdx + 1}: ${topicLabel}`,
+            courseTitle: cleanTitle,
+            startSeconds,
+            endSeconds,
+            lessonIndex: globalIdx,
+          },
+          4
+        );
 
         return {
           orderIndex: lIdx + 1,
-          title: `${cleanTitle.split(" ")[0]} Module ${chIdx + 1}.${lIdx + 1}: ${topicLabel}`,
-          description: `Interactive walkthrough covering essential concepts from ${cleanTitle} (${topicLabel}).`,
+          title: lessonTitle,
+          description: lessonDescription,
           youtubeVideoId: videoId,
           startSeconds,
           endSeconds,
           durationSeconds,
-          summary: `In this lesson, you will master key techniques inside ${cleanTitle}, understand core trade-offs, and test recall with interactive exercises.`,
-          keyTakeaways: JSON.stringify([
-            `Understand core workflow principles for ${topicLabel}`,
-            `Apply practical patterns in real projects`,
-            `Recognize common mistakes and debug them systematically`,
-          ]),
-          importantDefinitions: JSON.stringify([
-            {
-              term: topicLabel.split(" ")[0] + " Workflow",
-              definition: `Structured approach introduced in ${cleanTitle} to keep implementation modular and reliable.`,
-            },
-          ]),
+          summary: lessonSummary,
+          keyTakeaways: JSON.stringify(takeawaysList),
+          importantDefinitions: JSON.stringify([definitionEntry]),
           status: "READY",
           quizQuestions: {
-            create: [
-              {
-                orderIndex: 1,
-                questionText: `What is the main focus of ${topicLabel} in ${cleanTitle}?`,
-                correctOptionIndex: 1,
-                explanation: `This segment emphasizes structured understanding and practical application in ${topicLabel}.`,
-                replayTimestampSeconds: startSeconds,
-                options: {
-                  create: [
-                    { optionIndex: 0, optionText: "Skipping fundamentals without practice" },
-                    { optionIndex: 1, optionText: `Applying structured workflows in ${topicLabel}` },
-                    { optionIndex: 2, optionText: "Memorizing random syntax without context" },
-                    { optionIndex: 3, optionText: "Disabling all verification checks" },
-                  ],
-                },
+            create: synthesizedQuizzes.map((q, qIdx) => ({
+              orderIndex: qIdx,
+              questionText: q.questionText,
+              correctOptionIndex: q.correctOptionIndex,
+              explanation: q.explanation,
+              replayTimestampSeconds: q.replayTimestampSeconds,
+              options: {
+                create: q.options.map((optText, optIdx) => ({
+                  optionIndex: optIdx,
+                  optionText: optText,
+                })),
               },
-            ],
+            })),
           },
         };
       });

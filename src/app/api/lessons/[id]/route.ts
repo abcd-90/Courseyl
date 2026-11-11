@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { ensureLessonQuizzesInDb } from "@/lib/ai/quizGenerator";
 
 export async function GET(
   req: Request,
@@ -114,6 +115,35 @@ export async function GET(
       importantDefinitions = [];
     }
 
+    const formattedDefinitions: string[] = Array.isArray(importantDefinitions)
+      ? importantDefinitions
+          .map((d: unknown) =>
+            typeof d === "string"
+              ? d
+              : typeof d === "object" && d !== null && "term" in d && "definition" in d
+                ? `${String((d as { term: unknown }).term)}: ${String((d as { definition: unknown }).definition)}`
+                : ""
+          )
+          .filter(Boolean)
+      : [];
+
+    const resolvedQuizQuestions =
+      lesson.quizQuestions.length > 0
+        ? lesson.quizQuestions
+        : await ensureLessonQuizzesInDb(lesson.id, {
+            lessonId: lesson.id,
+            title: lesson.title,
+            description: lesson.description,
+            summary: lesson.summary,
+            keyTakeaways: Array.isArray(keyTakeaways) ? keyTakeaways.map(String) : [],
+            importantDefinitions: formattedDefinitions,
+            chapterTitle: lesson.chapter.title,
+            courseTitle: lesson.chapter.course.title,
+            startSeconds: lesson.startSeconds,
+            endSeconds: lesson.endSeconds,
+            lessonIndex: lesson.orderIndex,
+          });
+
     const courseSource = lesson.chapter?.course?.source;
     const resolvedVideoId =
       lesson.youtubeVideoId && lesson.youtubeVideoId !== "urbkF3zPpxw"
@@ -147,11 +177,12 @@ export async function GET(
         allLessons: allCourseLessons,
       },
       notes,
-      quizQuestions: lesson.quizQuestions.map((q) => ({
+      quizQuestions: resolvedQuizQuestions.map((q) => ({
         id: q.id,
         questionText: q.questionText,
         replayTimestampSeconds: q.replayTimestampSeconds,
         correctOptionIndex: q.correctOptionIndex,
+        explanation: q.explanation,
         options: q.options,
       })),
       progress: {
