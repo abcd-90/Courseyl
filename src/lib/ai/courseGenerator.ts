@@ -5,7 +5,9 @@ import {
   fetchYouTubeTranscript,
   TranscriptSegment,
   formatDuration,
+  formatClockTimestamp,
   VideoChapter,
+  VideoMetadata,
 } from "../youtube";
 import { getAIProvider, NemotronAIProvider, OpenAIProvider } from "./aiProvider";
 import { getFullSettings } from "../settings";
@@ -101,11 +103,11 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
   const tier = sub?.tier || "FREE";
   const role = user.role;
 
-  // Tier limits: allow comprehensive multi-hour masterclasses
+  // Tier limits: allow comprehensive multi-hour masterclasses (including 24h+ marathons)
   const tierLimits = {
-    FREE: { maxCourses: 5, maxDurationSec: 86400 },
-    PRO: { maxCourses: 20, maxDurationSec: 86400 },
-    MAX: { maxCourses: 50, maxDurationSec: 86400 },
+    FREE: { maxCourses: 5, maxDurationSec: 108000 },
+    PRO: { maxCourses: 20, maxDurationSec: 144000 },
+    MAX: { maxCourses: 50, maxDurationSec: 180000 },
   };
 
   const currentLimit = tierLimits[tier as keyof typeof tierLimits] || tierLimits.FREE;
@@ -136,7 +138,10 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
     );
   }
 
-  // 5. Ingest transcript
+  // 5. Ingest transcript (skip massive caption XML streams on 4h+ chaptered videos unless LLM active)
+  const provider = getAIProvider();
+  const hasExternalAI =
+    provider instanceof NemotronAIProvider || provider instanceof OpenAIProvider;
   let transcripts: TranscriptSegment[] | null = null;
   if (manualTranscript && manualTranscript.trim()) {
     transcripts = [
@@ -146,7 +151,12 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
         duration: meta.durationSeconds,
       },
     ];
-  } else {
+  } else if (
+    hasExternalAI ||
+    !meta.chapters ||
+    meta.chapters.length < 4 ||
+    meta.durationSeconds < 14400
+  ) {
     transcripts = await fetchYouTubeTranscript(parsedUrl.videoId);
   }
 
@@ -200,14 +210,12 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
   });
 
   // 7. Generate curriculum structure via AI or domain synthesizer
-  const provider = getAIProvider();
-
   try {
     let curriculumData = await generateCurriculumStructure(meta, transcripts, provider, difficulty);
 
-    // Ensure we have at least 1 chapter and 2-4 lessons
+    // Ensure we have at least 1 chapter and lessons covering duration
     if (!curriculumData.chapters || curriculumData.chapters.length === 0) {
-      curriculumData = generateFallbackCurriculum(meta, difficulty);
+      curriculumData = generateFallbackCurriculum(meta, difficulty, transcripts);
     }
 
     // 8. STREAMING REQUIREMENT: Create Chapter 1 & Lesson 1 immediately
@@ -222,6 +230,8 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
     });
 
     const firstLessonData = firstChapterData.lessons[0];
+    const firstStart = firstLessonData.startSeconds ?? 0;
+    const firstEnd = firstLessonData.endSeconds ?? Math.min(600, meta.durationSeconds);
     const createdFirstLesson = await prisma.lesson.create({
       data: {
         chapterId: createdFirstChapter.id,
@@ -229,11 +239,9 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
         title: firstLessonData.title,
         description: firstLessonData.description || firstLessonData.summary || `Master ${firstLessonData.title} with step-by-step guidance.`,
         youtubeVideoId: parsedUrl.videoId,
-        startSeconds: firstLessonData.startSeconds || 0,
-        endSeconds: firstLessonData.endSeconds || Math.min(600, meta.durationSeconds),
-        durationSeconds:
-          (firstLessonData.endSeconds || Math.min(600, meta.durationSeconds)) -
-          (firstLessonData.startSeconds || 0),
+        startSeconds: firstStart,
+        endSeconds: firstEnd,
+        durationSeconds: Math.max(30, firstEnd - firstStart),
         summary: firstLessonData.summary || firstLessonData.description || `Master ${firstLessonData.title} with step-by-step guidance.`,
         keyTakeaways: JSON.stringify(firstLessonData.keyTakeaways || []),
         importantDefinitions: JSON.stringify(firstLessonData.importantDefinitions || []),
@@ -241,31 +249,28 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
       },
     });
 
-    // Create quiz for Lesson 1
+    // Create quiz for Lesson 1 with nested options
     if (firstLessonData.quizQuestions && firstLessonData.quizQuestions.length > 0) {
-      for (let qIdx = 0; qIdx < firstLessonData.quizQuestions.length; qIdx++) {
-        const q = firstLessonData.quizQuestions[qIdx];
-        const quizQ = await prisma.quizQuestion.create({
-          data: {
-            lessonId: createdFirstLesson.id,
-            orderIndex: qIdx,
-            questionText: q.questionText,
-            correctOptionIndex: q.correctOptionIndex,
-            explanation: q.explanation,
-            replayTimestampSeconds: q.replayTimestampSeconds || createdFirstLesson.startSeconds,
-          },
-        });
-
-        for (let optIdx = 0; optIdx < q.options.length; optIdx++) {
-          await prisma.quizOption.create({
+      await Promise.all(
+        firstLessonData.quizQuestions.map((q, qIdx) =>
+          prisma.quizQuestion.create({
             data: {
-              questionId: quizQ.id,
-              optionIndex: optIdx,
-              optionText: q.options[optIdx],
+              lessonId: createdFirstLesson.id,
+              orderIndex: qIdx,
+              questionText: q.questionText,
+              correctOptionIndex: q.correctOptionIndex,
+              explanation: q.explanation,
+              replayTimestampSeconds: q.replayTimestampSeconds || createdFirstLesson.startSeconds,
+              options: {
+                create: (q.options || []).map((opt, optIdx) => ({
+                  optionIndex: optIdx,
+                  optionText: opt,
+                })),
+              },
             },
-          });
-        }
-      }
+          })
+        )
+      );
     }
 
     // Mark Lesson 1 READY and Course READY (streaming first lesson available!)
@@ -282,24 +287,21 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
       },
     });
 
-    // 9. Process remaining lessons in Chapter 1 and subsequent chapters using high-speed nested creates
-    for (let cIdx = 0; cIdx < curriculumData.chapters.length; cIdx++) {
-      const c = curriculumData.chapters[cIdx];
-
-      if (cIdx === 0) {
-        // Add remaining lessons for Chapter 1 (from index 1 onwards)
-        for (let lIdx = 1; lIdx < c.lessons.length; lIdx++) {
-          const l = c.lessons[lIdx];
-          await prisma.lesson.create({
+    // 9. Process remaining lessons in Chapter 1 and subsequent chapters using bounded concurrency batches
+    const firstChapter = curriculumData.chapters[0];
+    if (firstChapter.lessons.length > 1) {
+      await Promise.all(
+        firstChapter.lessons.slice(1).map((l, sliceIdx) =>
+          prisma.lesson.create({
             data: {
               chapterId: createdFirstChapter.id,
-              orderIndex: lIdx,
+              orderIndex: sliceIdx + 1,
               title: l.title,
               description: l.description || l.summary || `Comprehensive lesson on ${l.title}.`,
               youtubeVideoId: parsedUrl.videoId || "",
               startSeconds: l.startSeconds,
               endSeconds: l.endSeconds,
-              durationSeconds: Math.max(60, l.endSeconds - l.startSeconds),
+              durationSeconds: Math.max(30, l.endSeconds - l.startSeconds),
               summary: l.summary || l.description || `Comprehensive lesson on ${l.title}.`,
               keyTakeaways: JSON.stringify(l.keyTakeaways || []),
               importantDefinitions: JSON.stringify(l.importantDefinitions || []),
@@ -320,80 +322,86 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
                 })),
               },
             },
-          });
-        }
-      } else {
-        // Create full subsequent chapters with all nested lessons, quizzes, and options in 1 query per chapter
-        await prisma.chapter.create({
-          data: {
-            courseId: course.id,
-            orderIndex: cIdx,
-            title: c.title,
-            description: c.description,
-            lessons: {
-              create: c.lessons.map((l, lIdx) => ({
-                orderIndex: lIdx,
-                title: l.title,
-                description: l.description || l.summary || `Comprehensive lesson on ${l.title}.`,
-                youtubeVideoId: parsedUrl.videoId || "",
-                startSeconds: l.startSeconds,
-                endSeconds: l.endSeconds,
-                durationSeconds: Math.max(60, l.endSeconds - l.startSeconds),
-                summary: l.summary || l.description || `Comprehensive lesson on ${l.title}.`,
-                keyTakeaways: JSON.stringify(l.keyTakeaways || []),
-                importantDefinitions: JSON.stringify(l.importantDefinitions || []),
-                status: "READY",
-                quizQuestions: {
-                  create: (l.quizQuestions || []).map((q, qIdx) => ({
-                    orderIndex: qIdx,
-                    questionText: q.questionText,
-                    correctOptionIndex: q.correctOptionIndex,
-                    explanation: q.explanation,
-                    replayTimestampSeconds: q.replayTimestampSeconds || l.startSeconds,
-                    options: {
-                      create: (q.options || []).map((opt, optIdx) => ({
-                        optionIndex: optIdx,
-                        optionText: opt,
-                      })),
-                    },
-                  })),
-                },
-              })),
-            },
-          },
-        });
-      }
+          })
+        )
+      );
     }
 
-    // 10. Generate Placement Diagnostic Questions for the course
+    const remainingChapters = curriculumData.chapters.slice(1);
+    const CHAPTER_CONCURRENCY = 3;
+    for (let i = 0; i < remainingChapters.length; i += CHAPTER_CONCURRENCY) {
+      const wave = remainingChapters.slice(i, i + CHAPTER_CONCURRENCY);
+      await Promise.all(
+        wave.map((c, waveIdx) => {
+          const cIdx = i + waveIdx + 1;
+          return prisma.chapter.create({
+            data: {
+              courseId: course.id,
+              orderIndex: cIdx,
+              title: c.title,
+              description: c.description,
+              lessons: {
+                create: c.lessons.map((l, lIdx) => ({
+                  orderIndex: lIdx,
+                  title: l.title,
+                  description: l.description || l.summary || `Comprehensive lesson on ${l.title}.`,
+                  youtubeVideoId: parsedUrl.videoId || "",
+                  startSeconds: l.startSeconds,
+                  endSeconds: l.endSeconds,
+                  durationSeconds: Math.max(30, l.endSeconds - l.startSeconds),
+                  summary: l.summary || l.description || `Comprehensive lesson on ${l.title}.`,
+                  keyTakeaways: JSON.stringify(l.keyTakeaways || []),
+                  importantDefinitions: JSON.stringify(l.importantDefinitions || []),
+                  status: "READY",
+                  quizQuestions: {
+                    create: (l.quizQuestions || []).map((q, qIdx) => ({
+                      orderIndex: qIdx,
+                      questionText: q.questionText,
+                      correctOptionIndex: q.correctOptionIndex,
+                      explanation: q.explanation,
+                      replayTimestampSeconds: q.replayTimestampSeconds || l.startSeconds,
+                      options: {
+                        create: (q.options || []).map((opt, optIdx) => ({
+                          optionIndex: optIdx,
+                          optionText: opt,
+                        })),
+                      },
+                    })),
+                  },
+                })),
+              },
+            },
+          });
+        })
+      );
+    }
+
+    // 10. Generate Placement Diagnostic Questions for the course (nested creates in parallel)
     const placementQuestions =
       curriculumData.placementQuestions && curriculumData.placementQuestions.length >= 3
         ? curriculumData.placementQuestions
         : generateFallbackPlacement(curriculumData);
 
-    for (let pIdx = 0; pIdx < placementQuestions.length; pIdx++) {
-      const pq = placementQuestions[pIdx];
-      const createdPq = await prisma.placementQuestion.create({
-        data: {
-          courseId: course.id,
-          orderIndex: pIdx,
-          topicName: cleanPlacementText(pq.topicName),
-          questionText: cleanPlacementText(pq.questionText),
-          correctOptionIndex: pq.correctOptionIndex,
-          explanation: cleanPlacementText(pq.explanation),
-        },
-      });
-
-      for (let optIdx = 0; optIdx < pq.options.length; optIdx++) {
-        await prisma.placementOption.create({
+    await Promise.all(
+      placementQuestions.map((pq, pIdx) =>
+        prisma.placementQuestion.create({
           data: {
-            questionId: createdPq.id,
-            optionIndex: optIdx,
-            optionText: cleanPlacementText(pq.options[optIdx]),
+            courseId: course.id,
+            orderIndex: pIdx,
+            topicName: cleanPlacementText(pq.topicName),
+            questionText: cleanPlacementText(pq.questionText),
+            correctOptionIndex: pq.correctOptionIndex,
+            explanation: cleanPlacementText(pq.explanation),
+            options: {
+              create: pq.options.map((optText, optIdx) => ({
+                optionIndex: optIdx,
+                optionText: cleanPlacementText(optText),
+              })),
+            },
           },
-        });
-      }
-    }
+        })
+      )
+    );
 
     // 11. Finalize Job and Update User Usage
     await prisma.generationJob.update({
@@ -452,7 +460,7 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
 // AI Synthesis and Fallback Helpers
 // ----------------------------------------------------
 
-interface RawQuizQuestion {
+export interface RawQuizQuestion {
   questionText: string;
   options: string[];
   correctOptionIndex: number;
@@ -460,7 +468,7 @@ interface RawQuizQuestion {
   replayTimestampSeconds: number;
 }
 
-interface RawLesson {
+export interface RawLesson {
   title: string;
   description: string;
   startSeconds: number;
@@ -471,13 +479,13 @@ interface RawLesson {
   quizQuestions: RawQuizQuestion[];
 }
 
-interface RawChapter {
+export interface RawChapter {
   title: string;
   description: string;
   lessons: RawLesson[];
 }
 
-interface RawPlacementQuestion {
+export interface RawPlacementQuestion {
   topicName: string;
   questionText: string;
   options: string[];
@@ -485,195 +493,889 @@ interface RawPlacementQuestion {
   explanation: string;
 }
 
-interface RawCurriculum {
+export interface RawCurriculum {
   chapters: RawChapter[];
   placementQuestions?: RawPlacementQuestion[];
 }
 
-async function generateCurriculumStructure(
-  meta: { title: string; durationSeconds: number; description?: string; chapters?: VideoChapter[] },
-  transcripts: TranscriptSegment[] | null,
-  provider: ReturnType<typeof getAIProvider>,
-  difficulty: string
-): Promise<RawCurriculum> {
-  // If video has chapters extracted from YouTube timestamps, use them directly to organize into a daily plan
-  if (meta.chapters && meta.chapters.length >= 3) {
-    return organizeChaptersIntoDailyPlan(meta.chapters, meta.durationSeconds, meta.title);
-  }
-
-  if (provider instanceof NemotronAIProvider || provider instanceof OpenAIProvider) {
-    try {
-      const transcriptSummary = transcripts
-        ? transcripts.slice(0, 150).map((t) => `[${formatDuration(t.start)}] ${t.text}`).join("\n")
-        : meta.description || "";
-
-      const prompt = `You are designing a high-retention structured online course based on a YouTube video titled "${meta.title}".
-Video Total Duration: ${meta.durationSeconds} seconds (${formatDuration(meta.durationSeconds)}).
-Target Difficulty: ${difficulty}.
-Transcript / Context excerpt:
-${transcriptSummary.slice(0, 3000)}
-
-Please divide this course into 2-3 logical Chapters, each with 2-3 lessons.
-Each lesson must specify exact startSeconds and endSeconds (spanning the total duration 0 to ${meta.durationSeconds}).
-Each lesson must include 2-3 quiz questions with:
-- questionText
-- options (array of 4 distinct choices)
-- correctOptionIndex (0-3)
-- explanation
-- replayTimestampSeconds (timestamp within the lesson where this was explained)
-Also generate 4-6 course-level placement test questions evaluating prior knowledge of key topics.`;
-
-      const schema = `{
-  "chapters": [
-    {
-      "title": "Chapter title",
-      "description": "Chapter summary",
-      "lessons": [
-        {
-          "title": "Lesson title",
-          "description": "Lesson description",
-          "startSeconds": 0,
-          "endSeconds": 450,
-          "summary": "Detailed lesson summary",
-          "keyTakeaways": ["Takeaway 1", "Takeaway 2"],
-          "importantDefinitions": ["Def 1", "Def 2"],
-          "quizQuestions": [
-            {
-              "questionText": "Question?",
-              "options": ["Option A", "Option B", "Option C", "Option D"],
-              "correctOptionIndex": 0,
-              "explanation": "Why this is correct",
-              "replayTimestampSeconds": 120
-            }
-          ]
-        }
-      ]
-    }
-  ],
-  "placementQuestions": [
-    {
-      "topicName": "Topic name",
-      "questionText": "Diagnostic question?",
-      "options": ["A", "B", "C", "D"],
-      "correctOptionIndex": 0,
-      "explanation": "Explanation"
-    }
-  ]
-}`;
-
-      return await provider.generateJSON<RawCurriculum>(prompt, schema);
-    } catch (err) {
-      console.warn("LLM API generation failed, seamlessly falling back to high-fidelity domain synthesizer:", err);
-    }
-  }
-
-  return generateFallbackCurriculum(meta, difficulty);
+interface ConceptEntry {
+  keywords: string[];
+  term: string;
+  definition: string;
+  takeaway: string;
+  question?: {
+    prompt: string;
+    correct: string;
+    distractors: [string, string, string];
+    explanation: string;
+  };
 }
 
-function organizeChaptersIntoDailyPlan(
-  chapters: VideoChapter[],
-  totalDuration: number,
-  courseTitle: string
-): RawCurriculum {
-  // Group lessons into ~5-8 daily modules (around 1.5 to 2.2 hours per day)
-  const targetDaysCount = Math.min(10, Math.max(1, Math.ceil(totalDuration / (2 * 3600))));
-  const targetDayDuration = totalDuration / targetDaysCount;
-
-  const rawChapters: RawChapter[] = [];
-  let currentLessons: RawLesson[] = [];
-  let currentDaySeconds = 0;
-  let dayIndex = 1;
-
-  for (let i = 0; i < chapters.length; i++) {
-    const ch = chapters[i];
-    const midSec = Math.floor((ch.startSeconds + ch.endSeconds) / 2);
-
-    const quizQuestions: RawQuizQuestion[] = [
-      {
-        questionText: `What key concept is emphasized in "${ch.title}"?`,
-        options: [
-          `Understanding the core principles and practical mechanics of ${ch.title}`,
-          "Skipping all foundational syntax rules",
-          "Hardcoding values without data structures",
-          "Executing code without error handling",
-        ],
-        correctOptionIndex: 0,
-        explanation: `This section highlights proper implementation and patterns for ${ch.title}.`,
-        replayTimestampSeconds: Math.floor(ch.startSeconds + (ch.endSeconds - ch.startSeconds) * 0.25),
-      },
-      {
-        questionText: `Which approach is considered best practice when working with ${ch.title}?`,
-        options: [
-          "Writing clean, modular, and well-tested code",
-          "Disabling type assertions and ignoring syntax errors",
-          "Using arbitrary global variables across all scopes",
-          "Relying on deprecated methods without documentation",
-        ],
-        correctOptionIndex: 0,
-        explanation: `Best practices emphasize modularity and defensive design when implementing ${ch.title}.`,
-        replayTimestampSeconds: midSec,
-      },
-    ];
-
-    const lesson: RawLesson = {
-      title: ch.title,
-      description: `In this lesson, master ${ch.title} with step-by-step code walkthroughs, explanations, and exercises.`,
-      startSeconds: ch.startSeconds,
-      endSeconds: ch.endSeconds,
-      summary: `Comprehensive hands-on breakdown of ${ch.title}. We analyze the underlying mechanics, common patterns, and best practices.`,
-      keyTakeaways: [
-        `Core principles and operation of ${ch.title}`,
-        "Step-by-step implementation walkthrough",
-        "Common edge cases and debugging strategies",
+const KNOWLEDGE_GLOSSARY: ConceptEntry[] = [
+  {
+    keywords: ["langgraph", "stategraph", "node", "edge", "graph"],
+    term: "LangGraph StateGraph",
+    definition: "Graph-based orchestration framework that models agent execution as stateful nodes and conditional/cyclic edges.",
+    takeaway: "Design agent workflows explicitly using typed state schemas, nodes, and conditional routing edges.",
+    question: {
+      prompt: "Why is LangGraph preferred over simple linear chains for complex agent workflows?",
+      correct: "It supports cyclic graphs, shared mutable state, conditional branching, and durable checkpointing.",
+      distractors: [
+        "It compiles Python models directly into browser WebAssembly binaries without APIs",
+        "It restricts agents to a single deterministic prompt without memory or retries",
+        "It eliminates the need for structured inputs or state validation",
       ],
-      importantDefinitions: [
-        `${ch.title}: Essential topic covered in this section of the masterclass.`,
-        "Idiomatic Pattern: Writing clean, maintainable, and standard code as recommended in modern software engineering.",
+      explanation: "LangGraph enables cyclic reasoning loops, shared state updates, branching logic, and durable execution.",
+    },
+  },
+  {
+    keywords: ["langchain"],
+    term: "LangChain Orchestration",
+    definition: "Composable framework for connecting LLMs with prompts, structured parsers, retrievers, and callable external tools.",
+    takeaway: "Compose prompts, models, parsers, and tool interfaces cleanly via modular LangChain abstractions.",
+  },
+  {
+    keywords: ["multi-agent", "multi agent", "supervisor", "agentic"],
+    term: "Multi-Agent System",
+    definition: "Architecture where specialized autonomous agents collaborate, delegate subtasks, and share state to solve complex goals.",
+    takeaway: "Decompose complex goals across specialized agents with well-defined handoff contracts and guardrails.",
+    question: {
+      prompt: "What core architectural advantage does a Multi-Agent System offer over a single monolithic prompt?",
+      correct: "Focused toolsets, separation of responsibilities, and specialized verification across coordinated agents.",
+      distractors: [
+        "Guaranteeing zero token consumption regardless of conversation length",
+        "Bypassing all network requests and executing without model weights",
+        "Storing every user secret directly inside public system prompts",
       ],
-      quizQuestions,
-    };
+      explanation: "Splitting responsibilities across focused agents improves reliability, tool accuracy, and maintainability.",
+    },
+  },
+  {
+    keywords: ["pydantic", "validation", "structured", "schema"],
+    term: "Pydantic Schema Validation",
+    definition: "Runtime type validation and data parsing layer enforcing strict JSON structures on LLM inputs and tool outputs.",
+    takeaway: "Enforce runtime schemas and typed contracts with Pydantic to catch malformed payloads early.",
+    question: {
+      prompt: "What role does Pydantic play in reliable AI agent engineering?",
+      correct: "It enforces strict runtime schema validation and type-safe parsing on inputs, state, and structured LLM outputs.",
+      distractors: [
+        "It trains custom transformer weights from scratch inside SQL tables",
+        "It disables exception handling to prevent validation errors from surfacing",
+        "It compresses video frames into PNG sprites for embedding models",
+      ],
+      explanation: "Pydantic ensures downstream agent steps receive valid, strongly typed structures instead of brittle free-form text.",
+    },
+  },
+  {
+    keywords: ["async", "asynchronous", "await", "asyncio", "concurrent", "parallel"],
+    term: "Asynchronous / Parallel Execution",
+    definition: "Non-blocking execution pattern enabling concurrent I/O calls, parallel branches, and lower end-to-end latency.",
+    takeaway: "Use async I/O and parallel graph branches to run independent model and tool calls concurrently.",
+  },
+  {
+    keywords: ["sequential", "conditional", "iterative", "loop", "routing"],
+    term: "Workflow Control Flow",
+    definition: "Execution topology combining linear stages, conditional branches, and iterative feedback loops until termination criteria pass.",
+    takeaway: "Combine sequential pipelines, conditional routers, and bounded retry loops for predictable convergence.",
+  },
+  {
+    keywords: ["persistence", "memory", "thread", "threading", "checkpoint"],
+    term: "State Persistence & Checkpointing",
+    definition: "Saving conversation threads and graph execution state to durable storage so sessions can pause, replay, and resume.",
+    takeaway: "Persist thread-scoped checkpoints cleanly to support multi-turn continuity and failure recovery.",
+    question: {
+      prompt: "Why do production agentic chatbots require thread-scoped persistence and checkpointing?",
+      correct: "To preserve conversation history across requests, isolate sessions by thread ID, and resume interrupted graphs safely.",
+      distractors: [
+        "To reset every session variable to null after each token generated",
+        "To expose all users' private chat threads in a shared global variable",
+        "To replace HTTP APIs with static HTML files",
+      ],
+      explanation: "Checkpointing keyed by thread ID keeps multi-user memory isolated and allows stateful resumption.",
+    },
+  },
+  {
+    keywords: ["stream", "streaming"],
+    term: "Token & Event Streaming",
+    definition: "Incrementally emitting partial model tokens and node state events in real time to improve perceived responsiveness.",
+    takeaway: "Stream graph state transitions and token deltas incrementally rather than blocking on complete execution.",
+  },
+  {
+    keywords: ["tool", "tools", "mcp", "function calling"],
+    term: "Tool Integration & Function Calling",
+    definition: "Binding typed external APIs, search providers, and databases as schema-validated actions an agent can invoke dynamically.",
+    takeaway: "Define clear tool docstrings, strict parameter schemas, and safe error handling around external tool calls.",
+  },
+  {
+    keywords: ["rag", "retrieval", "chromadb", "vector", "embedding"],
+    term: "Retrieval-Augmented Generation (RAG)",
+    definition: "Grounding LLM responses in domain documents indexed via vector embeddings and semantic similarity search.",
+    takeaway: "Chunk, embed, and retrieve relevant context from vector stores before synthesis to minimize hallucinations.",
+    question: {
+      prompt: "How does Retrieval-Augmented Generation (RAG) improve domain accuracy in an agentic chatbot?",
+      correct: "It queries embedded knowledge chunks semantically and injects grounded context into the model prompt.",
+      distractors: [
+        "It re-trains the foundation model weights on every single user query",
+        "It deletes source documents immediately after parsing headings",
+        "It forces the model to ignore retrieved evidence and answer from memory alone",
+      ],
+      explanation: "RAG combines vector similarity retrieval with generation so responses stay grounded in current, authoritative data.",
+    },
+  },
+  {
+    keywords: ["hitl", "human-in-the-loop", "human in the loop", "approval", "interrupt"],
+    term: "Human-in-the-Loop (HITL)",
+    definition: "Pausing stateful workflows via interrupts so a human reviewer can approve, inspect, or edit actions before side effects run.",
+    takeaway: "Gate high-risk tool actions behind HITL interrupts and persisted checkpoints before committing changes.",
+  },
+  {
+    keywords: ["langsmith", "monitor", "monitoring", "observability", "tracing"],
+    term: "LLM Observability & Tracing",
+    definition: "End-to-end inspection of prompts, token latency, tool payloads, and evaluation traces via telemetry like LangSmith.",
+    takeaway: "Instrument trace spans around every node and LLM call to diagnose regressions, cost, and latency bottlenecks.",
+  },
+  {
+    keywords: ["docker", "ci/cd", "github actions", "aws", "render", "deploy", "deployment"],
+    term: "Containerized CI/CD Deployment",
+    definition: "Packaging reproducible Docker images, running automated GitHub Actions checks, and shipping reliably to cloud targets like AWS or Render.",
+    takeaway: "Containerize dependencies deterministically and automate build, health checks, and secret injection in CI/CD.",
+    question: {
+      prompt: "What is the primary benefit of packaging an agent service with Docker and CI/CD pipelines before cloud deployment?",
+      correct: "Consistent runtime dependencies across environments and automated, repeatable verification before release.",
+      distractors: [
+        "Storing plain-text production API keys inside version-controlled source files",
+        "Eliminating the need for environment health checks or rollback procedures",
+        "Requiring manual SSH edits on every server for each minor code tweak",
+      ],
+      explanation: "Docker ensures environment parity while CI/CD automates repeatable build, test, and deployment stages.",
+    },
+  },
+  {
+    keywords: ["fastapi", "postgresql", "postgres", "sqlalchemy", "database", "crud", "groq", "api"],
+    term: "Backend API & Relational Storage",
+    definition: "Exposing typed REST endpoints (e.g., FastAPI) backed by transactional PostgreSQL/SQLAlchemy models and low-latency inference APIs.",
+    takeaway: "Decouple stateless HTTP request handlers from connection-pooled database persistence and strict schema validation.",
+  },
+  {
+    keywords: ["llm", "llms", "chatgpt", "token", "evolution", "agentic"],
+    term: "LLM-to-Agentic Evolution",
+    definition: "Progression from single-turn stateless completions to autonomous goal-driven loops equipped with memory, planning, and tools.",
+    takeaway: "Distinguish passive text generation pipelines from goal-directed agent loops capable of inspecting feedback.",
+  },
+  {
+    keywords: ["hacking", "security", "penetration", "network", "recon", "exploit", "vulnerability"],
+    term: "Offensive & Defensive Security Hygiene",
+    definition: "Systematic reconnaissance, vulnerability validation, least-privilege hardening, and remediating attack surfaces safely.",
+    takeaway: "Document threat models systematically and validate remediations within authorized scope.",
+  },
+  {
+    keywords: ["system design", "caching", "cache", "redis", "cdn", "load", "scalability", "microservices"],
+    term: "Scalable Distributed Architecture",
+    definition: "Balancing throughput, fault tolerance, caching layers, partitioning strategies, and horizontal service scaling.",
+    takeaway: "Evaluate latency vs consistency tradeoffs carefully when introducing caches, queues, and replicated storage.",
+  },
+];
 
-    currentLessons.push(lesson);
-    currentDaySeconds += ch.durationSeconds;
+type CourseDomain =
+  | "agentic"
+  | "genai"
+  | "system_design"
+  | "backend"
+  | "cybersecurity"
+  | "data"
+  | "frontend"
+  | "python"
+  | "general";
 
-    const isLast = i === chapters.length - 1;
-    const isOverTarget = currentDaySeconds >= targetDayDuration * 0.85;
-    const hasMoreDaysNeeded = dayIndex < targetDaysCount;
+const DOMAIN_TOPIC_POOLS: Record<CourseDomain, { themes: string[]; lessons: string[] }> = {
+  agentic: {
+    themes: [
+      "Agentic AI Foundations & Execution Loops",
+      "Schema Validation, Async & Tooling",
+      "LangChain Single & Multi-Agent Patterns",
+      "LangGraph State, Nodes & Routing",
+      "Workflows: Sequential, Parallel & Conditional",
+      "Memory, Threading & Durable Persistence",
+      "Streaming, Tool Calling & RAG Grounding",
+      "Human-in-the-Loop & Observability",
+      "FastAPI, Databases & Container Packaging",
+      "Cloud CI/CD & Production Capstone Systems",
+    ],
+    lessons: [
+      "Course Roadmap, Agentic Architecture & Environment Setup",
+      "Evolution from Static LLMs to Autonomous Agent Loops",
+      "Core Agent Components: Reasoning, Planning, Memory & Tools",
+      "Asynchronous Programming & Non-Blocking I/O for Agents",
+      "Pydantic Data Validation & Structured LLM Outputs",
+      "Prompt Contracts, Tool Schemas & Output Parsers",
+      "Single-Agent Orchestration & ReAct Reasoning Loops",
+      "Multi-Agent Collaboration, Supervisor & Handoff Patterns",
+      "Graph-Based Orchestration: StateSchemas, Nodes & Edges",
+      "Sequential & Conditional Graph Routing Workflows",
+      "Parallel Fan-Out / Fan-In Execution & Aggregation",
+      "Iterative Self-Correction, Critics & Termination Guards",
+      "Short-Term Thread Memory vs Long-Term Knowledge State",
+      "Durable Checkpointing with Relational Databases",
+      "Real-Time Token & Event Streaming to Client Apps",
+      "Integrating External Search, Code & API Tools Safely",
+      "Vector Embeddings, Chunking & RAG Pipeline Integration",
+      "Human-in-the-Loop (HITL) Interrupts & Approval Gates",
+      "Tracing, Evaluation & Latency Monitoring with Telemetry",
+      "FastAPI Backend Exposure & Session Thread APIs",
+      "Docker Containerization & Reproducible Build Environments",
+      "CI/CD Automation, Secrets Hygiene & Cloud Deployment",
+      "Capstone Architecture: End-to-End Conversational Agent",
+      "Capstone Verification, Load Testing & Production Checklist",
+    ],
+  },
+  genai: {
+    themes: [
+      "LLM Foundations & Transformer Mechanics",
+      "Prompt Engineering & Structured Extraction",
+      "Embeddings, Vector Stores & RAG Pipelines",
+      "Function Calling & Agent Workflows",
+      "Evaluation, Safety & Guardrails",
+      "Production Inference & Deployment",
+    ],
+    lessons: [
+      "Generative AI Landscape, Use Cases & Setup",
+      "Tokenization, Context Windows & Sampling Parameters",
+      "Zero-Shot, Few-Shot & Chain-of-Thought Prompting",
+      "Structured JSON Generation & Schema Validation",
+      "Text Embeddings & Semantic Similarity Search",
+      "Document Ingestion, Chunking & Indexing Pipelines",
+      "Hybrid Retrieval, Reranking & Context Injection",
+      "Tool Integration & External API Function Calling",
+      "Conversational Memory Management & Summarization",
+      "Hallucination Mitigation, Evaluation Metrics & Guardrails",
+      "Streaming API Design & Rate-Limit Resilience",
+      "Deploying Scalable GenAI Applications to Production",
+    ],
+  },
+  system_design: {
+    themes: [
+      "Scalability Fundamentals & Capacity Planning",
+      "Networking, DNS, Load Balancing & CDNs",
+      "Databases, Sharding & Replication",
+      "Caching, Queues & Event-Driven Systems",
+      "Microservices, Resilience & Observability",
+      "Real-World Architecture Case Studies",
+    ],
+    lessons: [
+      "Requirements Gathering, SLAs & Back-of-Envelope Estimation",
+      "HTTP/REST, gRPC, WebSockets & API Gateway Design",
+      "DNS Resolution, Anycast, Reverse Proxies & CDNs",
+      "Load Balancing Algorithms & Health Check Mechanics",
+      "Relational vs NoSQL Tradeoffs & Indexing Internals",
+      "Replication Topologies, Partitioning & Consistent Hashing",
+      "Distributed Caching Patterns (Cache-Aside, Write-Through, Redis)",
+      "Message Brokers, Async Workers & Backpressure Handling",
+      "Rate Limiting, Idempotency Keys & Circuit Breakers",
+      "Distributed Transactions, Consistency Models & CAP Theorem",
+      "Monitoring, Distributed Tracing & Log Aggregation",
+      "Case Study: High-Throughput Feed, Chat & URL Shortener",
+    ],
+  },
+  backend: {
+    themes: [
+      "Server Architecture & Core API Design",
+      "Database Modeling & ORM Query Optimization",
+      "Authentication, Security & Validation",
+      "Caching, Background Jobs & Docker",
+      "Testing, CI/CD & Production Deployment",
+    ],
+    lessons: [
+      "Project Architecture, Routing & Request Lifecycle",
+      "RESTful API Design, DTOs & Input Validation",
+      "Relational Data Modeling, Migrations & Connection Pooling",
+      "Query Optimization, Transactions & Error Handling",
+      "Authentication: JWTs, Sessions, Hashing & RBAC",
+      "Redis Caching, Rate Limiting & Queue Processing",
+      "Dockerfiles, Compose & Multi-Stage Production Images",
+      "Integration Testing, Structured Logging & Deployment",
+    ],
+  },
+  cybersecurity: {
+    themes: [
+      "Security Foundations & Lab Setup",
+      "Networking & Active Reconnaissance",
+      "Vulnerability Scanning & Enumeration",
+      "Web Application Security & OWASP Top 10",
+      "Exploitation Mechanics & Privilege Analysis",
+      "Hardening, Incident Response & Reporting",
+    ],
+    lessons: [
+      "Security Ethics, Rules of Engagement & Isolated Lab Setup",
+      "TCP/IP Networking, Packet Inspection & Firewall Fundamentals",
+      "Passive OSINT & Subdomain Reconnaissance Techniques",
+      "Active Port Scanning, Service Fingerprinting & Enumeration",
+      "Web Traffic Interception, Proxies & Session Mechanics",
+      "Injection Flaws, Broken Access Control & Input Hardening",
+      "Authentication Weaknesses, Cryptography & TLS Hygiene",
+      "Post-Exploitation Analysis, Remediation & Professional Reporting",
+    ],
+  },
+  data: {
+    themes: [
+      "Data Foundations & Cleaning Workflows",
+      "Transformations, Formulas & Aggregations",
+      "Exploratory Modeling & Statistical Insight",
+      "Dashboards, Reporting & Automation",
+    ],
+    lessons: [
+      "Data Environment Setup & Schema Inspection",
+      "Data Cleaning, Deduplication & Type Normalization",
+      "Filtering, Grouping, Lookup Joins & Pivot Aggregations",
+      "Time-Series Trends, Cohort Metrics & Summary Tables",
+      "KPI Storytelling, Visual Hierarchy & Interactive Reports",
+      "Automating Recurring Analysis & Export Pipelines",
+    ],
+  },
+  frontend: {
+    themes: [
+      "Modern UI Foundations & Type Safety",
+      "Component Architecture & State Management",
+      "Routing, Data Fetching & Caching",
+      "Accessibility, Performance & Deployment",
+    ],
+    lessons: [
+      "Modern Project Structure, Tooling & Responsive Layout",
+      "Component Composition, Props Contracts & Semantic Markup",
+      "Client State, Forms Validation & Optimistic Updates",
+      "Async Data Fetching, Error Boundaries & Loading Skeletons",
+      "Performance Profiling, Bundle Optimization & Deployment",
+    ],
+  },
+  python: {
+    themes: [
+      "Core Fundamentals & Setup",
+      "Data Types, Operators & Control Flow",
+      "Data Structures & Modular Functions",
+      "OOP, Files & Exception Handling",
+      "Modern Tooling & Capstone Implementation",
+    ],
+    lessons: [
+      "Python Setup, Interpreter Execution & Core Syntax",
+      "Variables, Primitive Types & String Manipulation",
+      "Conditionals, Iteration Loops & Flow Control",
+      "Lists, Tuples, Sets & Dictionary Hash Maps",
+      "Functions, Scope, Arguments & Comprehensions",
+      "File I/O, Context Managers & Exception Handling",
+      "Object-Oriented Programming: Classes & Inheritance",
+      "Modules, Virtual Environments, APIs & Final Project",
+    ],
+  },
+  general: {
+    themes: [
+      "Foundational Concepts & Setup",
+      "Core Building Blocks & Patterns",
+      "Applied Workflows & Tooling",
+      "Intermediate Architecture & Integration",
+      "Optimization, Debugging & Testing",
+      "Capstone Implementation & Best Practices",
+    ],
+    lessons: [
+      "Course Introduction, Roadmap & Workspace Setup",
+      "Core Principles, Terminology & Execution Model",
+      "Foundational Patterns & Step-by-Step Walkthrough",
+      "Working with Structured Inputs, State & Data Flow",
+      "Modular Design, Abstraction & Reusable Components",
+      "Handling Edge Cases, Validation & Diagnostics",
+      "Integrating External Services, Storage & Workflows",
+      "Testing, Performance Verification & Production Readiness",
+    ],
+  },
+};
 
-    if (isLast || (isOverTarget && hasMoreDaysNeeded)) {
-      const firstTitle = currentLessons[0]?.title || `Module ${dayIndex}`;
-      let topic = firstTitle.replace(/^[–—\-:\s\d.]+/, "").split(/[&|:-]/)[0].trim();
+function detectCourseDomain(title: string, description = ""): CourseDomain {
+  const haystack = `${title} ${description}`.toLowerCase();
+  if (/agentic|langgraph|langchain|multi-agent|crewai|autogen|ai agent|mcp/.test(haystack)) return "agentic";
+  if (/generative ai|genai|llm|rag|prompt|chatgpt|openai|gemini|transformer/.test(haystack)) return "genai";
+  if (/system design|distributed|caching|cdn|load balanc|sharding|scalability/.test(haystack)) return "system_design";
+  if (/hacking|penetration|pentest|cyber|security|kali|wireshark|exploit/.test(haystack)) return "cybersecurity";
+  if (/backend|fastapi|express|nestjs|redis|docker|kubernetes|microservice/.test(haystack)) return "backend";
+  if (/excel|power bi|tableau|pandas|analytics|data science|sql/.test(haystack)) return "data";
+  if (/react|next\.?js|javascript|typescript|frontend|tailwind|html|css/.test(haystack)) return "frontend";
+  if (/python|codewithharry|cs50p/.test(haystack)) return "python";
+  return "general";
+}
 
-      let dayTitle = `Day ${dayIndex} (${topic || "Foundations"})`;
-      if (dayIndex === 1) {
-        dayTitle = `Day 1 (Core Fundamentals & Setup)`;
-      } else if (firstTitle.toLowerCase().includes("string") || firstTitle.toLowerCase().includes("type")) {
-        dayTitle = `Day ${dayIndex} (Strings & Type Conversions)`;
-      } else if (firstTitle.toLowerCase().includes("operator") || firstTitle.toLowerCase().includes("if") || firstTitle.toLowerCase().includes("loop")) {
-        dayTitle = `Day ${dayIndex} (Operators & Control Flow)`;
-      } else if (firstTitle.toLowerCase().includes("list") || firstTitle.toLowerCase().includes("tuple")) {
-        dayTitle = `Day ${dayIndex} (Lists & Tuples)`;
-      } else if (firstTitle.toLowerCase().includes("set") || firstTitle.toLowerCase().includes("dict")) {
-        dayTitle = `Day ${dayIndex} (Sets & Dictionaries)`;
-      } else if (firstTitle.toLowerCase().includes("function") || firstTitle.toLowerCase().includes("lambda")) {
-        dayTitle = `Day ${dayIndex} (Functions & Advanced Logic)`;
-      } else if (firstTitle.toLowerCase().includes("llm") || firstTitle.toLowerCase().includes("ai") || firstTitle.toLowerCase().includes("prompt")) {
-        dayTitle = `Day ${dayIndex} (AI & Large Language Models)`;
-      } else if (firstTitle.toLowerCase().includes("rag") || firstTitle.toLowerCase().includes("agent") || firstTitle.toLowerCase().includes("mcp")) {
-        dayTitle = `Day ${dayIndex} (AI Agents, RAG & MCP)`;
-      }
+function extractTranscriptExcerpt(
+  transcripts: TranscriptSegment[] | null,
+  startSeconds: number,
+  endSeconds: number,
+  maxChars = 340
+): string {
+  if (!transcripts || transcripts.length === 0) return "";
+  const matched = transcripts.filter(
+    (seg) => seg.start >= startSeconds && seg.start < endSeconds
+  );
+  if (matched.length === 0) return "";
+  const combined = matched
+    .map((s) => s.text.trim())
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (combined.length <= maxChars) return combined;
+  return `${combined.slice(0, maxChars).replace(/\s+\S*$/, "")}...`;
+}
 
-      rawChapters.push({
-        title: dayTitle,
-        description: `Day ${dayIndex} learning plan covering ${currentLessons.length} lessons (${Math.round(currentDaySeconds / 60)} minutes of guided video instruction).`,
-        lessons: [...currentLessons],
-      });
-
-      dayIndex++;
-      currentLessons = [];
-      currentDaySeconds = 0;
+function matchConceptsForText(text: string): ConceptEntry[] {
+  const lower = text.toLowerCase();
+  const hits: ConceptEntry[] = [];
+  for (const entry of KNOWLEDGE_GLOSSARY) {
+    if (entry.keywords.some((kw) => lower.includes(kw))) {
+      hits.push(entry);
     }
   }
+  return hits;
+}
+
+function cleanConceptTopic(rawTitle: string): string {
+  return rawTitle
+    .replace(/^\d+[\.\:\-]\s*/, "")
+    .replace(/\s*\(Part\s*\d+(?:\s*of\s*\d+)?[:\s]*[^)]*\)\s*/gi, "")
+    .replace(/^(Project|Module|Chapter|Day\s*\d+)\s*:\s*/i, "")
+    .trim();
+}
+
+function extractCourseDescriptionFocus(description = ""): string {
+  if (!description) return "";
+  const firstPara = description
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .find(
+      (l) =>
+        l.length > 40 &&
+        !/^https?:\/\//i.test(l) &&
+        !/chapters|subscribe|support|thanks/i.test(l)
+    );
+  if (!firstPara) return "";
+  return firstPara.length > 220 ? `${firstPara.slice(0, 217).trim()}...` : firstPara;
+}
+
+function buildDetailedLessonContent(params: {
+  title: string;
+  startSeconds: number;
+  endSeconds: number;
+  lessonIndex: number;
+  prevTitle?: string;
+  nextTitle?: string;
+  courseTitle: string;
+  courseDescription?: string;
+  transcripts: TranscriptSegment[] | null;
+}): RawLesson {
+  const {
+    title,
+    startSeconds,
+    endSeconds,
+    lessonIndex,
+    prevTitle,
+    nextTitle,
+    courseTitle,
+    courseDescription,
+    transcripts,
+  } = params;
+
+  const cleanTopic = cleanConceptTopic(title) || title;
+  const durMin = Math.max(1, Math.round((endSeconds - startSeconds) / 60));
+  const clockStart = formatClockTimestamp(startSeconds);
+  const clockEnd = formatClockTimestamp(endSeconds);
+  const concepts = matchConceptsForText(`${title} ${courseTitle}`);
+  const primaryConcept = concepts[0];
+  const transcriptSnippet = extractTranscriptExcerpt(transcripts, startSeconds, endSeconds);
+  const courseLead = extractCourseDescriptionFocus(courseDescription);
+
+  const descriptionParts = [
+    `Explore ${cleanTopic} (${clockStart} – ${clockEnd}, ${durMin} min) with practical architecture walkthroughs tailored to ${courseTitle.split(/[|–—-]/)[0].trim()}.`,
+  ];
+  if (primaryConcept) {
+    descriptionParts.push(primaryConcept.definition);
+  } else if (nextTitle) {
+    descriptionParts.push(`Connects directly into "${cleanConceptTopic(nextTitle)}" as the system scales.`);
+  }
+
+  const summaryParts = [
+    `Segment Overview [${clockStart} – ${clockEnd}]: This ${durMin}-minute lesson breaks down ${cleanTopic}.`,
+  ];
+  if (concepts.length > 0) {
+    summaryParts.push(
+      `Key focus areas include ${concepts
+        .slice(0, 3)
+        .map((c) => c.term)
+        .join(", ")}. ${concepts[0].definition}`
+    );
+  } else if (courseLead) {
+    summaryParts.push(`Context within the curriculum: ${courseLead}`);
+  }
+  if (transcriptSnippet) {
+    summaryParts.push(`Spoken highlights from video: "${transcriptSnippet}"`);
+  } else if (prevTitle || nextTitle) {
+    const flow: string[] = [];
+    const formatRef = (t: string) => t.replace(/^\d+[\.\:\-]\s*/, "").trim();
+    if (prevTitle) flow.push(`building upon "${formatRef(prevTitle)}"`);
+    if (nextTitle) flow.push(`preparing for "${formatRef(nextTitle)}"`);
+    summaryParts.push(`Curriculum progression: ${flow.join(" and ")}.`);
+  }
+
+  const takeawaysSet = new Set<string>();
+  for (const c of concepts.slice(0, 3)) {
+    takeawaysSet.add(c.takeaway);
+  }
+  takeawaysSet.add(`Understand the core mechanics and practical implementation of ${cleanTopic}.`);
+  if (takeawaysSet.size < 3 && nextTitle) {
+    takeawaysSet.add(`See how ${cleanTopic} integrates cleanly before moving to ${cleanConceptTopic(nextTitle)}.`);
+  }
+  if (takeawaysSet.size < 3) {
+    takeawaysSet.add(`Review patterns, failure modes, and verifiable engineering checkpoints across this ${durMin}-minute module.`);
+  }
+
+  const definitions: string[] = concepts
+    .slice(0, 3)
+    .map((c) => `${c.term}: ${c.definition}`);
+  if (definitions.length === 0) {
+    definitions.push(
+      `${cleanTopic}: Core module taught from ${clockStart} to ${clockEnd} covering concepts, workflows, and practical code patterns.`
+    );
+  }
+  if (definitions.length < 2) {
+    definitions.push(
+      `Production Reliability: Validating schemas, handling failure states gracefully, and keeping ${cleanTopic} modular.`
+    );
+  }
+
+  const quizQuestions: RawQuizQuestion[] = [];
+  const span = Math.max(20, endSeconds - startSeconds);
+  const conceptWithQ = concepts.find((c) => c.question);
+
+  const rotateQuiz = (
+    qText: string,
+    correct: string,
+    wrongs: [string, string, string],
+    explanation: string,
+    qIdx: number
+  ): RawQuizQuestion => {
+    const targetIdx = (lessonIndex + qIdx) % 4;
+    const options: string[] = [];
+    let wCursor = 0;
+    for (let i = 0; i < 4; i++) {
+      if (i === targetIdx) options.push(correct);
+      else options.push(wrongs[wCursor++]);
+    }
+    return {
+      questionText: qText,
+      options,
+      correctOptionIndex: targetIdx,
+      explanation,
+      replayTimestampSeconds: Math.floor(startSeconds + span * (qIdx === 0 ? 0.25 : 0.6)),
+    };
+  };
+
+  if (conceptWithQ?.question) {
+    quizQuestions.push(
+      rotateQuiz(
+        conceptWithQ.question.prompt,
+        conceptWithQ.question.correct,
+        conceptWithQ.question.distractors,
+        conceptWithQ.question.explanation,
+        0
+      )
+    );
+  } else {
+    quizQuestions.push(
+      rotateQuiz(
+        `What is the primary learning outcome of "${cleanTopic}"?`,
+        `Designing, implementing, and verifying ${cleanTopic} using clean interfaces and structured data flow.`,
+        [
+          `Bypassing input validation and relying on hardcoded global state throughout`,
+          `Replacing modular components with duplicated copy-pasted scripts`,
+          `Suppressing runtime exceptions so failures remain invisible`,
+        ],
+        `This module focuses on mastering ${cleanTopic} with maintainable patterns and clear validation.`,
+        0
+      )
+    );
+  }
+
+  quizQuestions.push(
+    rotateQuiz(
+      `When applying "${cleanTopic}" in a real-world workflow, which practice ensures stability?`,
+      concepts[0]
+        ? `${concepts[0].takeaway}`
+        : `Validating edge cases, documenting assumptions, and verifying outputs before downstream integration.`,
+      [
+        `Skipping automated verification and ignoring schema constraints`,
+        `Hardcoding credentials directly inside source files`,
+        `Disabling logging and observability hooks in production`,
+      ],
+      `Applying ${cleanTopic} reliably requires explicit contracts, clear boundaries, and testable validation.`,
+      1
+    )
+  );
+
+  return {
+    title,
+    description: descriptionParts.join(" "),
+    startSeconds,
+    endSeconds,
+    summary: summaryParts.join(" "),
+    keyTakeaways: Array.from(takeawaysSet).slice(0, 4),
+    importantDefinitions: definitions.slice(0, 3),
+    quizQuestions,
+  };
+}
+
+function getSubpartLabel(rawTitle: string, partIdx: number, totalParts: number): string {
+  const isProject = /project|build|chatbot|planner|agent|deploy/i.test(rawTitle);
+  const labels3 = isProject
+    ? ["Architecture & Setup", "Core Workflow & Logic", "Integration & Walkthrough"]
+    : ["Core Concepts & Setup", "Implementation Walkthrough", "Advanced Patterns & Wrap-Up"];
+  const labels4 = isProject
+    ? [
+        "Architecture & Core Setup",
+        "State, Agents & Business Logic",
+        "APIs, Persistence & Integrations",
+        "Testing, Deployment & Review",
+      ]
+    : [
+        "Foundations & Mental Model",
+        "Core Implementation",
+        "Edge Cases & Integration",
+        "Production Review",
+      ];
+
+  if (totalParts === 2) {
+    return partIdx === 0 ? "Foundations & Setup" : "Hands-On Implementation";
+  }
+  if (totalParts === 3 && labels3[partIdx]) return labels3[partIdx];
+  if (totalParts === 4 && labels4[partIdx]) return labels4[partIdx];
+  return `Part ${partIdx + 1} of ${totalParts}`;
+}
+
+interface TimeSegment {
+  title: string;
+  startSeconds: number;
+  endSeconds: number;
+}
+
+function normalizeAndSubdivideChapters(
+  rawChapters: VideoChapter[],
+  totalDuration: number
+): TimeSegment[] {
+  const sorted = [...rawChapters]
+    .filter((c) => c.endSeconds > c.startSeconds)
+    .sort((a, b) => a.startSeconds - b.startSeconds);
+
+  if (sorted.length === 0) return [];
+
+  const continuous: TimeSegment[] = [];
+
+  // Prepend intro segment if chapters start well after 0:00
+  if (sorted[0].startSeconds >= 120) {
+    continuous.push({
+      title: "Course Introduction & Prerequisites",
+      startSeconds: 0,
+      endSeconds: sorted[0].startSeconds,
+    });
+  }
+
+  for (let i = 0; i < sorted.length; i++) {
+    const cur = sorted[i];
+    const start = Math.max(
+      continuous.length > 0 ? continuous[continuous.length - 1].endSeconds : 0,
+      cur.startSeconds
+    );
+    const nextStart = sorted[i + 1]?.startSeconds;
+    const targetEnd =
+      i === sorted.length - 1
+        ? Math.max(totalDuration, cur.endSeconds)
+        : nextStart && nextStart > start
+        ? nextStart
+        : cur.endSeconds;
+
+    if (targetEnd > start) {
+      continuous.push({
+        title: cleanPlacementText(cur.title) || cur.title,
+        startSeconds: start,
+        endSeconds: targetEnd,
+      });
+    }
+  }
+
+  // Split oversized chapters (> 50 minutes = 3000s) into ~35-42 min focused lessons
+  const MAX_CHAPTER_SECONDS = 3000;
+  const IDEAL_SUBPART_SECONDS = 2400;
+  const subdivided: TimeSegment[] = [];
+
+  for (const seg of continuous) {
+    const dur = seg.endSeconds - seg.startSeconds;
+    if (dur <= MAX_CHAPTER_SECONDS) {
+      subdivided.push(seg);
+      continue;
+    }
+
+    const partsCount = Math.min(10, Math.max(2, Math.ceil(dur / IDEAL_SUBPART_SECONDS)));
+    const step = Math.floor(dur / partsCount);
+
+    for (let p = 0; p < partsCount; p++) {
+      const pStart = p === 0 ? seg.startSeconds : seg.startSeconds + p * step;
+      const pEnd = p === partsCount - 1 ? seg.endSeconds : seg.startSeconds + (p + 1) * step;
+      const phase = getSubpartLabel(seg.title, p, partsCount);
+      subdivided.push({
+        title: `${seg.title} (Part ${p + 1}: ${phase})`,
+        startSeconds: pStart,
+        endSeconds: pEnd,
+      });
+    }
+  }
+
+  return subdivided;
+}
+
+function buildDayTitle(dayNumber: number, lessons: TimeSegment[]): string {
+  const cleanedTopics = lessons
+    .map((l) =>
+      cleanConceptTopic(l.title)
+        .split(/[|–—]/)[0]
+        .replace(/^What is\s+/i, "")
+        .replace(/^How to\s+/i, "")
+        .replace(/^Build\s+(?:Your\s+Own\s+|Your\s+|End-to-End\s+|Permanent\s+)?/i, "")
+        .replace(/^Add\s+/i, "")
+        .replace(/^Implement\s+/i, "")
+        .replace(/^Integrate\s+/i, "")
+        .replace(/^Understand(?:ing)?\s+/i, "")
+        .replace(/^Master\s+/i, "")
+        .replace(/\s+using\s+.*$/i, "")
+        .replace(/\s+with\s+.*$/i, "")
+        .replace(/\s+in\s+Agentic Chatbot.*$/i, "")
+        .trim()
+    )
+    .filter(Boolean);
+
+  const uniqueTopics: string[] = [];
+  for (const t of cleanedTopics) {
+    if (!uniqueTopics.some((u) => u.toLowerCase() === t.toLowerCase())) {
+      uniqueTopics.push(t);
+    }
+  }
+
+  let focusLabel = "Core Concepts & Practice";
+  if (uniqueTopics.length === 1) {
+    focusLabel = uniqueTopics[0];
+  } else if (uniqueTopics.length >= 2) {
+    const combined = `${uniqueTopics[0]} & ${uniqueTopics[uniqueTopics.length - 1]}`;
+    focusLabel = combined.length <= 54 ? combined : uniqueTopics[0];
+  }
+
+  if (focusLabel.length > 56) {
+    focusLabel = `${focusLabel.slice(0, 53).trim()}...`;
+  }
+
+  return `Day ${dayNumber} (${focusLabel})`;
+}
+
+function partitionSegmentsIntoDays(
+  segments: TimeSegment[],
+  totalDuration: number,
+  meta: { title: string; description?: string },
+  transcripts: TranscriptSegment[] | null
+): RawCurriculum {
+  const effectiveTotal = Math.max(
+    totalDuration,
+    segments[segments.length - 1]?.endSeconds || 0
+  );
+
+  // ~2h daily study pacing for multi-hour courses; up to 14 days for 24h+ marathons
+  let targetDaysCount = 1;
+  if (effectiveTotal > 5400 && segments.length > 2) {
+    const maxDays = effectiveTotal > 18 * 3600 ? 14 : 10;
+    const rawDays = Math.round(effectiveTotal / (2 * 3600));
+    targetDaysCount = Math.min(maxDays, Math.min(segments.length, Math.max(2, rawDays)));
+  }
+
+  const dayGroups: TimeSegment[][] = [];
+  let cursor = 0;
+
+  for (let d = 0; d < targetDaysCount; d++) {
+    const remainingDaysAfterThis = targetDaysCount - 1 - d;
+    if (remainingDaysAfterThis === 0) {
+      dayGroups.push(segments.slice(cursor));
+      break;
+    }
+
+    const idealEnd = ((d + 1) / targetDaysCount) * effectiveTotal;
+    const group: TimeSegment[] = [];
+
+    while (cursor < segments.length) {
+      const remainingSegmentsAfterCur = segments.length - 1 - cursor;
+      const curSeg = segments[cursor];
+
+      // Always ensure at least 1 segment per remaining day
+      if (group.length === 0) {
+        group.push(curSeg);
+        cursor++;
+        if (remainingSegmentsAfterCur <= remainingDaysAfterThis) break;
+        continue;
+      }
+
+      if (remainingSegmentsAfterCur < remainingDaysAfterThis) break;
+
+      const prevEnd = group[group.length - 1].endSeconds;
+      if (prevEnd >= idealEnd) break;
+
+      // Pick whichever boundary (stopping before cur vs including cur) is closer to idealEnd
+      const distBefore = Math.abs(idealEnd - prevEnd);
+      const distAfter = Math.abs(curSeg.endSeconds - idealEnd);
+      if (curSeg.endSeconds > idealEnd && distAfter > distBefore) {
+        break;
+      }
+
+      group.push(curSeg);
+      cursor++;
+    }
+
+    dayGroups.push(group);
+  }
+
+  let globalLessonIdx = 0;
+  const rawChapters: RawChapter[] = dayGroups
+    .filter((g) => g.length > 0)
+    .map((group, dIdx) => {
+      const lessons = group.map((seg) => {
+        const prev = globalLessonIdx > 0 ? segments[globalLessonIdx - 1]?.title : undefined;
+        const next =
+          globalLessonIdx < segments.length - 1
+            ? segments[globalLessonIdx + 1]?.title
+            : undefined;
+        const lessonObj = buildDetailedLessonContent({
+          title: seg.title,
+          startSeconds: seg.startSeconds,
+          endSeconds: seg.endSeconds,
+          lessonIndex: globalLessonIdx,
+          prevTitle: prev,
+          nextTitle: next,
+          courseTitle: meta.title,
+          courseDescription: meta.description,
+          transcripts,
+        });
+        globalLessonIdx++;
+        return lessonObj;
+      });
+
+      const dayStart = lessons[0].startSeconds;
+      const dayEnd = lessons[lessons.length - 1].endSeconds;
+      const dayMinutes = Math.max(1, Math.round((dayEnd - dayStart) / 60));
+
+      return {
+        title: buildDayTitle(dIdx + 1, group),
+        description: `Day ${dIdx + 1} study plan spanning ${lessons.length} focused lesson${
+          lessons.length > 1 ? "s" : ""
+        } (${formatDuration(dayEnd - dayStart)} · ${dayMinutes} min total video instruction from ${formatClockTimestamp(
+          dayStart
+        )} to ${formatClockTimestamp(dayEnd)}).`,
+        lessons,
+      };
+    });
 
   return {
     chapters: rawChapters,
@@ -681,176 +1383,192 @@ function organizeChaptersIntoDailyPlan(
   };
 }
 
-function generateFallbackCurriculum(
-  meta: { title: string; durationSeconds: number; description?: string; chapters?: VideoChapter[] },
-  difficulty: string
-): RawCurriculum {
-  if (meta.chapters && meta.chapters.length >= 3) {
-    return organizeChaptersIntoDailyPlan(meta.chapters, meta.durationSeconds, meta.title);
-  }
+function buildScheduleSlots(totalDuration: number): {
+  daysCount: number;
+  slots: { dayIndex: number; lessonIndexInDay: number; startSeconds: number; endSeconds: number }[];
+} {
+  const duration = Math.max(600, totalDuration);
+  const maxDays = duration > 18 * 3600 ? 14 : 10;
+  const daysCount =
+    duration <= 5400
+      ? 1
+      : Math.min(maxDays, Math.max(2, Math.round(duration / (2 * 3600))));
 
-  const duration = Math.max(1200, meta.durationSeconds);
-  const cleanTitle = meta.title.replace(/[|:-].*$/, "").trim();
-
-  // Determine number of Days based on duration (~1.2 to 2.0 hours per day)
-  const daysCount = Math.min(10, Math.max(1, Math.ceil(duration / (1.75 * 3600))));
   const dayDuration = duration / daysCount;
+  // Target ~20–26 min lessons (~1400s), bounded 3–7 per day so 24h gets ~60–72 lessons
+  const lessonsPerDay =
+    duration <= 1800
+      ? Math.max(2, Math.round(duration / 600))
+      : Math.min(7, Math.max(4, Math.round(dayDuration / 1400)));
 
-  // Each day has 6 to 9 bite-sized micro-lessons (each ~10 to 18 minutes)
-  const lessonsPerDay = Math.min(9, Math.max(5, Math.round(dayDuration / 720)));
-  const totalLessonsCount = daysCount * lessonsPerDay;
-  const singleLessonDuration = Math.floor(duration / totalLessonsCount);
+  const totalLessons = daysCount * lessonsPerDay;
+  const singleDur = Math.floor(duration / totalLessons);
+  const slots: { dayIndex: number; lessonIndexInDay: number; startSeconds: number; endSeconds: number }[] = [];
 
-  const dayThematicTitles = [
-    "Core Fundamentals & Setup",
-    "Data Types & Foundational Mechanics",
-    "Operators, Slicing & Expressions",
-    "Control Flow, Loops & Conditionals",
-    "Data Structures, Collections & Mutability",
-    "Functions, Scope & Modularity",
-    "Object-Oriented Architecture & Inheritance",
-    "Files, I/O & Exception Handling",
-    "Advanced Paradigms & Industry Tooling",
-    "Production Systems & Capstone Project",
-  ];
-
-  const lessonSubtopics = [
-    "Course Introduction & Development Environment Setup",
-    "Core Syntax, Indentation & Interpreted Execution",
-    "Variables, Data Types & Type Conversion",
-    "Arithmetic, Logical & Comparison Operators",
-    "String Manipulation, Slicing & Format Sequences",
-    "Conditional Logic: Branching & Truthy Values",
-    "While Loops & Iteration Bounds",
-    "For Loops, Range Sequences & Iterables",
-    "Break, Continue & Pass Statements",
-    "List Operations, Indexing & Mutability",
-    "List Methods: Append, Insert, Pop & Sort",
-    "Tuples & Immutable Sequence Mechanics",
-    "Dictionaries: Key-Value Hash Maps & Queries",
-    "Dictionary Methods: Keys, Values, Items & Defaults",
-    "Sets: Mathematical Uniqueness & Operations",
-    "Functions: Definition, Invocation & Parameters",
-    "Positional vs Keyword Arguments & Defaults",
-    "Return Values, NoneType & Variable Scope",
-    "Recursion: Call Stack & Base Termination",
-    "Lambda Functions, Map, Filter & List Comprehensions",
-    "File I/O: Reading Text & Binary Streams",
-    "File Writing, Appending & Resource Management",
-    "Context Managers with with-Statement Syntax",
-    "Object-Oriented Programming: Classes & Instances",
-    "Self Reference, Attributes & Instance Methods",
-    "Constructor Methods with __init__ Dunder",
-    "Class Attributes vs Instance Attribute Resolution",
-    "Static Methods & @staticmethod Decorator",
-    "Class Methods & @classmethod Architecture",
-    "Property Decorators: Managed Getters & Setters",
-    "Single & Multilevel Class Inheritance",
-    "Super Method & Base Constructor Invocations",
-    "Multiple Inheritance & Method Resolution Order",
-    "Operator Overloading & Magic Dunder Methods",
-    "Exception Handling: Try, Except & Finally Blocks",
-    "Raising Custom Exceptions & Error Hierarchies",
-    "Modules, Packages & Pip Dependency Ecosystem",
-    "Virtual Environments & Project Isolation",
-    "Standard Library: Datetime, Math & Random",
-    "JSON Serialization, APIs & Network Requests",
-    "Regular Expressions & String Pattern Matching",
-    "Generators, Iterators & Memory Optimization",
-    "Decorators & Functional Composition Patterns",
-    "Type Annotations, Type Hinting & Static Checking",
-    "Unit Testing, Assertions & Test Frameworks",
-    "Debugging Strategies, Breakpoints & Stack Traces",
-    "Asynchronous Programming with Async & Await",
-    "Concurrency, Threads & Multiprocessing Models",
-    "Database Connectivity, CRUD Operations & ORMs",
-    "Web Frameworks: Routing, Endpoints & Middleware",
-    "Security Best Practices & Input Sanitization",
-    "Packaging, Publishing & Distribution",
-    "Docker Containerization & Environment Consistency",
-    "Continuous Integration, Linting & Formatting",
-    "Cloud Deployment & Serverless Integration",
-    "Performance Profiling, Benchmarking & Bottlenecks",
-    "Production Logging, Telemetry & Observability",
-    "Capstone Project: Architecture & System Setup",
-    "Capstone Project: Core Implementation & Workflows",
-    "Course Recap, Portfolio Presentation & Next Steps",
-  ];
-
-  const chapters: RawChapter[] = [];
-  let globalLessonIdx = 0;
-
-  for (let dIdx = 0; dIdx < daysCount; dIdx++) {
-    const dayLessons: RawLesson[] = [];
-    const dayTitleTheme = dayThematicTitles[dIdx % dayThematicTitles.length];
-    const dayTitle = `Day ${dIdx + 1} (${dayTitleTheme})`;
-
-    for (let lIdx = 0; lIdx < lessonsPerDay; lIdx++) {
-      const isVeryLast = globalLessonIdx === totalLessonsCount - 1;
-      const startSec = globalLessonIdx * singleLessonDuration;
-      const endSec = isVeryLast ? duration : (globalLessonIdx + 1) * singleLessonDuration;
-      const subtopic = lessonSubtopics[globalLessonIdx % lessonSubtopics.length];
-      const midSec = Math.floor((startSec + endSec) / 2);
-
-      const quizQuestions: RawQuizQuestion[] = [
-        {
-          questionText: `What is the central design principle emphasized in "${subtopic}" for ${cleanTitle}?`,
-          options: [
-            `Ensuring modular separation of concerns and predictable data flow`,
-            `Eliminating all unit testing and error logging`,
-            `Hardcoding dependencies directly in global namespace`,
-            `Ignoring execution constraints and runtime boundaries`,
-          ],
-          correctOptionIndex: 0,
-          explanation: `Modularity and predictable data flow are essential for ${cleanTitle}.`,
-          replayTimestampSeconds: Math.floor(startSec + (endSec - startSec) * 0.25),
-        },
-        {
-          questionText: `Which approach is strongly recommended when developing "${subtopic}"?`,
-          options: [
-            `Adhering to strict contracts, clean interfaces, and proper error handling`,
-            `Bypassing type checks and suppressing all runtime warnings`,
-            `Using arbitrary global state without encapsulation`,
-            `Relying entirely on undocumented legacy conventions`,
-          ],
-          correctOptionIndex: 0,
-          explanation: `Clean interfaces and defensive error handling ensure maintainable architecture.`,
-          replayTimestampSeconds: midSec,
-        },
-      ];
-
-      dayLessons.push({
-        title: `${lIdx + 1}. ${subtopic}`,
-        description: `Master ${subtopic} with structured explanations, architectural guidance, and best practices.`,
-        startSeconds: startSec,
-        endSeconds: endSec,
-        summary: `Comprehensive lesson on ${subtopic} within ${cleanTitle}. We cover core principles, execution mechanics, and real-world considerations.`,
-        keyTakeaways: [
-          `Core mental model and rationale behind ${subtopic}`,
-          `Practical implementation techniques and common pitfalls`,
-          `Production considerations for scalability and maintainability`,
-        ],
-        importantDefinitions: [
-          `${subtopic}: Essential topic covered in this section of the ${cleanTitle} masterclass.`,
-          `Best Practice: Industry-standard conventions ensuring reliability and code clarity.`,
-        ],
-        quizQuestions,
-      });
-
-      globalLessonIdx++;
-    }
-
-    chapters.push({
-      title: dayTitle,
-      description: `Day ${dIdx + 1} learning module covering ${dayLessons.length} lessons spanning ${Math.round((dayLessons[dayLessons.length - 1].endSeconds - dayLessons[0].startSeconds) / 60)} minutes.`,
-      lessons: dayLessons,
+  for (let i = 0; i < totalLessons; i++) {
+    const startSeconds = i * singleDur;
+    const endSeconds = i === totalLessons - 1 ? duration : (i + 1) * singleDur;
+    slots.push({
+      dayIndex: Math.floor(i / lessonsPerDay),
+      lessonIndexInDay: i % lessonsPerDay,
+      startSeconds,
+      endSeconds,
     });
   }
 
-  return {
-    chapters,
-    placementQuestions: generateFallbackPlacement({ chapters }),
-  };
+  return { daysCount, slots };
+}
+
+export async function generateCurriculumStructure(
+  meta: Pick<VideoMetadata, "title" | "durationSeconds" | "description" | "chapters">,
+  transcripts: TranscriptSegment[] | null,
+  provider: ReturnType<typeof getAIProvider>,
+  difficulty: string
+): Promise<RawCurriculum> {
+  // 1. When real YouTube chapters/timestamps exist (>= 2), normalize, subdivide long modules, and partition cleanly
+  if (meta.chapters && meta.chapters.length >= 2) {
+    return organizeChaptersIntoDailyPlan(
+      meta.chapters,
+      meta.durationSeconds,
+      meta.title,
+      meta.description,
+      transcripts
+    );
+  }
+
+  // 2. When no YouTube timestamps exist and external LLM is active, enrich precomputed full-duration timeline slots
+  if (provider instanceof NemotronAIProvider || provider instanceof OpenAIProvider) {
+    try {
+      const { slots } = buildScheduleSlots(meta.durationSeconds);
+      const batchSize = 12;
+      const enrichedSegments: TimeSegment[] = [];
+
+      for (let i = 0; i < slots.length; i += batchSize) {
+        const batch = slots.slice(i, i + batchSize);
+        const slotHints = batch
+          .map((s, idx) => {
+            const excerpt = extractTranscriptExcerpt(transcripts, s.startSeconds, s.endSeconds, 180);
+            return `Slot ${idx + 1}: ${s.startSeconds}s..${s.endSeconds}s (${formatClockTimestamp(s.startSeconds)}-${formatClockTimestamp(s.endSeconds)})${
+              excerpt ? ` | Transcript: "${excerpt}"` : ""
+            }`;
+          })
+          .join("\n");
+
+        const prompt = `You are structuring an online course from "${meta.title}" (${formatDuration(meta.durationSeconds)} total, difficulty: ${difficulty}).
+Course context: ${(meta.description || "").slice(0, 600)}
+Generate distinct, progressive lesson titles strictly matching these exact time slots:
+${slotHints}`;
+
+        const schema = `{
+  "lessons": [
+    { "title": "Specific concise lesson title" }
+  ]
+}`;
+
+        const res = await provider.generateJSON<{ lessons?: { title?: string }[] }>(prompt, schema);
+        batch.forEach((slot, idx) => {
+          const aiTitle = res?.lessons?.[idx]?.title?.trim();
+          enrichedSegments.push({
+            title: aiTitle || `Module ${i + idx + 1}: Core Concepts & Walkthrough`,
+            startSeconds: slot.startSeconds,
+            endSeconds: slot.endSeconds,
+          });
+        });
+      }
+
+      if (enrichedSegments.length === slots.length) {
+        return partitionSegmentsIntoDays(
+          enrichedSegments,
+          meta.durationSeconds,
+          meta,
+          transcripts
+        );
+      }
+    } catch (err) {
+      console.warn(
+        "LLM API generation failed, seamlessly falling back to high-fidelity domain synthesizer:",
+        err
+      );
+    }
+  }
+
+  return generateFallbackCurriculum(meta, difficulty, transcripts);
+}
+
+function organizeChaptersIntoDailyPlan(
+  chapters: VideoChapter[],
+  totalDuration: number,
+  courseTitle: string,
+  courseDescription?: string,
+  transcripts: TranscriptSegment[] | null = null
+): RawCurriculum {
+  const segments = normalizeAndSubdivideChapters(chapters, totalDuration);
+  return partitionSegmentsIntoDays(
+    segments,
+    totalDuration,
+    { title: courseTitle, description: courseDescription },
+    transcripts
+  );
+}
+
+function generateFallbackCurriculum(
+  meta: { title: string; durationSeconds: number; description?: string; chapters?: VideoChapter[] },
+  difficulty: string,
+  transcripts: TranscriptSegment[] | null = null
+): RawCurriculum {
+  if (meta.chapters && meta.chapters.length >= 2) {
+    return organizeChaptersIntoDailyPlan(
+      meta.chapters,
+      meta.durationSeconds,
+      meta.title,
+      meta.description,
+      transcripts
+    );
+  }
+
+  const domain = detectCourseDomain(meta.title, meta.description);
+  const pool = DOMAIN_TOPIC_POOLS[domain];
+  const { slots } = buildScheduleSlots(meta.durationSeconds);
+
+  const segments: TimeSegment[] = slots.map((slot, idx) => {
+    const poolIdx = Math.min(
+      pool.lessons.length - 1,
+      Math.floor((idx / Math.max(1, slots.length - 1)) * (pool.lessons.length - 1))
+    );
+    const baseTopic = pool.lessons[poolIdx];
+    const isDuplicateTopic = idx > 0 && Math.floor(((idx - 1) / Math.max(1, slots.length - 1)) * (pool.lessons.length - 1)) === poolIdx;
+    const title = isDuplicateTopic
+      ? `${baseTopic} (Deep Dive & Applied Lab)`
+      : `${idx + 1}. ${baseTopic}`;
+
+    return {
+      title,
+      startSeconds: slot.startSeconds,
+      endSeconds: slot.endSeconds,
+    };
+  });
+
+  // Ensure Day themes harmonize nicely if video lacked timestamps
+  const curriculum = partitionSegmentsIntoDays(
+    segments,
+    meta.durationSeconds,
+    meta,
+    transcripts
+  );
+
+  // Prefix Day Focus cleanly when chapterless fallback used multi-part slots
+  curriculum.chapters = curriculum.chapters.map((ch, idx) => {
+    if (ch.title.includes("(Deep Dive") && pool.themes[idx % pool.themes.length]) {
+      return {
+        ...ch,
+        title: `Day ${idx + 1} (${pool.themes[idx % pool.themes.length]})`,
+      };
+    }
+    return ch;
+  });
+
+  void difficulty;
+  return curriculum;
 }
 
 function cleanPlacementText(str: string): string {
@@ -878,20 +1596,22 @@ function generateFallbackPlacement(curriculum: { chapters: RawChapter[] }): RawP
     });
   });
 
+  const targetCount = Math.min(8, Math.max(4, Math.min(allLessons.length, 6)));
   const selectedLessons: RawLesson[] = [];
-  if (allLessons.length <= 6) {
+  if (allLessons.length <= targetCount) {
     selectedLessons.push(...allLessons);
   } else {
-    const step = allLessons.length / 6;
-    for (let i = 0; i < 6; i++) {
+    const step = allLessons.length / targetCount;
+    for (let i = 0; i < targetCount; i++) {
       const idx = Math.min(allLessons.length - 1, Math.floor(i * step));
       selectedLessons.push(allLessons[idx]);
     }
   }
 
   return selectedLessons.map((les, idx) => {
-    const cleanTopic = cleanPlacementText(les.title);
-    const lower = cleanTopic.toLowerCase();
+    const cleanTopic = cleanConceptTopic(cleanPlacementText(les.title)) || cleanPlacementText(les.title);
+    const glossaryHits = matchConceptsForText(cleanTopic);
+    const conceptWithQ = glossaryHits.find((g) => g.question);
 
     let questionText = "";
     let correctOption = "";
@@ -900,62 +1620,26 @@ function generateFallbackPlacement(curriculum: { chapters: RawChapter[] }): RawP
     let wrong3 = "";
     let explanation = "";
 
-    if (lower.includes("roadmap") || lower.includes("career") || lower.includes("overview") || lower.includes("intro")) {
-      questionText = `What is the recommended core technical foundation before building production-grade ${cleanTopic}?`;
-      correctOption = "Mastering foundational programming, data structures, and asynchronous API interactions.";
-      wrong1 = "Deploying unverified machine learning models directly into production without unit testing.";
-      wrong2 = "Skipping code version control (Git) and manually sharing binary executable files.";
-      wrong3 = "Disabling authentication checks to maximize network transmission speed.";
-      explanation = "A solid grasp of programming fundamentals and system design is essential before engineering advanced architectures.";
-    } else if (lower.includes("token") || lower.includes("llm") || lower.includes("genai") || lower.includes("foundational")) {
-      questionText = `In modern Large Language Models (LLMs), what is a 'token' and how does the model process it?`;
-      correctOption = "A sub-word textual chunk converted into high-dimensional numerical embeddings for transformer processing.";
-      wrong1 = "A temporary security password stored in the browser's HTTP-only session cookie.";
-      wrong2 = "A hardware register inside the GPU that stores raw uncompressed video frames.";
-      wrong3 = "A physical network packet sent over ethernet without TCP headers.";
-      explanation = "LLMs tokenize text into sub-words (using algorithms like Byte-Pair Encoding) and represent them as dense vector embeddings.";
-    } else if (lower.includes("prompt") || lower.includes("zero-shot") || lower.includes("chain-of-thought") || lower.includes("few-shot")) {
-      questionText = `What is the fundamental mechanism that makes Chain-of-Thought (CoT) prompting effective for complex tasks?`;
-      correctOption = "It instructs the model to articulate intermediate reasoning steps before arriving at the conclusion.";
-      wrong1 = "It executes the same prompt multiple times in parallel and returns the fastest response.";
-      wrong2 = "It modifies the internal weight matrices of the model in real time using gradient descent.";
-      wrong3 = "It restricts the output to a single yes/no binary boolean response.";
-      explanation = "Chain-of-Thought prompting directs the LLM to decompose complicated problems into logical deduction steps, significantly reducing errors.";
-    } else if (lower.includes("rag") || lower.includes("vector") || lower.includes("database") || lower.includes("retrieval")) {
-      questionText = `In a Retrieval-Augmented Generation (RAG) pipeline, what is the primary purpose of semantic vector search?`;
-      correctOption = "To locate and retrieve contextually relevant knowledge chunks based on mathematical cosine similarity.";
-      wrong1 = "To compress relational SQL tables into static CSV files for cold archive storage.";
-      wrong2 = "To automatically compile dynamic Python scripts into compiled C++ binary libraries.";
-      wrong3 = "To bypass rate limits by randomly scattering API requests across multiple IP addresses.";
-      explanation = "Vector search matches the user's query vector against document chunk vectors to feed the most semantically relevant context to the prompt.";
-    } else if (lower.includes("agent") || lower.includes("langgraph") || lower.includes("langchain") || lower.includes("mcp")) {
-      questionText = `What architectural feature fundamentally differentiates an autonomous AI Agent from a standard LLM completion?`;
-      correctOption = "An iterative reasoning loop that invokes external tools, inspects feedback, and updates persistent state.";
-      wrong1 = "The ability to run exclusively on local microcontroller hardware without an internet connection.";
-      wrong2 = "Strictly restricting output generation to static pre-compiled template strings.";
-      wrong3 = "Disabling memory persistence so every tool call is completely forgotten immediately.";
-      explanation = "Autonomous agents combine reasoning (such as ReAct loops), external tool invocation, and state management to achieve multi-step goals.";
-    } else if (lower.includes("openai") || lower.includes("gemini") || lower.includes("claude") || lower.includes("api")) {
-      questionText = `When architecting a production application with multi-provider LLM APIs (e.g., OpenAI, Gemini, Claude), what is a key architectural best practice?`;
-      correctOption = "Decoupling API calls behind an abstraction interface and enforcing Structured Outputs with strict JSON schemas.";
-      wrong1 = "Embedding private secret API keys directly inside public client-side JavaScript bundles.";
-      wrong2 = "Assuming every API provider uses identical pricing tiers and latency SLAs.";
-      wrong3 = "Disabling retry logic and exponential backoff on HTTP 429 rate limit responses.";
-      explanation = "Using provider abstraction layers and schema validation (e.g. Zod or Pydantic) ensures resilient, type-safe multi-model integration.";
-    } else if (lower.includes("python") || lower.includes("syntax") || lower.includes("programming")) {
-      questionText = `In modern Python engineering, which feature provides type safety and runtime data validation for incoming API payloads?`;
-      correctOption = "Type annotations combined with data parsing libraries like Pydantic or dataclasses.";
-      wrong1 = "Using raw untyped global variables across all module namespaces.";
-      wrong2 = "Converting all numeric inputs into base64 strings before execution.";
-      wrong3 = "Suppressing all runtime exceptions with bare except: pass blocks.";
-      explanation = "Type hints and validation schemas (e.g., Pydantic) detect malformed payloads early and ensure reliable contract enforcement.";
+    if (conceptWithQ?.question) {
+      questionText = conceptWithQ.question.prompt;
+      correctOption = conceptWithQ.question.correct;
+      [wrong1, wrong2, wrong3] = conceptWithQ.question.distractors;
+      explanation = conceptWithQ.question.explanation;
+    } else if (glossaryHits[0]) {
+      const c = glossaryHits[0];
+      questionText = `Which core engineering principle best describes "${c.term}" when building ${cleanTopic}?`;
+      correctOption = c.definition;
+      wrong1 = "Storing all state inside mutable global variables without validation or interfaces.";
+      wrong2 = "Disabling schema verification and runtime error handling in production.";
+      wrong3 = "Eliminating automated tests and deployment checks to ship unverified builds.";
+      explanation = `${c.term}: ${c.takeaway}`;
     } else {
       questionText = `In practical software development, what is the core architectural objective when working with ${cleanTopic}?`;
-      correctOption = `To build modular, maintainable, and verifiable components that fulfill ${cleanTopic} requirements.`;
-      wrong1 = `To merge all business logic, database queries, and UI components into a single unmaintainable file.`;
-      wrong2 = `To disable all automated testing and continuous integration checks to speed up releases.`;
-      wrong3 = `To bypass error handling and allow unhandled exceptions to crash the application runtime.`;
-      explanation = `Engineering best practices emphasize modularity, separation of concerns, and automated test coverage.`;
+      correctOption = `Building modular, verifiable components with strict contracts tailored to ${cleanTopic}.`;
+      wrong1 = "Merging all business logic, database queries, and UI components into one unmaintainable script.";
+      wrong2 = "Disabling automated verification and validation checks prior to release.";
+      wrong3 = "Bypassing error handling and allowing unhandled exceptions to terminate execution.";
+      explanation = "Engineering best practices emphasize modularity, clear contracts, and automated test coverage.";
     }
 
     const targetCorrectIdx = idx % 4;

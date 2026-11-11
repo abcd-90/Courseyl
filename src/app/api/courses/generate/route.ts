@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { generateCourse } from "@/lib/ai/courseGenerator";
 
+export const maxDuration = 60;
+
 export async function POST(req: Request) {
   try {
     const user = await getCurrentUser();
