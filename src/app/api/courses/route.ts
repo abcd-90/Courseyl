@@ -47,7 +47,7 @@ export async function GET(req: Request) {
       })) as any[];
 
       const formatted = enrollments
-        .filter((e: any) => e.course)
+        .filter((e: any) => e.course && e.course.status !== "FAILED")
         .map((e: any) => {
           const c = e.course;
           let lessonCount = 0;

@@ -15,7 +15,20 @@ import {
   generateLessonQuizQuestions,
   synthesizeLessonQuizQuestions,
 } from "./quizGenerator";
+import { randomUUID } from "crypto";
 import { getFullSettings } from "../settings";
+
+const makeId = () => `c${randomUUID().replace(/-/g, "").slice(0, 24)}`;
+
+async function createManyInChunks<T>(
+  items: T[],
+  insertChunk: (chunk: T[]) => Promise<unknown>,
+  chunkSize = 400
+) {
+  for (let i = 0; i < items.length; i += chunkSize) {
+    await insertChunk(items.slice(i, i + chunkSize));
+  }
+}
 
 export interface GenerateCourseParams {
   url: string;
@@ -83,35 +96,6 @@ async function resolveLessonQuizzesAsync(
   return generateLessonQuizQuestions(ctx, expectedCount);
 }
 
-async function buildQuizCreatePayloadAsync(
-  l: RawLesson,
-  courseTitle: string,
-  chapterTitle?: string,
-  lessonIndex = 0,
-  useExternalLLM = false
-) {
-  const quizzes = await resolveLessonQuizzesAsync(
-    l,
-    courseTitle,
-    chapterTitle,
-    lessonIndex,
-    useExternalLLM
-  );
-  return quizzes.map((q, qIdx) => ({
-    orderIndex: qIdx,
-    questionText: q.questionText,
-    correctOptionIndex: q.correctOptionIndex,
-    explanation: q.explanation,
-    replayTimestampSeconds: q.replayTimestampSeconds || l.startSeconds,
-    options: {
-      create: (q.options || []).map((opt, optIdx) => ({
-        optionIndex: optIdx,
-        optionText: opt,
-      })),
-    },
-  }));
-}
-
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -131,47 +115,51 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
     throw new Error("Invalid YouTube video or playlist URL. Please provide a valid YouTube link.");
   }
 
-  // 2. Duplicate Detection
+  // 2. Duplicate Detection (clean up any stale FAILED half-built attempt before regenerating)
   const existingSource = await prisma.courseSource.findFirst({
     where: { youtubeId: parsedUrl.videoId },
     include: { course: true },
   });
 
   if (existingSource && existingSource.course) {
-    // Check if user is already enrolled
-    const existingEnrollment = await prisma.enrollment.findUnique({
-      where: {
-        userId_courseId: {
-          userId,
-          courseId: existingSource.course.id,
+    if (existingSource.course.status === "FAILED") {
+      await prisma.course.delete({ where: { id: existingSource.course.id } }).catch(() => {});
+    } else {
+      // Check if user is already enrolled
+      const existingEnrollment = await prisma.enrollment.findUnique({
+        where: {
+          userId_courseId: {
+            userId,
+            courseId: existingSource.course.id,
+          },
         },
-      },
-    });
+      });
 
-    if (!existingEnrollment) {
-      await prisma.enrollment.create({
-        data: {
-          userId,
-          courseId: existingSource.course.id,
+      if (!existingEnrollment) {
+        await prisma.enrollment.create({
+          data: {
+            userId,
+            courseId: existingSource.course.id,
+          },
+        });
+        await prisma.course.update({
+          where: { id: existingSource.course.id },
+          data: { enrollmentCount: { increment: 1 } },
+        });
+      }
+
+      return {
+        success: true,
+        courseId: existingSource.course.id,
+        course: {
+          id: existingSource.course.id,
+          slug: existingSource.course.slug,
+          title: existingSource.course.title,
         },
-      });
-      await prisma.course.update({
-        where: { id: existingSource.course.id },
-        data: { enrollmentCount: { increment: 1 } },
-      });
+        isExisting: true,
+        message: "Course already exists on CourseIt! Enrolled instantly without consuming generation quota.",
+      };
     }
-
-    return {
-      success: true,
-      courseId: existingSource.course.id,
-      course: {
-        id: existingSource.course.id,
-        slug: existingSource.course.slug,
-        title: existingSource.course.title,
-      },
-      isExisting: true,
-      message: "Course already exists on CourseIt! Enrolled instantly without consuming generation quota.",
-    };
   }
 
   // 3. User quota verification
@@ -315,196 +303,211 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
       curriculumData = generateFallbackCurriculum(meta, difficulty, transcripts);
     }
 
-    // 8. STREAMING REQUIREMENT: Create Chapter 1 & Lesson 1 immediately
-    const firstChapterData = curriculumData.chapters[0];
-    const createdFirstChapter = await prisma.chapter.create({
-      data: {
-        courseId: course.id,
-        orderIndex: 0,
-        title: firstChapterData.title,
-        description: firstChapterData.description || "Foundational concepts and overview.",
-      },
-    });
-
-    const firstLessonData = firstChapterData.lessons[0];
-    const firstStart = firstLessonData.startSeconds ?? 0;
-    const firstEnd = firstLessonData.endSeconds ?? Math.min(600, meta.durationSeconds);
-    const createdFirstLesson = await prisma.lesson.create({
-      data: {
-        chapterId: createdFirstChapter.id,
-        orderIndex: 0,
-        title: firstLessonData.title,
-        description: firstLessonData.description || firstLessonData.summary || `Master ${firstLessonData.title} with step-by-step guidance.`,
-        youtubeVideoId: parsedUrl.videoId,
-        startSeconds: firstStart,
-        endSeconds: firstEnd,
-        durationSeconds: Math.max(30, firstEnd - firstStart),
-        summary: firstLessonData.summary || firstLessonData.description || `Master ${firstLessonData.title} with step-by-step guidance.`,
-        keyTakeaways: JSON.stringify(firstLessonData.keyTakeaways || []),
-        importantDefinitions: JSON.stringify(firstLessonData.importantDefinitions || []),
-        status: "READY",
-      },
-    });
-
-    // Create quiz for Lesson 1 with nested options
-    const llmQuizDeadlineMs = Date.now() + 34000;
+    // 8. Build Chapters, Lessons, Quizzes & Placement Rows in memory (bounded LLM concurrency, zero DB pool contention)
+    const now = new Date();
     const isExternalProvider = provider.name !== "Local Deterministic Synthesizer";
-    const firstLessonQuizzes = await resolveLessonQuizzesAsync(
-      firstLessonData,
-      meta.title,
-      firstChapterData.title,
-      0,
-      isExternalProvider
-    );
-    if (firstLessonQuizzes.length > 0) {
-      await Promise.all(
-        firstLessonQuizzes.map((q, qIdx) =>
-          prisma.quizQuestion.create({
-            data: {
-              lessonId: createdFirstLesson.id,
-              orderIndex: qIdx,
-              questionText: q.questionText,
-              correctOptionIndex: q.correctOptionIndex,
-              explanation: q.explanation,
-              replayTimestampSeconds: q.replayTimestampSeconds || createdFirstLesson.startSeconds,
-              options: {
-                create: (q.options || []).map((opt, optIdx) => ({
-                  optionIndex: optIdx,
-                  optionText: opt,
-                })),
-              },
-            },
-          })
+    const llmQuizDeadlineMs = Date.now() + 20000;
+    const videoId = parsedUrl.videoId || "";
+
+    const chapterRows: {
+      id: string;
+      courseId: string;
+      orderIndex: number;
+      title: string;
+      description: string;
+    }[] = [];
+    const lessonRows: {
+      id: string;
+      chapterId: string;
+      orderIndex: number;
+      title: string;
+      description: string;
+      youtubeVideoId: string;
+      startSeconds: number;
+      endSeconds: number;
+      durationSeconds: number;
+      summary: string;
+      keyTakeaways: string;
+      importantDefinitions: string;
+      status: string;
+      updatedAt: Date;
+    }[] = [];
+    const quizQuestionRows: {
+      id: string;
+      lessonId: string;
+      orderIndex: number;
+      questionText: string;
+      correctOptionIndex: number;
+      explanation: string;
+      replayTimestampSeconds: number;
+    }[] = [];
+    const quizOptionRows: {
+      id: string;
+      questionId: string;
+      optionIndex: number;
+      optionText: string;
+    }[] = [];
+
+    // Collect flat lesson specs first so any optional LLM quiz calls run cleanly before DB writes
+    const lessonWorkQueue: {
+      chapterId: string;
+      orderIndex: number;
+      chapterTitle: string;
+      lessonData: RawLesson;
+    }[] = [];
+
+    for (let cIdx = 0; cIdx < curriculumData.chapters.length; cIdx++) {
+      const c = curriculumData.chapters[cIdx];
+      const chapterId = makeId();
+      chapterRows.push({
+        id: chapterId,
+        courseId: course.id,
+        orderIndex: cIdx,
+        title: c.title,
+        description: c.description || (cIdx === 0 ? "Foundational concepts and overview." : ""),
+      });
+
+      for (let lIdx = 0; lIdx < c.lessons.length; lIdx++) {
+        lessonWorkQueue.push({
+          chapterId,
+          orderIndex: lIdx,
+          chapterTitle: c.title,
+          lessonData: c.lessons[lIdx],
+        });
+      }
+    }
+
+    const QUIZ_LLM_CONCURRENCY = 4;
+    for (let i = 0; i < lessonWorkQueue.length; i += QUIZ_LLM_CONCURRENCY) {
+      const batch = lessonWorkQueue.slice(i, i + QUIZ_LLM_CONCURRENCY);
+      const batchQuizzes = await Promise.all(
+        batch.map((item) =>
+          resolveLessonQuizzesAsync(
+            item.lessonData,
+            meta.title,
+            item.chapterTitle,
+            item.orderIndex,
+            isExternalProvider && Date.now() < llmQuizDeadlineMs
+          )
         )
       );
-    }
 
-    // Mark Lesson 1 READY and Course READY (streaming first lesson available!)
-    await prisma.course.update({
-      where: { id: course.id },
-      data: { status: "READY" },
-    });
+      for (let j = 0; j < batch.length; j++) {
+        const item = batch[j];
+        const l = item.lessonData;
+        const lessonId = makeId();
+        const startSec = l.startSeconds ?? 0;
+        const endSec = l.endSeconds ?? Math.min(600, meta.durationSeconds);
 
-    await prisma.generationJob.update({
-      where: { id: job.id },
-      data: {
-        progressPercentage: 45,
-        currentStep: "Lesson 1 ready for learning! Processing remaining lessons.",
-      },
-    });
+        lessonRows.push({
+          id: lessonId,
+          chapterId: item.chapterId,
+          orderIndex: item.orderIndex,
+          title: l.title,
+          description: l.description || l.summary || `Comprehensive lesson on ${l.title}.`,
+          youtubeVideoId: videoId,
+          startSeconds: startSec,
+          endSeconds: endSec,
+          durationSeconds: Math.max(30, endSec - startSec),
+          summary: l.summary || l.description || `Comprehensive lesson on ${l.title}.`,
+          keyTakeaways: JSON.stringify(l.keyTakeaways || []),
+          importantDefinitions: JSON.stringify(l.importantDefinitions || []),
+          status: "READY",
+          updatedAt: now,
+        });
 
-    // 9. Process remaining lessons in Chapter 1 and subsequent chapters using bounded concurrency batches
-    const firstChapter = curriculumData.chapters[0];
-    if (firstChapter.lessons.length > 1) {
-      await Promise.all(
-        firstChapter.lessons.slice(1).map(async (l, sliceIdx) => {
-          const quizCreate = await buildQuizCreatePayloadAsync(
-            l,
-            meta.title,
-            firstChapter.title,
-            sliceIdx + 1,
-            isExternalProvider && Date.now() < llmQuizDeadlineMs
-          );
-          return prisma.lesson.create({
-            data: {
-              chapterId: createdFirstChapter.id,
-              orderIndex: sliceIdx + 1,
-              title: l.title,
-              description: l.description || l.summary || `Comprehensive lesson on ${l.title}.`,
-              youtubeVideoId: parsedUrl.videoId || "",
-              startSeconds: l.startSeconds,
-              endSeconds: l.endSeconds,
-              durationSeconds: Math.max(30, l.endSeconds - l.startSeconds),
-              summary: l.summary || l.description || `Comprehensive lesson on ${l.title}.`,
-              keyTakeaways: JSON.stringify(l.keyTakeaways || []),
-              importantDefinitions: JSON.stringify(l.importantDefinitions || []),
-              status: "READY",
-              quizQuestions: {
-                create: quizCreate,
-              },
-            },
+        const quizzes = batchQuizzes[j];
+        for (let qIdx = 0; qIdx < quizzes.length; qIdx++) {
+          const q = quizzes[qIdx];
+          const questionId = makeId();
+          quizQuestionRows.push({
+            id: questionId,
+            lessonId,
+            orderIndex: qIdx,
+            questionText: q.questionText,
+            correctOptionIndex: q.correctOptionIndex,
+            explanation: q.explanation,
+            replayTimestampSeconds: q.replayTimestampSeconds || startSec,
           });
-        })
-      );
+          const opts = q.options || [];
+          for (let optIdx = 0; optIdx < opts.length; optIdx++) {
+            quizOptionRows.push({
+              id: makeId(),
+              questionId,
+              optionIndex: optIdx,
+              optionText: opts[optIdx],
+            });
+          }
+        }
+      }
     }
 
-    const remainingChapters = curriculumData.chapters.slice(1);
-    const CHAPTER_CONCURRENCY = 3;
-    for (let i = 0; i < remainingChapters.length; i += CHAPTER_CONCURRENCY) {
-      const wave = remainingChapters.slice(i, i + CHAPTER_CONCURRENCY);
-      await Promise.all(
-        wave.map(async (c, waveIdx) => {
-          const cIdx = i + waveIdx + 1;
-          const lessonsWithQuizzes = await Promise.all(
-            c.lessons.map(async (l, lIdx) => ({
-              l,
-              quizCreate: await buildQuizCreatePayloadAsync(
-                l,
-                meta.title,
-                c.title,
-                lIdx,
-                isExternalProvider && Date.now() < llmQuizDeadlineMs
-              ),
-            }))
-          );
-          return prisma.chapter.create({
-            data: {
-              courseId: course.id,
-              orderIndex: cIdx,
-              title: c.title,
-              description: c.description,
-              lessons: {
-                create: lessonsWithQuizzes.map(({ l, quizCreate }, lIdx) => ({
-                  orderIndex: lIdx,
-                  title: l.title,
-                  description: l.description || l.summary || `Comprehensive lesson on ${l.title}.`,
-                  youtubeVideoId: parsedUrl.videoId || "",
-                  startSeconds: l.startSeconds,
-                  endSeconds: l.endSeconds,
-                  durationSeconds: Math.max(30, l.endSeconds - l.startSeconds),
-                  summary: l.summary || l.description || `Comprehensive lesson on ${l.title}.`,
-                  keyTakeaways: JSON.stringify(l.keyTakeaways || []),
-                  importantDefinitions: JSON.stringify(l.importantDefinitions || []),
-                  status: "READY",
-                  quizQuestions: {
-                    create: quizCreate,
-                  },
-                })),
-              },
-            },
-          });
-        })
-      );
-    }
-
-    // 10. Generate Placement Diagnostic Questions for the course (nested creates in parallel)
+    // 9. Build Placement Diagnostic Rows
     const placementQuestions =
       curriculumData.placementQuestions && curriculumData.placementQuestions.length >= 3
         ? curriculumData.placementQuestions
         : generateFallbackPlacement(curriculumData);
 
-    await Promise.all(
-      placementQuestions.map((pq, pIdx) =>
-        prisma.placementQuestion.create({
-          data: {
-            courseId: course.id,
-            orderIndex: pIdx,
-            topicName: cleanPlacementText(pq.topicName),
-            questionText: cleanPlacementText(pq.questionText),
-            correctOptionIndex: pq.correctOptionIndex,
-            explanation: cleanPlacementText(pq.explanation),
-            options: {
-              create: pq.options.map((optText, optIdx) => ({
-                optionIndex: optIdx,
-                optionText: cleanPlacementText(optText),
-              })),
-            },
-          },
-        })
-      )
-    );
+    const placementQuestionRows: {
+      id: string;
+      courseId: string;
+      orderIndex: number;
+      topicName: string;
+      questionText: string;
+      correctOptionIndex: number;
+      explanation: string;
+    }[] = [];
+    const placementOptionRows: {
+      id: string;
+      questionId: string;
+      optionIndex: number;
+      optionText: string;
+    }[] = [];
 
-    // 11. Finalize Job and Update User Usage
+    for (let pIdx = 0; pIdx < placementQuestions.length; pIdx++) {
+      const pq = placementQuestions[pIdx];
+      const pqId = makeId();
+      placementQuestionRows.push({
+        id: pqId,
+        courseId: course.id,
+        orderIndex: pIdx,
+        topicName: cleanPlacementText(pq.topicName),
+        questionText: cleanPlacementText(pq.questionText),
+        correctOptionIndex: pq.correctOptionIndex,
+        explanation: cleanPlacementText(pq.explanation),
+      });
+      for (let optIdx = 0; optIdx < pq.options.length; optIdx++) {
+        placementOptionRows.push({
+          id: makeId(),
+          questionId: pqId,
+          optionIndex: optIdx,
+          optionText: cleanPlacementText(pq.options[optIdx]),
+        });
+      }
+    }
+
+    // 10. Persist full course atomically in fast sequential bulk chunks (zero pool starvation)
+    await prisma.generationJob.update({
+      where: { id: job.id },
+      data: {
+        progressPercentage: 70,
+        currentStep: `Saving ${chapterRows.length} days, ${lessonRows.length} lessons, and ${quizQuestionRows.length} interactive quiz questions...`,
+      },
+    });
+
+    await createManyInChunks(chapterRows, (data) => prisma.chapter.createMany({ data }));
+    await createManyInChunks(lessonRows, (data) => prisma.lesson.createMany({ data }));
+    await createManyInChunks(quizQuestionRows, (data) => prisma.quizQuestion.createMany({ data }));
+    await createManyInChunks(quizOptionRows, (data) => prisma.quizOption.createMany({ data }));
+    await createManyInChunks(placementQuestionRows, (data) => prisma.placementQuestion.createMany({ data }));
+    await createManyInChunks(placementOptionRows, (data) => prisma.placementOption.createMany({ data }));
+
+    // 11. Mark Course READY & Finalize Job
+    await prisma.course.update({
+      where: { id: course.id },
+      data: { status: "READY" },
+    });
+
     await prisma.generationJob.update({
       where: { id: job.id },
       data: {
@@ -1066,6 +1069,7 @@ function buildDetailedLessonContent(params: {
   courseTitle: string;
   courseDescription?: string;
   transcripts: TranscriptSegment[] | null;
+  subTopics?: string[];
 }): RawLesson {
   const {
     title,
@@ -1077,13 +1081,19 @@ function buildDetailedLessonContent(params: {
     courseTitle,
     courseDescription,
     transcripts,
+    subTopics = [],
   } = params;
 
   const cleanTopic = cleanConceptTopic(title) || title;
+  const cleanSubTopics = subTopics
+    .map((s) => cleanConceptTopic(s) || s.trim())
+    .filter((s, idx, arr) => Boolean(s) && arr.indexOf(s) === idx);
   const durMin = Math.max(1, Math.round((endSeconds - startSeconds) / 60));
   const clockStart = formatClockTimestamp(startSeconds);
   const clockEnd = formatClockTimestamp(endSeconds);
-  const concepts = matchConceptsForText(`${title} ${courseTitle}`);
+  const concepts = matchConceptsForText(
+    `${title} ${cleanSubTopics.join(" ")} ${courseTitle}`
+  );
   const primaryConcept = concepts[0];
   const transcriptSnippet = extractTranscriptExcerpt(transcripts, startSeconds, endSeconds);
   const courseLead = extractCourseDescriptionFocus(courseDescription);
@@ -1091,7 +1101,11 @@ function buildDetailedLessonContent(params: {
   const descriptionParts = [
     `Explore ${cleanTopic} (${clockStart} – ${clockEnd}, ${durMin} min) with practical architecture walkthroughs tailored to ${courseTitle.split(/[|–—-]/)[0].trim()}.`,
   ];
-  if (primaryConcept) {
+  if (cleanSubTopics.length > 1) {
+    descriptionParts.push(
+      `Topics covered: ${cleanSubTopics.slice(0, 7).join(" · ")}.`
+    );
+  } else if (primaryConcept) {
     descriptionParts.push(primaryConcept.definition);
   } else if (nextTitle) {
     descriptionParts.push(`Connects directly into "${cleanConceptTopic(nextTitle)}" as the system scales.`);
@@ -1100,6 +1114,11 @@ function buildDetailedLessonContent(params: {
   const summaryParts = [
     `Segment Overview [${clockStart} – ${clockEnd}]: This ${durMin}-minute lesson breaks down ${cleanTopic}.`,
   ];
+  if (cleanSubTopics.length > 1) {
+    summaryParts.push(
+      `Sections inside this module: ${cleanSubTopics.slice(0, 8).join("; ")}.`
+    );
+  }
   if (concepts.length > 0) {
     summaryParts.push(
       `Key focus areas include ${concepts
@@ -1124,6 +1143,12 @@ function buildDetailedLessonContent(params: {
   for (const c of concepts.slice(0, 3)) {
     takeawaysSet.add(c.takeaway);
   }
+  for (const sub of cleanSubTopics.slice(0, 5)) {
+    const strippedSub = sub.replace(/\s*\(\d{1,2}:\d{2}(?::\d{2})?\)$/, "").trim();
+    if (strippedSub.length >= 6 && takeawaysSet.size < 6) {
+      takeawaysSet.add(`Apply practical workflows and core techniques for ${strippedSub}.`);
+    }
+  }
   takeawaysSet.add(`Understand the core mechanics and practical implementation of ${cleanTopic}.`);
   if (takeawaysSet.size < 3 && nextTitle) {
     takeawaysSet.add(`See how ${cleanTopic} integrates cleanly before moving to ${cleanConceptTopic(nextTitle)}.`);
@@ -1135,6 +1160,14 @@ function buildDetailedLessonContent(params: {
   const definitions: string[] = concepts
     .slice(0, 3)
     .map((c) => `${c.term}: ${c.definition}`);
+  if (cleanSubTopics.length > 1 && definitions.length < 4) {
+    for (const sub of cleanSubTopics) {
+      const strippedSub = sub.replace(/\s*\(\d{1,2}:\d{2}(?::\d{2})?\)$/, "").trim();
+      if (strippedSub.length >= 8 && definitions.length < 4 && !definitions.some((d) => d.startsWith(`${strippedSub}:`))) {
+        definitions.push(`${strippedSub}: Key section covered during ${sub}.`);
+      }
+    }
+  }
   if (definitions.length === 0) {
     definitions.push(
       `${cleanTopic}: Core module taught from ${clockStart} to ${clockEnd} covering concepts, workflows, and practical code patterns.`
@@ -1150,8 +1183,8 @@ function buildDetailedLessonContent(params: {
     title,
     description: descriptionParts.join(" "),
     summary: summaryParts.join(" "),
-    keyTakeaways: Array.from(takeawaysSet).slice(0, 4),
-    importantDefinitions: definitions.slice(0, 3),
+    keyTakeaways: Array.from(takeawaysSet).slice(0, 6),
+    importantDefinitions: definitions.slice(0, 4),
     courseTitle,
     startSeconds,
     endSeconds,
@@ -1166,8 +1199,8 @@ function buildDetailedLessonContent(params: {
     startSeconds,
     endSeconds,
     summary: summaryParts.join(" "),
-    keyTakeaways: Array.from(takeawaysSet).slice(0, 4),
-    importantDefinitions: definitions.slice(0, 3),
+    keyTakeaways: Array.from(takeawaysSet).slice(0, 6),
+    importantDefinitions: definitions.slice(0, 4),
     quizQuestions,
     transcriptExcerpt: transcriptSnippet || undefined,
   };
@@ -1204,6 +1237,122 @@ interface TimeSegment {
   title: string;
   startSeconds: number;
   endSeconds: number;
+  subTopics?: string[];
+}
+
+function isFillerChapterTitle(rawTitle: string): boolean {
+  return /^(intro(duction)?|welcome|how to watch.*|overview|outro|conclusion|what to do next|wrap[- ]?up)$/i.test(
+    cleanConceptTopic(rawTitle).trim()
+  );
+}
+
+function pickConsolidatedTitle(bucket: TimeSegment[]): string {
+  if (bucket.length === 1) return bucket[0].title;
+  const cleanedAll = bucket
+    .map((b) => cleanConceptTopic(b.title) || b.title.trim())
+    .filter(Boolean);
+  const substantive = cleanedAll.filter((t) => !isFillerChapterTitle(t));
+  const pool = substantive.length > 0 ? substantive : cleanedAll;
+  if (pool.length === 0) return bucket[0].title;
+  if (pool.length === 1) return pool[0];
+
+  const trimAnchor = (text: string) =>
+    text
+      .replace(/^FULL SETUP FROM SCRATCH:\s*/i, "")
+      .replace(/^#?\d+\s*:\s*/i, "")
+      .replace(/\s*\([^)]{6,}\)\s*$/g, "")
+      .trim();
+
+  const first = trimAnchor(pool[0]);
+  const last = trimAnchor(pool[pool.length - 1]);
+  if (first.toLowerCase() === last.toLowerCase()) return first;
+
+  const combined = `${first} & ${last}`;
+  if (combined.length <= 86) return combined;
+
+  const stripBuildPrefix = (s: string) =>
+    s.replace(/^(?:BUILD|Build|Offer Menu)(?:\s*#?\d+)?:\s*/i, "").trim();
+
+  const compactFirst = stripBuildPrefix(first.split(/[|—–]/)[0].trim());
+  const compactLast = stripBuildPrefix(last.split(/[|—–]/)[0].trim());
+  const compactCombined =
+    compactFirst.toLowerCase() === compactLast.toLowerCase()
+      ? first.length <= 86
+        ? first
+        : compactFirst
+      : `${compactFirst} & ${compactLast}`;
+  if (compactCombined.length <= 86) return compactCombined;
+  return `${compactCombined.slice(0, 83).trim()}...`;
+}
+
+function consolidateMicroSegments(
+  segments: TimeSegment[],
+  totalDuration: number
+): TimeSegment[] {
+  const totalSpan = Math.max(
+    totalDuration,
+    segments[segments.length - 1]?.endSeconds || 0
+  );
+  const avgSegSeconds = segments.length > 0 ? totalSpan / segments.length : 0;
+
+  // Preserve normal multi-chapter videos (>= ~7m average or <= 15 markers);
+  // only consolidate dense micro-timestamped marathons (e.g. 60+ 1-3m markers across 3h)
+  if (segments.length < 16 || totalSpan < 2700 || avgSegSeconds >= 420) {
+    return segments;
+  }
+
+  const MIN_MERGED_SECONDS = 540; // ~9 min target minimum study lesson
+  const MAX_MERGED_SECONDS = 900; // ~15 min max per consolidated block
+  const groupedBuckets: TimeSegment[][] = [];
+  let bucket: TimeSegment[] = [segments[0]];
+
+  for (let i = 1; i < segments.length; i++) {
+    const seg = segments[i];
+    const bucketStart = bucket[0].startSeconds;
+    const bucketDur = bucket[bucket.length - 1].endSeconds - bucketStart;
+    const combinedDur = seg.endSeconds - bucketStart;
+    const segDur = seg.endSeconds - seg.startSeconds;
+
+    if (
+      combinedDur <= MAX_MERGED_SECONDS &&
+      (bucketDur < MIN_MERGED_SECONDS || segDur < 180)
+    ) {
+      bucket.push(seg);
+    } else {
+      groupedBuckets.push(bucket);
+      bucket = [seg];
+    }
+  }
+  groupedBuckets.push(bucket);
+
+  // Fold tiny trailing outro bucket into previous lesson if total stays <= 20m
+  if (groupedBuckets.length >= 2) {
+    const lastBucket = groupedBuckets[groupedBuckets.length - 1];
+    const prevBucket = groupedBuckets[groupedBuckets.length - 2];
+    const lastDur =
+      lastBucket[lastBucket.length - 1].endSeconds - lastBucket[0].startSeconds;
+    const mergedDur =
+      lastBucket[lastBucket.length - 1].endSeconds - prevBucket[0].startSeconds;
+    if (lastDur < 300 && mergedDur <= 1200) {
+      prevBucket.push(...lastBucket);
+      groupedBuckets.pop();
+    }
+  }
+
+  return groupedBuckets.map((grp) => ({
+    title: pickConsolidatedTitle(grp),
+    startSeconds: grp[0].startSeconds,
+    endSeconds: grp[grp.length - 1].endSeconds,
+    subTopics:
+      grp.length > 1
+        ? grp.map(
+            (s) =>
+              `${cleanPlacementText(s.title) || s.title} (${formatClockTimestamp(
+                s.startSeconds
+              )})`
+          )
+        : undefined,
+  }));
 }
 
 function normalizeAndSubdivideChapters(
@@ -1250,12 +1399,15 @@ function normalizeAndSubdivideChapters(
     }
   }
 
+  // Coalesce micro-fragmented multi-hour markers (1-2m clips) into 9-15m cohesive lessons
+  const consolidated = consolidateMicroSegments(continuous, totalDuration);
+
   // Split oversized chapters (> 50 minutes = 3000s) into ~35-42 min focused lessons
   const MAX_CHAPTER_SECONDS = 3000;
   const IDEAL_SUBPART_SECONDS = 2400;
   const subdivided: TimeSegment[] = [];
 
-  for (const seg of continuous) {
+  for (const seg of consolidated) {
     const dur = seg.endSeconds - seg.startSeconds;
     if (dur <= MAX_CHAPTER_SECONDS) {
       subdivided.push(seg);
@@ -1287,6 +1439,8 @@ function buildDayTitle(dayNumber: number, lessons: TimeSegment[]): string {
         .split(/[|–—]/)[0]
         .replace(/^What is\s+/i, "")
         .replace(/^How to\s+/i, "")
+        .replace(/^BUILD(?:\s*#?\d+)?:\s*/i, "")
+        .replace(/^#?\d+\s*:\s*/i, "")
         .replace(/^Build\s+(?:Your\s+Own\s+|Your\s+|End-to-End\s+|Permanent\s+)?/i, "")
         .replace(/^Add\s+/i, "")
         .replace(/^Implement\s+/i, "")
@@ -1405,6 +1559,7 @@ function partitionSegmentsIntoDays(
           courseTitle: meta.title,
           courseDescription: meta.description,
           transcripts,
+          subTopics: seg.subTopics,
         });
         globalLessonIdx++;
         return lessonObj;

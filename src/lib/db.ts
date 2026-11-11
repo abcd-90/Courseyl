@@ -29,9 +29,9 @@ function createPrismaClient() {
     new Pool({
       connectionString,
       ssl: { rejectUnauthorized: false },
-      max: process.env.NODE_ENV === "production" ? 1 : 3,
+      max: process.env.NODE_ENV === "production" ? 3 : 5,
       idleTimeoutMillis: 10000,
-      connectionTimeoutMillis: 10000,
+      connectionTimeoutMillis: 25000,
     });
 
   globalForPrisma.pool = pool;
