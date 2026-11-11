@@ -4,10 +4,6 @@ import { supabaseAnonKey, supabaseUrl } from "./supabaseClient";
 export const AUTH_SECRETS_KEY = "site_auth_secrets";
 
 export interface ServerAuthSecretsConfig {
-  githubClientId: string;
-  githubClientSecret: string;
-  xClientId: string;
-  xClientSecret: string;
   resendApiKey: string;
   smtpHost: string;
   smtpPort: number;
@@ -17,10 +13,6 @@ export interface ServerAuthSecretsConfig {
 }
 
 export const DEFAULT_AUTH_SECRETS: ServerAuthSecretsConfig = {
-  githubClientId: "",
-  githubClientSecret: "",
-  xClientId: "",
-  xClientSecret: "",
   resendApiKey: "",
   smtpHost: "",
   smtpPort: 587,
@@ -87,19 +79,6 @@ export async function getEffectiveAuthConfig(): Promise<
   return {
     googleClientId: process.env.GOOGLE_CLIENT_ID?.trim() || "",
     googleClientSecret: process.env.GOOGLE_CLIENT_SECRET?.trim() || "",
-    githubClientId: pick(process.env.GITHUB_CLIENT_ID, db.githubClientId),
-    githubClientSecret: pick(
-      process.env.GITHUB_CLIENT_SECRET,
-      db.githubClientSecret
-    ),
-    xClientId: pick(
-      process.env.X_CLIENT_ID || process.env.TWITTER_CLIENT_ID,
-      db.xClientId
-    ),
-    xClientSecret: pick(
-      process.env.X_CLIENT_SECRET || process.env.TWITTER_CLIENT_SECRET,
-      db.xClientSecret
-    ),
     resendApiKey: pick(process.env.RESEND_API_KEY, db.resendApiKey),
     smtpHost: pick(process.env.SMTP_HOST, db.smtpHost),
     smtpPort: Number(db.smtpPort || process.env.SMTP_PORT || 587),
@@ -117,20 +96,6 @@ export async function saveAuthSecretsForAdmin(
     typeof v !== "string" || !v.trim() || v.includes("••••");
 
   const next: ServerAuthSecretsConfig = {
-    githubClientId:
-      typeof incoming.githubClientId === "string"
-        ? incoming.githubClientId.trim()
-        : existing.githubClientId || "",
-    githubClientSecret: isMaskedOrBlank(incoming.githubClientSecret)
-      ? existing.githubClientSecret || ""
-      : String(incoming.githubClientSecret).trim(),
-    xClientId:
-      typeof incoming.xClientId === "string"
-        ? incoming.xClientId.trim()
-        : existing.xClientId || "",
-    xClientSecret: isMaskedOrBlank(incoming.xClientSecret)
-      ? existing.xClientSecret || ""
-      : String(incoming.xClientSecret).trim(),
     resendApiKey: isMaskedOrBlank(incoming.resendApiKey)
       ? existing.resendApiKey || ""
       : String(incoming.resendApiKey).trim(),
@@ -163,10 +128,6 @@ export async function getMaskedAuthSecretsForAdmin() {
   const cfg = await getEffectiveAuthConfig();
   return {
     googleConfigured: Boolean(cfg.googleClientId && cfg.googleClientSecret),
-    githubClientId: cfg.githubClientId,
-    githubHasSecret: Boolean(cfg.githubClientSecret),
-    xClientId: cfg.xClientId,
-    xHasSecret: Boolean(cfg.xClientSecret),
     hasResendKey: Boolean(cfg.resendApiKey),
     smtpHost: cfg.smtpHost,
     smtpPort: cfg.smtpPort,
@@ -190,12 +151,6 @@ export async function getPublicAuthProvidersStatus() {
   const googleDirect = Boolean(cfg.googleClientId && cfg.googleClientSecret);
   const googleSupabase = Boolean(external.google);
 
-  const githubDirect = Boolean(cfg.githubClientId && cfg.githubClientSecret);
-  const githubSupabase = Boolean(external.github);
-
-  const xDirect = Boolean(cfg.xClientId && cfg.xClientSecret);
-  const xSupabase = Boolean(external.twitter);
-
   const hasCustomMailer = Boolean(
     cfg.resendApiKey || (cfg.smtpHost && cfg.smtpUser && cfg.smtpPass)
   );
@@ -204,14 +159,6 @@ export async function getPublicAuthProvidersStatus() {
     google: {
       enabled: googleDirect || googleSupabase,
       mode: googleDirect ? "direct" : googleSupabase ? "supabase" : "unconfigured",
-    },
-    github: {
-      enabled: githubDirect || githubSupabase,
-      mode: githubDirect ? "direct" : githubSupabase ? "supabase" : "unconfigured",
-    },
-    x: {
-      enabled: xDirect || xSupabase,
-      mode: xDirect ? "direct" : xSupabase ? "supabase" : "unconfigured",
     },
     email: {
       enabled: true,

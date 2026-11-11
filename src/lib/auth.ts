@@ -114,7 +114,7 @@ export function getAuthCookieOptions() {
 
 export interface UpsertVerifiedUserParams {
   email: string;
-  provider: "email" | "google" | "github" | "x";
+  provider: "email" | "google";
   providerId?: string | null;
   displayName?: string | null;
   avatarUrl?: string | null;

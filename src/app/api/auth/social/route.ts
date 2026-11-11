@@ -38,17 +38,11 @@ export async function POST(req: Request) {
       sbUser.app_metadata?.provider || "email"
     ).toLowerCase();
 
-    const mappedProvider: "email" | "google" | "github" | "x" =
-      rawProvider === "google"
-        ? "google"
-        : rawProvider === "github"
-        ? "github"
-        : rawProvider === "twitter" || rawProvider === "x"
-        ? "x"
-        : "email";
+    const mappedProvider: "email" | "google" =
+      rawProvider === "google" ? "google" : "email";
 
     const isEmailConfirmed = Boolean(
-      sbUser.email_confirmed_at || sbUser.confirmed_at || mappedProvider !== "email"
+      sbUser.email_confirmed_at || sbUser.confirmed_at || mappedProvider === "google"
     );
 
     if (!isEmailConfirmed) {
@@ -61,11 +55,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const verifiedEmail =
-      sbUser.email ||
-      (mappedProvider === "x"
-        ? `${sbUser.user_metadata?.user_name || sbUser.id}@x-oauth.courseyl.internal`
-        : null);
+    const verifiedEmail = sbUser.email || null;
 
     if (!verifiedEmail) {
       return NextResponse.json(

@@ -63,10 +63,6 @@ interface AdminUserRow {
 }
 
 interface AuthSecretsForm {
-  githubClientId: string;
-  githubClientSecret: string;
-  xClientId: string;
-  xClientSecret: string;
   resendApiKey: string;
   smtpHost: string;
   smtpPort: number;
@@ -179,10 +175,6 @@ export default function StudioHubAdminPage() {
   const [testingMailer, setTestingMailer] = useState(false);
   const [copiedCallback, setCopiedCallback] = useState<string | null>(null);
   const [authSecretsForm, setAuthSecretsForm] = useState<AuthSecretsForm>({
-    githubClientId: "",
-    githubClientSecret: "",
-    xClientId: "",
-    xClientSecret: "",
     resendApiKey: "",
     smtpHost: "",
     smtpPort: 587,
@@ -222,10 +214,6 @@ export default function StudioHubAdminPage() {
         if (sData?.authSecrets) {
           setAuthSecretsForm((prev) => ({
             ...prev,
-            githubClientId: sData.authSecrets.githubClientId || "",
-            githubClientSecret: sData.authSecrets.githubHasSecret ? "••••••••••••" : "",
-            xClientId: sData.authSecrets.xClientId || "",
-            xClientSecret: sData.authSecrets.xHasSecret ? "••••••••••••" : "",
             resendApiKey: sData.authSecrets.hasResendKey ? "••••••••••••" : "",
             smtpHost: sData.authSecrets.smtpHost || "",
             smtpPort: sData.authSecrets.smtpPort || 587,
@@ -1976,7 +1964,7 @@ export default function StudioHubAdminPage() {
                 </div>
 
                 {/* Live Provider Readiness Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div className="p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] space-y-1.5">
                     <div className="text-[0.68rem] font-mono font-bold uppercase text-ink-soft">
                       Google OAuth
@@ -1997,46 +1985,6 @@ export default function StudioHubAdminPage() {
                   </div>
                   <div className="p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] space-y-1.5">
                     <div className="text-[0.68rem] font-mono font-bold uppercase text-ink-soft">
-                      GitHub OAuth
-                    </div>
-                    <div className="text-sm font-bold text-ink">
-                      {authProvidersStatus?.github?.enabled
-                        ? `● Active (${authProvidersStatus.github.mode})`
-                        : "○ Needs Client ID/Secret"}
-                    </div>
-                    <div className="text-[0.68rem] text-ink-soft font-mono break-all">
-                      {siteOrigin}/api/auth/github/callback
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => copyCallbackUrl("github", "/api/auth/github/callback")}
-                      className="text-[0.68rem] font-semibold text-moss hover:underline cursor-pointer"
-                    >
-                      {copiedCallback === "github" ? "✓ Copied GitHub Callback URL" : "Copy GitHub Callback URL"}
-                    </button>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] space-y-1.5">
-                    <div className="text-[0.68rem] font-mono font-bold uppercase text-ink-soft">
-                      X (Twitter) OAuth
-                    </div>
-                    <div className="text-sm font-bold text-ink">
-                      {authProvidersStatus?.x?.enabled
-                        ? `● Active (${authProvidersStatus.x.mode})`
-                        : "○ Needs Client ID/Secret"}
-                    </div>
-                    <div className="text-[0.68rem] text-ink-soft font-mono break-all">
-                      {siteOrigin}/api/auth/x/callback
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => copyCallbackUrl("x", "/api/auth/x/callback")}
-                      className="text-[0.68rem] font-semibold text-moss hover:underline cursor-pointer"
-                    >
-                      {copiedCallback === "x" ? "✓ Copied X Callback URL" : "Copy X Callback URL"}
-                    </button>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] space-y-1.5">
-                    <div className="text-[0.68rem] font-mono font-bold uppercase text-ink-soft">
                       Email Confirmation
                     </div>
                     <div className="text-sm font-bold text-ink">
@@ -2045,71 +1993,8 @@ export default function StudioHubAdminPage() {
                         : "⚠ Supabase Default (Add SMTP)"}
                     </div>
                     <div className="text-[0.68rem] text-ink-soft">
-                      Typo/dummy/MX check + 6-digit OTP
+                      Typo/dummy/MX check + 1-click auto-sync verification link
                     </div>
-                  </div>
-                </div>
-
-                {/* OAuth Credentials Inputs */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-line">
-                  <div className="space-y-3 p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)]">
-                    <div className="text-xs font-mono font-bold uppercase text-moss">
-                      GitHub OAuth App
-                    </div>
-                    <input
-                      type="text"
-                      value={authSecretsForm.githubClientId}
-                      onChange={(e) =>
-                        setAuthSecretsForm({
-                          ...authSecretsForm,
-                          githubClientId: e.target.value,
-                        })
-                      }
-                      placeholder="GitHub Client ID (Ov23li...)"
-                      className="w-full h-10 rounded-xl bg-surface px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
-                    />
-                    <input
-                      type="password"
-                      value={authSecretsForm.githubClientSecret}
-                      onChange={(e) =>
-                        setAuthSecretsForm({
-                          ...authSecretsForm,
-                          githubClientSecret: e.target.value,
-                        })
-                      }
-                      placeholder="GitHub Client Secret"
-                      className="w-full h-10 rounded-xl bg-surface px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
-                    />
-                  </div>
-
-                  <div className="space-y-3 p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)]">
-                    <div className="text-xs font-mono font-bold uppercase text-moss">
-                      X (Twitter) OAuth 2.0 App
-                    </div>
-                    <input
-                      type="text"
-                      value={authSecretsForm.xClientId}
-                      onChange={(e) =>
-                        setAuthSecretsForm({
-                          ...authSecretsForm,
-                          xClientId: e.target.value,
-                        })
-                      }
-                      placeholder="X OAuth 2.0 Client ID"
-                      className="w-full h-10 rounded-xl bg-surface px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
-                    />
-                    <input
-                      type="password"
-                      value={authSecretsForm.xClientSecret}
-                      onChange={(e) =>
-                        setAuthSecretsForm({
-                          ...authSecretsForm,
-                          xClientSecret: e.target.value,
-                        })
-                      }
-                      placeholder="X OAuth 2.0 Client Secret"
-                      className="w-full h-10 rounded-xl bg-surface px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
-                    />
                   </div>
                 </div>
 
@@ -2128,7 +2013,7 @@ export default function StudioHubAdminPage() {
                     </button>
                   </div>
                   <p className="text-xs text-ink-soft leading-relaxed">
-                    Supabase free default mail has strict limits &amp; bounce warnings. Using Gmail SMTP (<code className="font-mono">smtp.gmail.com</code>, port <code className="font-mono">465</code> + Google App Password) or Resend API sends branded 6-digit OTPs directly from your account with zero Supabase limits.
+                    Supabase free default mail has strict limits &amp; bounce warnings. Using Gmail SMTP (<code className="font-mono">smtp.gmail.com</code>, port <code className="font-mono">465</code> + Google App Password) or Resend API sends branded confirmation emails directly from your account with zero Supabase limits.
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <input
