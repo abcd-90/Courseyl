@@ -6,9 +6,12 @@ import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/AppSidebar";
 import { LandscapeIllustration } from "@/components/LandscapeHero";
 import { getCleanThumbnailUrl } from "@/lib/thumbnail";
+import { useSiteSettings } from "@/components/SiteSettingsProvider";
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { settings } = useSiteSettings();
+  const brandName = settings?.branding?.brandName || "Courseyl";
   const [url, setUrl] = useState("");
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [myCourses, setMyCourses] = useState<any[]>([]);
@@ -172,7 +175,7 @@ export default function DashboardPage() {
           <div className="relative z-10 w-full max-w-xl text-center px-1">
             <div className="bg-white/95 dark:bg-[#121a15]/95 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-[#0f1611]/10 dark:border-white/10 shadow-xl p-5 sm:p-8 text-center space-y-3 sm:space-y-4">
               <div className="inline-flex items-center px-3.5 py-1 rounded-full bg-[#e4e9c6] dark:bg-white/10 text-[0.7rem] sm:text-[0.72rem] font-semibold text-[#4b5e1e] dark:text-[#b8c460] tracking-wide font-mono">
-                Welcome to Courseyl
+                Welcome to {brandName}
               </div>
 
               <h1 className="text-xl sm:text-2xl md:text-[2rem] font-display font-bold text-[#0f1611] dark:text-white tracking-tight leading-snug">

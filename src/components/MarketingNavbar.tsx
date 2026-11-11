@@ -5,11 +5,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { CourseItLogo } from "./CourseItLogo";
+import { useSiteSettings } from "./SiteSettingsProvider";
 
 export function MarketingNavbar() {
   const pathname = usePathname();
+  const { settings } = useSiteSettings();
   const [isDark, setIsDark] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const navLinks = (settings?.structure?.navLinks || []).filter((l) => l.visible !== false);
+  const navCtaLabel = settings?.structure?.navCtaLabel || "Start learning";
 
   useEffect(() => {
     const isDarkMode = document.documentElement.classList.contains("dark");
@@ -62,30 +66,20 @@ export function MarketingNavbar() {
 
         {/* Navigation Links (Desktop) */}
         <nav aria-label="Main" className="ml-auto hidden gap-6 text-[0.92rem] text-ink-soft md:flex items-center">
-          <Link
-            className="transition-colors hover:text-ink cursor-pointer"
-            href="/#features"
-            onClick={(e) => scrollToSection(e, "features")}
-          >
-            Features
-          </Link>
-          <Link
-            className="transition-colors hover:text-ink cursor-pointer"
-            href="/#courses"
-            onClick={(e) => scrollToSection(e, "courses")}
-          >
-            Courses
-          </Link>
-          <Link
-            className="transition-colors hover:text-ink cursor-pointer"
-            href="/#how-it-works"
-            onClick={(e) => scrollToSection(e, "how-it-works")}
-          >
-            How it works
-          </Link>
-          <Link className="transition-colors hover:text-ink cursor-pointer" href="/pricing">
-            Pricing
-          </Link>
+          {navLinks.map((nav) => {
+            const isHash = nav.href.startsWith("/#");
+            const targetId = isHash ? nav.href.slice(2) : "";
+            return (
+              <Link
+                key={nav.id}
+                className="transition-colors hover:text-ink cursor-pointer"
+                href={nav.href}
+                onClick={isHash ? (e) => scrollToSection(e, targetId) : undefined}
+              >
+                {nav.label}
+              </Link>
+            );
+          })}
         </nav>
 
         {/* Right action cluster */}
@@ -149,7 +143,7 @@ export function MarketingNavbar() {
               href="/login?next=/dashboard"
               className="inline-flex shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-moss-dark hover:-translate-y-px transition-all font-medium h-10 sm:h-11 px-3.5 sm:px-5 text-xs sm:text-[0.92rem] shadow-sm cursor-pointer whitespace-nowrap"
             >
-              Start learning
+              {navCtaLabel}
             </Link>
           )}
         </div>

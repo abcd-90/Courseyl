@@ -1,608 +1,457 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { CourseItLogo } from "@/components/CourseItLogo";
 import { useSiteSettings } from "@/components/SiteSettingsProvider";
+import {
+  DEFAULT_SETTINGS,
+  FullSiteSettings,
+  SiteAiSettings,
+  SiteBrandingSettings,
+  SitePlanSettings,
+  SiteStructureSettings,
+} from "@/lib/settings-types";
+import {
+  AdminCoursesStudio,
+  AdminCourseItem,
+} from "@/components/admin/AdminCoursesStudio";
+import { AdminStructureEditor } from "@/components/admin/AdminStructureEditor";
+
+type AdminTab =
+  | "overview"
+  | "plans"
+  | "courses"
+  | "structure"
+  | "branding"
+  | "ai"
+  | "users"
+  | "security";
+
+interface AdminMetrics {
+  totalUsers: number;
+  totalCourses: number;
+  totalLessons: number;
+  totalEnrollments: number;
+  totalLearningHours: number;
+  proSubscribers: number;
+  totalJobs: number;
+  completedJobs: number;
+  aiSuccessRate: number;
+}
+
+interface RecentUserRow {
+  id: string;
+  email: string;
+  role: string;
+  createdAt: string;
+  subscription?: { tier?: string } | null;
+}
+
+interface AdminUserRow {
+  id: string;
+  email: string;
+  role: string;
+  displayName: string;
+  tier: string;
+  coursesCreated: number;
+  coursesEnrolled: number;
+  notesCount: number;
+  createdAt: string;
+}
+
+const COLOR_PRESETS = [
+  {
+    name: "Courseyl Botanical",
+    primary: "#4b5e1e",
+    accent: "#b8c460",
+    lightBg: "#fcfcfa",
+    darkBg: "#0e1311",
+    badge: "Signature Olive",
+  },
+  {
+    name: "Emerald Studio",
+    primary: "#0f766e",
+    accent: "#5eead4",
+    lightBg: "#f8fbfa",
+    darkBg: "#091514",
+    badge: "Deep Teal",
+  },
+  {
+    name: "Midnight Cobalt",
+    primary: "#1d4ed8",
+    accent: "#60a5fa",
+    lightBg: "#f8faff",
+    darkBg: "#090f1e",
+    badge: "Sharp Tech",
+  },
+  {
+    name: "Royal Violet",
+    primary: "#6d28d9",
+    accent: "#c4b5fd",
+    lightBg: "#faf8ff",
+    darkBg: "#110b1f",
+    badge: "Creator Pro",
+  },
+  {
+    name: "Warm Terracotta",
+    primary: "#b45309",
+    accent: "#fbbf24",
+    lightBg: "#fffcf7",
+    darkBg: "#161009",
+    badge: "Warm Sunset",
+  },
+];
+
+const FONT_OPTIONS = [
+  "Familjen Grotesk",
+  "Plus Jakarta Sans",
+  "Space Grotesk",
+  "Outfit",
+  "DM Sans",
+  "Sora",
+  "Inter",
+  "Playfair Display",
+];
+
+const NAV_TABS: { id: AdminTab; label: string; icon: string }[] = [
+  { id: "overview", label: "Command Center", icon: "⚡" },
+  { id: "plans", label: "Free / Paid & Prices", icon: "💎" },
+  { id: "courses", label: "Courses & Dummy Studio", icon: "📚" },
+  { id: "structure", label: "Site Layout & Copy", icon: "🧩" },
+  { id: "branding", label: "Brand, Logo & Theme", icon: "🎨" },
+  { id: "ai", label: "AI & Prompts", icon: "🤖" },
+  { id: "users", label: "Users & Roles", icon: "👥" },
+  { id: "security", label: "Security Shield", icon: "🛡" },
+];
 
 export default function StudioHubAdminPage() {
-  const router = useRouter();
-  const { updateLiveColors } = useSiteSettings();
+  const { refreshSettings, updateLiveColors } = useSiteSettings();
 
-  // Auth / Gate State
-  const [authChecking, setAuthChecking] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [userEmail, setUserEmail] = useState("");
-  const [claimKey, setClaimKey] = useState("");
-  const [claimLoading, setClaimLoading] = useState(false);
-  const [claimError, setClaimError] = useState("");
+  const [authStatus, setAuthStatus] = useState<
+    "loading" | "unauthenticated" | "non-admin" | "admin"
+  >("loading");
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [claimSecret, setClaimSecret] = useState("");
+  const [claiming, setClaiming] = useState(false);
 
-  // Navigation
-  const [activeTab, setActiveTab] = useState<
-    "branding" | "plans" | "ai" | "courses" | "users" | "metrics" | "security"
-  >("branding");
-
-  // Notifications
-  const [toastMessage, setToastMessage] = useState("");
-  const [toastType, setToastType] = useState<"success" | "error">("success");
-
-  const showToast = (msg: string, type: "success" | "error" = "success") => {
-    setToastMessage(msg);
-    setToastType(type);
-    setTimeout(() => setToastMessage(""), 4500);
-  };
-
-  // 1. Branding Settings State
-  const [brandName, setBrandName] = useState("Courseyl");
-  const [brandSuffix, setBrandSuffix] = useState("yl");
-  const [tagline, setTagline] = useState("Turn any YouTube video into a course you actually finish.");
-  const [subTagline, setSubTagline] = useState(
-    "Structured lessons, active recall quizzes, interactive note-taking, and personalized placement tests in one distraction-free space."
+  const [activeTab, setActiveTab] = useState<AdminTab>("overview");
+  const [isDark, setIsDark] = useState(false);
+  const [savingCategory, setSavingCategory] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(
+    null
   );
-  const [badgeText, setBadgeText] = useState("No distraction between your studies");
-  const [logoIcon, setLogoIcon] = useState<"grad-cap" | "sparkles" | "code" | "rocket" | "video">("grad-cap");
-  const [customLogoUrl, setCustomLogoUrl] = useState("");
-  const [primaryColor, setPrimaryColor] = useState("#4b5e1e");
-  const [accentColor, setAccentColor] = useState("#b8c460");
-  const [darkBgColor, setDarkBgColor] = useState("#0e1311");
-  const [lightBgColor, setLightBgColor] = useState("#fcfcfa");
-  const [fontFamily, setFontFamily] = useState("Familjen Grotesk");
-  const [savingBranding, setSavingBranding] = useState(false);
 
-  // 2. Plans & Monetization State
-  const [unlimitedFreeMode, setUnlimitedFreeMode] = useState(true);
-  const [freeHoursLimit, setFreeHoursLimit] = useState(5);
-  const [freeGenerationsLimit, setFreeGenerationsLimit] = useState(3);
-  const [proPriceMonthly, setProPriceMonthly] = useState(12);
-  const [proHoursLimit, setProHoursLimit] = useState(40);
-  const [proGenerationsLimit, setProGenerationsLimit] = useState(25);
-  const [maxPriceMonthly, setMaxPriceMonthly] = useState(29);
-  const [maxHoursLimit, setMaxHoursLimit] = useState(120);
-  const [maxGenerationsLimit, setMaxGenerationsLimit] = useState(100);
-  const [allowNewSignups, setAllowNewSignups] = useState(true);
-  const [maintenanceMode, setMaintenanceMode] = useState(false);
-  const [maintenanceMessage, setMaintenanceMessage] = useState(
-    "Courseyl is currently undergoing scheduled platform upgrades. We will be back shortly!"
+  // Settings form state
+  const [brandingForm, setBrandingForm] = useState<SiteBrandingSettings>(
+    DEFAULT_SETTINGS.branding
   );
-  const [savingPlans, setSavingPlans] = useState(false);
+  const [plansForm, setPlansForm] = useState<SitePlanSettings>(DEFAULT_SETTINGS.plans);
+  const [aiForm, setAiForm] = useState<SiteAiSettings>(DEFAULT_SETTINGS.ai);
+  const [structureForm, setStructureForm] = useState<SiteStructureSettings>(
+    DEFAULT_SETTINGS.structure
+  );
 
-  // 3. AI Intelligence State
-  const [aiProvider, setAiProvider] = useState("NVIDIA_NEMOTRON");
-  const [aiModel, setAiModel] = useState("nvidia/llama-3.1-nemotron-70b-instruct");
-  const [aiApiKey, setAiApiKey] = useState("");
-  const [aiTemperature, setAiTemperature] = useState(0.3);
-  const [systemPrompt, setSystemPrompt] = useState("");
-  const [savingAi, setSavingAi] = useState(false);
-  const [testPrompt, setTestPrompt] = useState("Summarize the significance of neural network weights in 2 sentences.");
-  const [testOutput, setTestOutput] = useState("");
-  const [testingAi, setTestingAi] = useState(false);
-
-  // 4. Courses State
-  const [courses, setCourses] = useState<any[]>([]);
-  const [coursesLoading, setCoursesLoading] = useState(false);
-  const [courseSearch, setCourseSearch] = useState("");
-  const [ingestUrl, setIngestUrl] = useState("");
-  const [ingesting, setIngesting] = useState(false);
-
-  // 5. Users State
-  const [users, setUsers] = useState<any[]>([]);
-  const [usersLoading, setUsersLoading] = useState(false);
+  // Operational data
+  const [metrics, setMetrics] = useState<AdminMetrics | null>(null);
+  const [recentUsers, setRecentUsers] = useState<RecentUserRow[]>([]);
+  const [courses, setCourses] = useState<AdminCourseItem[]>([]);
+  const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [userSearch, setUserSearch] = useState("");
-  const [quickAdminEmail, setQuickAdminEmail] = useState("");
 
-  // 6. Metrics State
-  const [metrics, setMetrics] = useState<any>(null);
-  const [metricsLoading, setMetricsLoading] = useState(false);
-
-  // Initial Auth Check
-  useEffect(() => {
-    fetch("/api/admin/claim")
-      .then((res) => {
-        if (!res.ok) throw new Error("Unauthenticated");
-        return res.json();
-      })
-      .then((data) => {
-        setIsAuthenticated(data.authenticated);
-        setIsAdmin(data.isAdmin);
-        setUserEmail(data.email || "");
-        if (data.isAdmin) {
-          loadAllAdminData();
-        }
-      })
-      .catch(() => {
-        setIsAuthenticated(false);
-        setIsAdmin(false);
-      })
-      .finally(() => setAuthChecking(false));
+  const showToast = useCallback((type: "success" | "error", text: string) => {
+    setToast({ type, text });
+    setTimeout(() => {
+      setToast((prev) => (prev?.text === text ? null : prev));
+    }, 4500);
   }, []);
 
-  const loadAllAdminData = async () => {
-    // 1. Load Settings
+  const loadAllAdminData = useCallback(async () => {
     try {
-      const sRes = await fetch("/api/admin/settings");
-      if (sRes.ok) {
-        const sData = await sRes.json();
-        const b = sData.settings?.branding;
-        if (b) {
-          setBrandName(b.brandName || "Courseyl");
-          setBrandSuffix(b.brandSuffix || "yl");
-          setTagline(b.tagline || "");
-          setSubTagline(b.subTagline || "");
-          setBadgeText(b.badgeText || "");
-          setLogoIcon(b.logoIcon || "grad-cap");
-          setCustomLogoUrl(b.customLogoUrl || "");
-          setPrimaryColor(b.primaryColor || "#4b5e1e");
-          setAccentColor(b.accentColor || "#b8c460");
-          setDarkBgColor(b.darkBgColor || "#0e1311");
-          setLightBgColor(b.lightBgColor || "#fcfcfa");
-          setFontFamily(b.fontFamily || "Familjen Grotesk");
-        }
-        const p = sData.settings?.plans;
-        if (p) {
-          setUnlimitedFreeMode(p.unlimitedFreeMode ?? true);
-          setFreeHoursLimit(p.freeHoursLimit ?? 5);
-          setFreeGenerationsLimit(p.freeGenerationsLimit ?? 3);
-          setProPriceMonthly(p.proPriceMonthly ?? 12);
-          setProHoursLimit(p.proHoursLimit ?? 40);
-          setProGenerationsLimit(p.proGenerationsLimit ?? 25);
-          setMaxPriceMonthly(p.maxPriceMonthly ?? 29);
-          setMaxHoursLimit(p.maxHoursLimit ?? 120);
-          setMaxGenerationsLimit(p.maxGenerationsLimit ?? 100);
-          setAllowNewSignups(p.allowNewSignups ?? true);
-          setMaintenanceMode(p.maintenanceMode ?? false);
-          setMaintenanceMessage(p.maintenanceMessage ?? "");
-        }
-        const a = sData.settings?.ai;
-        if (a) {
-          setAiProvider(a.activeProvider || "NVIDIA_NEMOTRON");
-          setAiModel(a.modelName || "nvidia/llama-3.1-nemotron-70b-instruct");
-          setAiApiKey(a.apiKey || "");
-          setAiTemperature(a.temperature ?? 0.3);
-          setSystemPrompt(a.systemPromptOverride || "");
+      const [settingsRes, metricsRes, coursesRes, usersRes] = await Promise.all([
+        fetch("/api/admin/settings", { cache: "no-store" }),
+        fetch("/api/admin/metrics", { cache: "no-store" }),
+        fetch("/api/admin/courses", { cache: "no-store" }),
+        fetch("/api/admin/users", { cache: "no-store" }),
+      ]);
+
+      if (settingsRes.ok) {
+        const sData = await settingsRes.json();
+        const s: FullSiteSettings | undefined = sData?.settings;
+        if (s) {
+          setBrandingForm({ ...DEFAULT_SETTINGS.branding, ...s.branding });
+          setPlansForm({ ...DEFAULT_SETTINGS.plans, ...s.plans });
+          setAiForm({ ...DEFAULT_SETTINGS.ai, ...s.ai });
+          setStructureForm({ ...DEFAULT_SETTINGS.structure, ...(s.structure || {}) });
         }
       }
-    } catch {}
 
-    // 2. Load Telemetry
-    loadMetrics();
-
-    // 3. Load Courses
-    loadCourses();
-
-    // 4. Load Users
-    loadUsers();
-  };
-
-  const loadMetrics = async () => {
-    setMetricsLoading(true);
-    try {
-      const res = await fetch("/api/admin/metrics");
-      if (res.ok) {
-        const data = await res.json();
-        setMetrics(data.metrics);
+      if (metricsRes.ok) {
+        const mData = await metricsRes.json();
+        setMetrics(mData.metrics || null);
+        setRecentUsers(mData.recentUsers || []);
       }
-    } catch {}
-    setMetricsLoading(false);
-  };
 
-  const loadCourses = async () => {
-    setCoursesLoading(true);
-    try {
-      const res = await fetch("/api/admin/courses");
-      if (res.ok) {
-        const data = await res.json();
-        setCourses(data.courses || []);
+      if (coursesRes.ok) {
+        const cData = await coursesRes.json();
+        setCourses(cData.courses || []);
       }
-    } catch {}
-    setCoursesLoading(false);
-  };
 
-  const loadUsers = async () => {
-    setUsersLoading(true);
-    try {
-      const res = await fetch("/api/admin/users");
-      if (res.ok) {
-        const data = await res.json();
-        setUsers(data.users || []);
+      if (usersRes.ok) {
+        const uData = await usersRes.json();
+        setUsers(uData.users || []);
       }
-    } catch {}
-    setUsersLoading(false);
+    } catch {
+      showToast("error", "Could not sync some admin panels.");
+    }
+  }, [showToast]);
+
+  useEffect(() => {
+    setIsDark(document.documentElement.classList.contains("dark"));
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data?.authenticated || !data.user) {
+          setAuthStatus("unauthenticated");
+          return;
+        }
+        setCurrentUser(data.user);
+        if (data.user.role === "ADMIN") {
+          setAuthStatus("admin");
+          loadAllAdminData();
+        } else {
+          setAuthStatus("non-admin");
+        }
+      })
+      .catch(() => setAuthStatus("unauthenticated"));
+  }, [loadAllAdminData]);
+
+  const toggleTheme = () => {
+    const currentlyDark = document.documentElement.classList.contains("dark");
+    if (currentlyDark) {
+      document.documentElement.classList.remove("dark");
+      document.documentElement.classList.add("light");
+      document.documentElement.style.colorScheme = "light";
+      localStorage.setItem("theme", "light");
+      setIsDark(false);
+    } else {
+      document.documentElement.classList.add("dark");
+      document.documentElement.classList.remove("light");
+      document.documentElement.style.colorScheme = "dark";
+      localStorage.setItem("theme", "dark");
+      setIsDark(true);
+    }
   };
 
-  // Claim Admin Action
   const handleClaimAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setClaimLoading(true);
-    setClaimError("");
+    setClaiming(true);
     try {
       const res = await fetch("/api/admin/claim", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ secretKey: claimKey }),
+        body: JSON.stringify({ secretCode: claimSecret }),
       });
       const data = await res.json();
-      if (res.ok && data.success) {
-        setIsAdmin(true);
-        showToast("Administrator clearance verified! Vault unlocked.", "success");
-        loadAllAdminData();
-      } else {
-        setClaimError(data.error || "Verification failed. Check your secret key.");
+      if (!res.ok) {
+        showToast("error", data.error || "Invalid vault passphrase.");
+        return;
       }
+      window.location.reload();
     } catch {
-      setClaimError("Network error attempting admin authorization.");
+      showToast("error", "Network error unlocking Admin Vault.");
     } finally {
-      setClaimLoading(false);
+      setClaiming(false);
     }
   };
 
-  // Save Branding
-  const handleSaveBranding = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavingBranding(true);
+  const saveCategory = async (
+    category: "site_branding" | "site_plans" | "site_ai" | "site_structure",
+    payload: any,
+    customSuccessMsg?: string
+  ) => {
+    setSavingCategory(category);
     try {
-      const payload = {
-        brandName,
-        brandSuffix,
-        tagline,
-        subTagline,
-        badgeText,
-        logoIcon,
-        customLogoUrl,
-        primaryColor,
-        accentColor,
-        darkBgColor,
-        lightBgColor,
-        fontFamily,
-      };
       const res = await fetch("/api/admin/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category: "site_branding", data: payload }),
-      });
-      if (res.ok) {
-        updateLiveColors(primaryColor, accentColor, darkBgColor, lightBgColor);
-        showToast("Branding & visual redesign applied to the entire website!", "success");
-      } else {
-        showToast("Failed to save branding changes.", "error");
-      }
-    } catch {
-      showToast("Error updating branding.", "error");
-    } finally {
-      setSavingBranding(false);
-    }
-  };
-
-  // Save Plans
-  const handleSavePlans = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavingPlans(true);
-    try {
-      const payload = {
-        unlimitedFreeMode: Boolean(unlimitedFreeMode),
-        freeHoursLimit: Number(freeHoursLimit),
-        freeGenerationsLimit: Number(freeGenerationsLimit),
-        proPriceMonthly: Number(proPriceMonthly),
-        proHoursLimit: Number(proHoursLimit),
-        proGenerationsLimit: Number(proGenerationsLimit),
-        maxPriceMonthly: Number(maxPriceMonthly),
-        maxHoursLimit: Number(maxHoursLimit),
-        maxGenerationsLimit: Number(maxGenerationsLimit),
-        allowNewSignups,
-        maintenanceMode,
-        maintenanceMessage,
-      };
-      const res = await fetch("/api/admin/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category: "site_plans", data: payload }),
-      });
-      if (res.ok) {
-        showToast("Monetization and platform quotas updated successfully!", "success");
-      } else {
-        showToast("Failed to save plans configuration.", "error");
-      }
-    } catch {
-      showToast("Error updating plans.", "error");
-    } finally {
-      setSavingPlans(false);
-    }
-  };
-
-  // Save AI Settings
-  const handleSaveAi = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavingAi(true);
-    try {
-      const payload = {
-        activeProvider: aiProvider,
-        modelName: aiModel,
-        apiKey: aiApiKey,
-        temperature: Number(aiTemperature),
-        systemPromptOverride: systemPrompt,
-      };
-      const res = await fetch("/api/admin/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category: "site_ai", data: payload }),
-      });
-      if (res.ok) {
-        showToast("AI Intelligence settings updated successfully!", "success");
-      } else {
-        showToast("Failed to save AI configuration.", "error");
-      }
-    } catch {
-      showToast("Error updating AI.", "error");
-    } finally {
-      setSavingAi(false);
-    }
-  };
-
-  // Test AI Connection
-  const handleTestAi = async () => {
-    setTestingAi(true);
-    setTestOutput("");
-    try {
-      const res = await fetch("/api/admin/ai-config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          provider: aiProvider,
-          model: aiModel,
-          test: true,
-          prompt: testPrompt,
-        }),
+        body: JSON.stringify({ category, data: payload }),
       });
       const data = await res.json();
-      if (res.ok) {
-        setTestOutput(data.message || data.output || "AI Engine responded successfully!");
-        showToast("AI Connection test passed!", "success");
-      } else {
-        setTestOutput(data.error || "AI Engine test failed.");
-        showToast("AI test failed.", "error");
+      if (!res.ok) {
+        showToast("error", data.error || "Failed to save settings.");
+        return;
       }
+      await refreshSettings();
+      showToast("success", customSuccessMsg || data.message || "Saved & live site-wide!");
     } catch {
-      setTestOutput("Network or timeout error while reaching AI provider.");
+      showToast("error", "Failed to reach admin settings API.");
     } finally {
-      setTestingAi(false);
+      setSavingCategory(null);
     }
   };
 
-  // Toggle Course Visibility
-  const handleToggleCourseVisibility = async (courseId: string, currentPublic: boolean) => {
-    try {
-      const res = await fetch("/api/admin/courses", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courseId, isPublic: !currentPublic }),
-      });
-      if (res.ok) {
-        setCourses((prev) =>
-          prev.map((c) => (c.id === courseId ? { ...c, isPublic: !currentPublic } : c))
-        );
-        showToast(`Course visibility changed to ${!currentPublic ? "Public" : "Private"}.`, "success");
-      }
-    } catch {
-      showToast("Error toggling course visibility.", "error");
-    }
+  // ONE-CLICK FREE <-> PAID PLATFORM MODE SWITCH
+  const handleOneClickModeSwitch = async (enableFreeMode: boolean) => {
+    const nextPlans: SitePlanSettings = {
+      ...plansForm,
+      unlimitedFreeMode: enableFreeMode,
+      freeHoursLimit: enableFreeMode
+        ? plansForm.freeHoursLimit
+        : plansForm.freeHoursLimit >= 999
+        ? 5
+        : plansForm.freeHoursLimit,
+      freeGenerationsLimit: enableFreeMode
+        ? plansForm.freeGenerationsLimit
+        : plansForm.freeGenerationsLimit >= 999
+        ? 5
+        : plansForm.freeGenerationsLimit,
+    };
+    setPlansForm(nextPlans);
+    await saveCategory(
+      "site_plans",
+      nextPlans,
+      enableFreeMode
+        ? "🎉 Full Free Mode activated! All users now have unlimited free access."
+        : "💎 Monetized Paid Mode activated! Tier pricing & hour limits are now live."
+    );
   };
 
-  // Delete Course
-  const handleDeleteCourse = async (courseId: string, title: string) => {
-    if (!confirm(`Are you sure you want to permanently delete "${title}"?`)) return;
-    try {
-      const res = await fetch(`/api/admin/courses?id=${courseId}`, { method: "DELETE" });
-      if (res.ok) {
-        setCourses((prev) => prev.filter((c) => c.id !== courseId));
-        showToast("Course removed permanently.", "success");
-      }
-    } catch {
-      showToast("Error deleting course.", "error");
-    }
+  const handleToggleQuickPlanFlag = async (
+    key: "allowNewSignups" | "maintenanceMode"
+  ) => {
+    const nextPlans = { ...plansForm, [key]: !plansForm[key] };
+    setPlansForm(nextPlans);
+    await saveCategory(
+      "site_plans",
+      nextPlans,
+      key === "maintenanceMode"
+        ? nextPlans.maintenanceMode
+          ? "Maintenance overlay enabled for visitors."
+          : "Platform restored to live access."
+        : nextPlans.allowNewSignups
+        ? "New user signups unlocked."
+        : "New user signups paused."
+    );
   };
 
-  // Ingest Course
-  const handleIngestCourse = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!ingestUrl.trim()) return;
-    setIngesting(true);
-    try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ youtubeUrl: ingestUrl.trim() }),
-      });
-      const data = await res.json();
-      if (res.ok && data.courseId) {
-        showToast("Course creation initiated! Ingestion job processing.", "success");
-        setIngestUrl("");
-        loadCourses();
-      } else {
-        showToast(data.error || "Failed to ingest YouTube video.", "error");
-      }
-    } catch {
-      showToast("Error ingesting course.", "error");
-    } finally {
-      setIngesting(false);
-    }
-  };
-
-  // Update User Role
-  const handleUpdateUserRole = async (targetUserId: string, currentRole: string) => {
-    const newRole = currentRole === "ADMIN" ? "USER" : "ADMIN";
+  const handleUpdateUser = async (
+    targetUserId: string,
+    updates: { role?: string; tier?: string }
+  ) => {
     try {
       const res = await fetch("/api/admin/users", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetUserId, role: newRole }),
+        body: JSON.stringify({ targetUserId, ...updates }),
       });
-      if (res.ok) {
-        setUsers((prev) =>
-          prev.map((u) => (u.id === targetUserId ? { ...u, role: newRole } : u))
-        );
-        showToast(`User role updated to ${newRole}!`, "success");
+      if (!res.ok) {
+        const d = await res.json();
+        showToast("error", d.error || "Failed to update user.");
+        return;
+      }
+      showToast("success", "User permissions updated.");
+      const uRes = await fetch("/api/admin/users", { cache: "no-store" });
+      if (uRes.ok) {
+        const uData = await uRes.json();
+        setUsers(uData.users || []);
       }
     } catch {
-      showToast("Error updating user role.", "error");
+      showToast("error", "Error updating user.");
     }
   };
 
-  // Update User Tier
-  const handleUpdateUserTier = async (targetUserId: string, tier: string) => {
-    try {
-      const res = await fetch("/api/admin/users", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetUserId, tier }),
-      });
-      if (res.ok) {
-        setUsers((prev) =>
-          prev.map((u) => (u.id === targetUserId ? { ...u, tier } : u))
-        );
-        showToast(`Subscription plan updated to ${tier}!`, "success");
-      }
-    } catch {
-      showToast("Error updating plan tier.", "error");
+  const refreshCourses = async () => {
+    const res = await fetch("/api/admin/courses", { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      setCourses(data.courses || []);
     }
   };
 
-  // Delete User
-  const handleDeleteUser = async (targetUserId: string, email: string) => {
-    if (!confirm(`Are you sure you want to delete user account "${email}"? This will delete all their notes and progress.`))
-      return;
-    try {
-      const res = await fetch(`/api/admin/users?userId=${targetUserId}`, { method: "DELETE" });
-      if (res.ok) {
-        setUsers((prev) => prev.filter((u) => u.id !== targetUserId));
-        showToast("User account deleted permanently.", "success");
-      }
-    } catch {
-      showToast("Error deleting user.", "error");
-    }
-  };
-
-  // Quick Promote
-  const handleQuickPromote = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!quickAdminEmail.trim()) return;
-    const target = users.find((u) => u.email.toLowerCase() === quickAdminEmail.trim().toLowerCase());
-    if (!target) {
-      showToast("User email not found in database.", "error");
-      return;
-    }
-    await handleUpdateUserRole(target.id, "USER");
-    setQuickAdminEmail("");
-  };
-
-  // Preset Colors
-  const applyPreset = (preset: {
-    primary: string;
-    accent: string;
-    darkBg: string;
-    lightBg: string;
-    font: string;
-  }) => {
-    setPrimaryColor(preset.primary);
-    setAccentColor(preset.accent);
-    setDarkBgColor(preset.darkBg);
-    setLightBgColor(preset.lightBg);
-    setFontFamily(preset.font);
-    updateLiveColors(preset.primary, preset.accent, preset.darkBg, preset.lightBg);
-    showToast("Preset applied! Click 'Save & Apply Live' to persist.", "success");
-  };
-
-  // Loading Screen
-  if (authChecking) {
+  // --- Auth Screens Styled Like Courseyl ---
+  if (authStatus === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0e1311] text-[#b8c460] font-mono text-xs">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full border-2 border-[#b8c460] border-t-transparent animate-spin" />
-          <span>INITIALIZING SECURE STUDIO VAULT...</span>
+      <div className="min-h-screen bg-paper text-ink flex items-center justify-center p-6">
+        <div className="flex items-center gap-3 rounded-full bg-surface px-6 py-3 shadow-[0_0_0_1px_var(--line)] text-sm font-medium text-ink-soft">
+          <span className="size-2.5 rounded-full bg-moss animate-ping" />
+          Authenticating Studio Hub...
         </div>
       </div>
     );
   }
 
-  // Not Logged In Screen
-  if (!isAuthenticated) {
+  if (authStatus === "unauthenticated") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#090d0b] text-[#f1f3ea] px-4">
-        <div className="max-w-md w-full bg-[#121815] border border-white/10 rounded-3xl p-8 shadow-2xl text-center space-y-6">
-          <div className="w-16 h-16 rounded-2xl bg-[#b8c460]/10 border border-[#b8c460]/30 flex items-center justify-center text-2xl mx-auto">
-            🔒
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold font-display text-white">Courseyl Studio Vault</h1>
-            <p className="text-xs text-[#b3b7a3] mt-2">
-              This administrative control route is restricted. Please sign in with an authorized account to access platform controls.
+      <div className="min-h-screen bg-paper text-ink flex items-center justify-center p-6">
+        <div className="max-w-md w-full rounded-[28px] bg-surface p-8 shadow-[0_0_0_1px_var(--line)] text-center space-y-5">
+          <CourseItLogo size="lg" />
+          <div className="space-y-2">
+            <h1 className="text-2xl font-display font-bold text-ink">
+              Admin Sign-In Required
+            </h1>
+            <p className="text-sm text-ink-soft">
+              Please sign in with an authorized account to unlock the autonomous control hub.
             </p>
           </div>
           <Link
-            href="/login?redirect=/studio-hub"
-            className="w-full inline-flex items-center justify-center py-3 rounded-full bg-[#b8c460] text-[#0f1611] font-bold text-sm hover:bg-[#a6b350] transition-transform hover:-translate-y-0.5"
+            href="/login?next=/studio-hub"
+            className="inline-flex w-full items-center justify-center h-12 rounded-full bg-moss text-on-moss font-semibold text-sm hover:bg-moss-dark transition-colors"
           >
-            Sign In with Email or Google →
+            Sign in to Studio Hub →
           </Link>
-          <div className="text-[0.7rem] text-[#b3b7a3]/60 font-mono">
-            Security Protocol 256-Bit · Bot Scanners Quarantined
-          </div>
         </div>
       </div>
     );
   }
 
-  // Logged in but not ADMIN -> Clearance / Claim Screen
-  if (!isAdmin) {
+  if (authStatus === "non-admin") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#090d0b] text-[#f1f3ea] px-4">
-        <div className="max-w-md w-full bg-[#121815] border border-[#b8c460]/20 rounded-3xl p-8 shadow-2xl space-y-6">
-          <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-2xl mx-auto">
-            🛡️
+      <div className="min-h-screen bg-paper text-ink flex items-center justify-center p-6">
+        <div className="max-w-md w-full rounded-[28px] bg-surface p-8 shadow-[0_0_0_1px_var(--line)] space-y-6">
+          <div className="flex items-center justify-between">
+            <CourseItLogo size="default" />
+            <span className="px-3 py-1 rounded-full bg-lime-soft text-pill-ink text-xs font-mono font-semibold">
+              Security Vault
+            </span>
           </div>
-          <div className="text-center">
-            <h1 className="text-xl font-bold font-display text-white">Administrator Clearance Required</h1>
-            <p className="text-xs text-[#b3b7a3] mt-2">
-              Signed in as <strong className="text-white font-mono">{userEmail}</strong>. This account currently has{" "}
-              <span className="px-2 py-0.5 rounded-full bg-white/10 font-mono text-[0.7rem]">USER</span> role.
+
+          <div className="space-y-1.5">
+            <h1 className="text-2xl font-display font-bold text-ink">
+              Unlock Autonomous <em className="italic text-moss font-serif">Admin Hub</em>
+            </h1>
+            <p className="text-xs sm:text-sm text-ink-soft">
+              Signed in as <strong className="text-ink">{currentUser?.email}</strong>. Enter your Vault Key to elevate this account to Administrator.
             </p>
           </div>
 
-          <form onSubmit={handleClaimAdmin} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-[#b3b7a3] mb-1.5">
-                Master Security Key or Admin Setup Token
-              </label>
-              <input
-                type="password"
-                placeholder="Enter setup passphrase..."
-                value={claimKey}
-                onChange={(e) => setClaimKey(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-sm text-white focus:border-[#b8c460] outline-none font-mono"
-              />
-              <p className="text-[0.68rem] text-[#b3b7a3]/70 mt-1">
-                Default platform vault key: <code className="text-[#b8c460]">courseyl_admin_vault_2026</code>
-              </p>
+          {toast && (
+            <div className="p-3 rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 text-xs font-semibold">
+              {toast.text}
             </div>
+          )}
 
-            {claimError && (
-              <p className="text-xs text-red-400 font-semibold bg-red-500/10 p-2.5 rounded-xl border border-red-500/20">
-                {claimError}
-              </p>
-            )}
-
+          <form onSubmit={handleClaimAdmin} className="space-y-4">
+            <input
+              type="password"
+              value={claimSecret}
+              onChange={(e) => setClaimSecret(e.target.value)}
+              placeholder="Enter Admin Vault Key..."
+              required
+              className="w-full h-11 rounded-xl bg-paper px-4 text-sm text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none focus:ring-2 focus:ring-moss/30"
+            />
             <button
               type="submit"
-              disabled={claimLoading}
-              className="w-full py-2.5 rounded-full bg-[#b8c460] text-[#0f1611] font-bold text-sm hover:bg-[#a6b350] transition-colors disabled:opacity-50 cursor-pointer"
+              disabled={claiming}
+              className="w-full h-11 rounded-full bg-moss text-on-moss font-semibold text-sm hover:bg-moss-dark transition-colors disabled:opacity-50 cursor-pointer"
             >
-              {claimLoading ? "Verifying clearance..." : "Unlock Studio Vault & Authorize Account"}
+              {claiming ? "Verifying Vault Key..." : "Unlock Studio Hub"}
             </button>
           </form>
 
-          <div className="pt-2 border-t border-white/10 text-center">
-            <Link href="/dashboard" className="text-xs text-[#b3b7a3] hover:text-white underline">
-              ← Return to Learner Dashboard
+          <div className="text-center pt-1">
+            <Link href="/dashboard" className="text-xs font-medium text-ink-soft hover:text-ink">
+              ← Back to Learner Dashboard
             </Link>
           </div>
         </div>
@@ -610,1177 +459,1390 @@ export default function StudioHubAdminPage() {
     );
   }
 
-  // ADMIN UNLOCKED: Main Control Hub UI
+  const isFreeMode = plansForm.unlimitedFreeMode === true;
+  const curr = plansForm.currencySymbol || "$";
+  const proYearlyDisplay =
+    plansForm.proPriceYearly ?? Math.max(1, Math.round(plansForm.proPriceMonthly * 0.8));
+  const maxYearlyDisplay =
+    plansForm.maxPriceYearly ?? Math.max(1, Math.round(plansForm.maxPriceMonthly * 0.8));
+
+  const filteredUsers = users.filter((u) => {
+    const q = userSearch.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      u.email.toLowerCase().includes(q) || u.displayName.toLowerCase().includes(q)
+    );
+  });
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#0a0f0c] text-[#f1f3ea] selection:bg-[#b8c460] selection:text-[#0f1611]">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div
-          className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl shadow-2xl text-xs sm:text-sm font-semibold flex items-center gap-3 animate-in fade-in slide-in-from-bottom-3 duration-200 ${
-            toastType === "success"
-              ? "bg-[#b8c460] text-[#0f1611] shadow-[#b8c460]/20"
-              : "bg-red-500 text-white shadow-red-500/20"
-          }`}
-        >
-          <span>{toastType === "success" ? "✓" : "⚠"}</span>
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
-      {/* Top Header */}
-      <header className="sticky top-0 z-40 bg-[#0e1411]/90 backdrop-blur-md border-b border-white/10 px-6 py-3.5 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <CourseItLogo size="default" href="/dashboard" />
-          <div className="h-4 w-px bg-white/15 hidden sm:block" />
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full bg-[#b8c460] text-[#0f1611] text-[0.68rem] font-bold uppercase tracking-wider font-mono">
-              STUDIO VAULT
-            </span>
-            <span className="hidden md:inline-flex items-center gap-1.5 text-[0.7rem] font-mono text-emerald-400">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              LIVE SYSTEM READY
+    <div className="min-h-screen bg-paper text-ink flex flex-col">
+      {/* Top Sticky Courseyl Glass Control Bar */}
+      <header className="sticky top-0 z-40 border-b border-line bg-paper/85 backdrop-blur-md">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <CourseItLogo size="default" href="/studio-hub" />
+            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-lime-soft px-3 py-1 font-mono text-[0.68rem] font-bold uppercase tracking-wider text-pill-ink">
+              ⚡ Autonomous Control
             </span>
           </div>
-        </div>
 
-        <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs">
-            <span className="text-[#b3b7a3]">Admin:</span>
-            <span className="font-semibold text-white truncate max-w-[150px]">{userEmail}</span>
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Live Free/Paid Status Indicator Pill */}
+            <button
+              type="button"
+              onClick={() => handleOneClickModeSwitch(!isFreeMode)}
+              disabled={savingCategory === "site_plans"}
+              className={`hidden md:inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                isFreeMode
+                  ? "bg-[#b8c460] text-[#0f1611] hover:opacity-90"
+                  : "bg-moss text-on-moss hover:bg-moss-dark"
+              }`}
+              title="Click to switch Full Free Mode / Paid Plans instantly"
+            >
+              <span className="size-2 rounded-full bg-current animate-pulse" />
+              <span>{isFreeMode ? "Full Free Mode ON" : "Paid Plans Active"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label="Toggle Light/Dark Mode"
+              className="size-10 rounded-full bg-surface text-ink shadow-[inset_0_0_0_1px_var(--line)] hover:bg-muted flex items-center justify-center transition-colors cursor-pointer"
+            >
+              {isDark ? "☀" : "☾"}
+            </button>
+
+            <Link
+              href="/dashboard"
+              className="px-3.5 py-2 rounded-full bg-surface text-ink text-xs font-semibold shadow-[inset_0_0_0_1px_var(--line)] hover:bg-muted transition-colors"
+            >
+              Dashboard
+            </Link>
+
+            <Link
+              href="/"
+              target="_blank"
+              className="px-4 py-2 rounded-full bg-moss text-on-moss text-xs font-semibold hover:bg-moss-dark transition-colors shadow-xs"
+            >
+              Live Site ↗
+            </Link>
           </div>
-          <Link
-            href="/dashboard"
-            className="px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/15 text-xs font-semibold text-white transition-colors"
-          >
-            Learner View →
-          </Link>
         </div>
       </header>
 
-      {/* Main Container with Sidebar Navigation */}
-      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8 flex flex-col md:flex-row gap-8">
-        {/* Navigation Sidebar Tabs */}
-        <aside className="w-full md:w-64 shrink-0 space-y-1.5">
-          {[
-            { id: "branding", label: "Branding & Redesign", icon: "🎨", badge: "A to Z" },
-            { id: "plans", label: "Plans, Pricing & Quotas", icon: "💰", badge: "Free/Paid" },
-            { id: "ai", label: "AI Engine & Intelligence", icon: "⚡", badge: "Nemotron" },
-            { id: "courses", label: "Courses & Content", icon: "📚", count: courses.length },
-            { id: "users", label: "User Management & Roles", icon: "👥", count: users.length },
-            { id: "metrics", label: "Platform Telemetry", icon: "📊" },
-            { id: "security", label: "Route & Security Shield", icon: "🔐" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition-all cursor-pointer text-left ${
-                activeTab === tab.id
-                  ? "bg-[#b8c460] text-[#0f1611] shadow-lg shadow-[#b8c460]/15"
-                  : "text-[#b3b7a3] hover:text-white hover:bg-white/5"
-              }`}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="text-base">{tab.icon}</span>
-                <span className="truncate">{tab.label}</span>
-              </div>
-              {tab.badge && (
-                <span
-                  className={`text-[0.62rem] font-mono px-2 py-0.5 rounded-full ${
-                    activeTab === tab.id ? "bg-[#0f1611] text-[#b8c460]" : "bg-white/10 text-[#b3b7a3]"
-                  }`}
-                >
-                  {tab.badge}
-                </span>
-              )}
-              {typeof tab.count === "number" && (
-                <span
-                  className={`text-[0.68rem] font-mono px-2 py-0.5 rounded-full ${
-                    activeTab === tab.id ? "bg-[#0f1611] text-[#b8c460]" : "bg-white/10 text-[#b3b7a3]"
-                  }`}
-                >
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          ))}
+      {/* Global Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-5 right-5 z-50 max-w-sm rounded-2xl px-5 py-3.5 shadow-2xl border border-line bg-surface flex items-center gap-3 animate-in fade-in slide-in-from-bottom-3">
+          <span
+            className={`size-2.5 rounded-full shrink-0 ${
+              toast.type === "success" ? "bg-[#76b900]" : "bg-red-500"
+            }`}
+          />
+          <p className="text-xs sm:text-sm font-semibold text-ink">{toast.text}</p>
+        </div>
+      )}
 
-          {/* Quick Stats Pill in Sidebar */}
-          <div className="pt-6 hidden md:block">
-            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
-              <p className="text-[0.7rem] uppercase font-mono font-bold text-[#b3b7a3]">Live Route Status</p>
-              <p className="text-xs text-white">
-                Admin portal active at: <code className="text-[#b8c460] font-mono font-bold">/studio-hub</code>
-              </p>
-              <p className="text-[0.68rem] text-[#b3b7a3]">
-                Standard <code className="text-red-400">/admin</code> returns HTTP 404 (Scanners blocked).
-              </p>
+      {/* Main Responsive Shell: Courseyl Editorial Left Sidebar + Rich Workspace */}
+      <div className="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 py-6 flex flex-col lg:flex-row gap-6">
+        {/* Left Navigation Sidebar */}
+        <aside className="lg:w-64 shrink-0">
+          <div className="lg:sticky lg:top-22 rounded-[26px] bg-sidebar p-3 shadow-[0_0_0_1px_var(--line)] flex lg:flex-col gap-1.5 overflow-x-auto">
+            {NAV_TABS.map((tab) => {
+              const active = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-medium whitespace-nowrap transition-all cursor-pointer text-left ${
+                    active
+                      ? "bg-[#b8c460] text-[#0f1611] font-bold shadow-xs"
+                      : "text-ink-soft hover:bg-surface/80 hover:text-ink"
+                  }`}
+                >
+                  <span className="text-base leading-none">{tab.icon}</span>
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+
+            <div className="hidden lg:block mt-4 pt-4 border-t border-line px-2 space-y-2">
+              <div className="text-[0.65rem] font-mono font-bold uppercase tracking-wider text-ink-soft">
+                Logged In Admin
+              </div>
+              <div className="text-xs font-semibold text-ink truncate">
+                {currentUser?.profile?.displayName || currentUser?.email}
+              </div>
             </div>
           </div>
         </aside>
 
-        {/* Tab Content Panes */}
-        <main className="flex-1 min-w-0">
-          {/* TAB 1: BRANDING & LIVE REDESIGN */}
-          {activeTab === "branding" && (
-            <div className="space-y-8 animate-in fade-in duration-200">
-              <div>
-                <h2 className="text-2xl font-bold font-display text-white">Live Site Redesign & Visual Identity</h2>
-                <p className="text-xs sm:text-sm text-[#b3b7a3] mt-1">
-                  Change site branding, colors, typography, and logos in real-time. Changes apply instantly across the entire platform.
-                </p>
-              </div>
-
-              {/* Color Presets */}
-              <div className="p-5 rounded-3xl bg-[#121815] border border-white/10 space-y-3">
-                <h3 className="text-xs font-bold uppercase font-mono text-[#b3b7a3]">1-Click Theme Presets</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {[
-                    {
-                      name: "CourseIt Moss & Lime",
-                      primary: "#4b5e1e",
-                      accent: "#b8c460",
-                      darkBg: "#0e1311",
-                      lightBg: "#fcfcfa",
-                      font: "Familjen Grotesk",
-                    },
-                    {
-                      name: "Cyber Citron & Slate",
-                      primary: "#0284c7",
-                      accent: "#eab308",
-                      darkBg: "#09090b",
-                      lightBg: "#fafafa",
-                      font: "Instrument Sans",
-                    },
-                    {
-                      name: "Electric Violet & Indigo",
-                      primary: "#6366f1",
-                      accent: "#a855f7",
-                      darkBg: "#0b0c16",
-                      lightBg: "#f8fafc",
-                      font: "Outfit",
-                    },
-                    {
-                      name: "Emerald Matrix",
-                      primary: "#059669",
-                      accent: "#10b981",
-                      darkBg: "#04140b",
-                      lightBg: "#f0fdf4",
-                      font: "Plus Jakarta Sans",
-                    },
-                  ].map((preset) => (
-                    <button
-                      key={preset.name}
-                      type="button"
-                      onClick={() => applyPreset(preset)}
-                      className="p-3 rounded-2xl bg-white/5 border border-white/10 hover:border-[#b8c460]/40 text-left transition-all cursor-pointer group"
-                    >
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: preset.primary }} />
-                        <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: preset.accent }} />
-                      </div>
-                      <p className="text-xs font-bold text-white group-hover:text-[#b8c460] transition-colors">
-                        {preset.name}
-                      </p>
-                    </button>
-                  ))}
+        {/* Main Content Canvas */}
+        <main className="flex-1 min-w-0 space-y-8 pb-14">
+          {/* ================= OVERVIEW / COMMAND CENTER ================= */}
+          {activeTab === "overview" && (
+            <div className="space-y-8">
+              {/* Hero Greeting & 1-Click Autonomous Master Switch */}
+              <div className="rounded-[30px] bg-surface p-6 sm:p-8 shadow-[0_0_0_1px_var(--line)] flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+                <div className="space-y-2 max-w-2xl">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-lime-soft px-3 py-1 font-mono text-[0.7rem] font-bold uppercase tracking-wider text-pill-ink">
+                    {brandingForm.brandName} · Studio Control Center
+                  </span>
+                  <h1 className="text-2xl sm:text-4xl font-display font-bold text-ink leading-tight">
+                    Control everything from{" "}
+                    <em className="italic text-moss font-serif">one rich hub.</em>
+                  </h1>
+                  <p className="text-xs sm:text-sm text-ink-soft leading-relaxed">
+                    Switch the entire tool between <strong>100% Free Mode</strong> and{" "}
+                    <strong>Paid Subscriptions</strong> in one click, build dummy or YouTube
+                    courses with custom creator attribution &amp; learners count, and customize
+                    every site section.
+                  </p>
                 </div>
-              </div>
 
-              {/* Real-time Interactive Preview */}
-              <div className="p-6 rounded-3xl bg-[#121815] border border-white/10 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase font-mono text-[#b3b7a3]">Live Component Preview</h3>
-                  <span className="text-[0.68rem] text-emerald-400 font-mono">Dynamic Preview</span>
-                </div>
-                <div
-                  className="p-6 rounded-2xl border transition-all"
-                  style={{
-                    backgroundColor: darkBgColor,
-                    borderColor: "rgba(255, 255, 255, 0.12)",
-                    fontFamily: fontFamily,
-                  }}
-                >
-                  <div className="flex items-center justify-between pb-4 border-b border-white/10">
-                    <div className="flex items-center gap-2">
-                      <span style={{ color: accentColor }} className="text-xl">
-                        {logoIcon === "sparkles" ? "✨" : logoIcon === "code" ? "</>" : logoIcon === "rocket" ? "🚀" : logoIcon === "video" ? "▶" : "🎓"}
-                      </span>
-                      <span className="text-lg font-bold">
-                        <span className="text-white font-bold">Course</span>
-                        <span style={{ color: accentColor }} className="font-bold">yl</span>
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      className="px-4 py-1.5 rounded-full text-xs font-bold shadow-md cursor-pointer"
-                      style={{ backgroundColor: accentColor, color: "#0f1611" }}
-                    >
-                      Start Learning
-                    </button>
-                  </div>
-                  <div className="py-6 text-center space-y-2">
-                    <span
-                      className="inline-block px-3 py-1 rounded-full text-xs font-mono font-semibold"
-                      style={{ backgroundColor: `${accentColor}25`, color: accentColor }}
-                    >
-                      {badgeText}
+                {/* One-Click Free <-> Paid Switch Box */}
+                <div className="rounded-3xl bg-paper p-5 shadow-[0_0_0_1px_var(--line)] min-w-[290px] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[0.68rem] font-mono font-bold uppercase tracking-wider text-ink-soft">
+                      1-Click Monetization Switch
                     </span>
-                    <h4 className="text-xl sm:text-2xl font-bold text-white max-w-md mx-auto">{tagline}</h4>
-                    <p className="text-xs text-[#b3b7a3] max-w-sm mx-auto">{subTagline}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Branding Edit Form */}
-              <form onSubmit={handleSaveBranding} className="space-y-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-6 rounded-3xl bg-[#121815] border border-white/10">
-                  {/* Brand Name */}
-                  <div>
-                    <label className="block text-xs font-semibold text-[#b3b7a3] uppercase font-mono mb-2">
-                      Platform Brand Name
-                    </label>
-                    <input
-                      type="text"
-                      value={brandName}
-                      onChange={(e) => setBrandName(e.target.value)}
-                      placeholder="e.g. Courseyl"
-                      className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-sm text-white focus:border-[#b8c460] outline-none"
-                    />
-                  </div>
-
-                  {/* Suffix Highlight */}
-                  <div>
-                    <label className="block text-xs font-semibold text-[#b3b7a3] uppercase font-mono mb-2">
-                      Accent Suffix Highlight
-                    </label>
-                    <input
-                      type="text"
-                      value={brandSuffix}
-                      onChange={(e) => setBrandSuffix(e.target.value)}
-                      placeholder="e.g. yl or It"
-                      className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-sm text-white focus:border-[#b8c460] outline-none"
-                    />
-                  </div>
-
-                  {/* Tagline */}
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-semibold text-[#b3b7a3] uppercase font-mono mb-2">
-                      Hero Headline / Tagline
-                    </label>
-                    <input
-                      type="text"
-                      value={tagline}
-                      onChange={(e) => setTagline(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-sm text-white focus:border-[#b8c460] outline-none"
-                    />
-                  </div>
-
-                  {/* Subtagline */}
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-semibold text-[#b3b7a3] uppercase font-mono mb-2">
-                      Sub-Tagline / Description
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={subTagline}
-                      onChange={(e) => setSubTagline(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-sm text-white focus:border-[#b8c460] outline-none resize-none"
-                    />
-                  </div>
-
-                  {/* Badge Text */}
-                  <div>
-                    <label className="block text-xs font-semibold text-[#b3b7a3] uppercase font-mono mb-2">
-                      Hero Badge Text
-                    </label>
-                    <input
-                      type="text"
-                      value={badgeText}
-                      onChange={(e) => setBadgeText(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-sm text-white focus:border-[#b8c460] outline-none"
-                    />
-                  </div>
-
-                  {/* Logo Icon Style */}
-                  <div>
-                    <label className="block text-xs font-semibold text-[#b3b7a3] uppercase font-mono mb-2">
-                      Logo Icon Style
-                    </label>
-                    <select
-                      value={logoIcon}
-                      onChange={(e) => setLogoIcon(e.target.value as any)}
-                      className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-sm text-white focus:border-[#b8c460] outline-none cursor-pointer"
-                    >
-                      <option value="grad-cap">🎓 Graduation Cap + Play (Default)</option>
-                      <option value="sparkles">✨ AI Sparkles</option>
-                      <option value="code">&lt;/&gt; Code Terminal</option>
-                      <option value="rocket">🚀 Rocket Launcher</option>
-                      <option value="video">▶ Modern Media Play</option>
-                    </select>
-                  </div>
-
-                  {/* Primary Color */}
-                  <div>
-                    <label className="block text-xs font-semibold text-[#b3b7a3] uppercase font-mono mb-2">
-                      Primary Brand Color (Moss)
-                    </label>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="color"
-                        value={primaryColor}
-                        onChange={(e) => {
-                          setPrimaryColor(e.target.value);
-                          updateLiveColors(e.target.value, accentColor, darkBgColor, lightBgColor);
-                        }}
-                        className="w-10 h-10 rounded-lg bg-transparent cursor-pointer border border-white/15"
-                      />
-                      <input
-                        type="text"
-                        value={primaryColor}
-                        onChange={(e) => setPrimaryColor(e.target.value)}
-                        className="flex-1 px-3 py-2 rounded-xl bg-black/40 border border-white/15 text-sm text-white font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Accent Color */}
-                  <div>
-                    <label className="block text-xs font-semibold text-[#b3b7a3] uppercase font-mono mb-2">
-                      Accent Color (Citron Lime)
-                    </label>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="color"
-                        value={accentColor}
-                        onChange={(e) => {
-                          setAccentColor(e.target.value);
-                          updateLiveColors(primaryColor, e.target.value, darkBgColor, lightBgColor);
-                        }}
-                        className="w-10 h-10 rounded-lg bg-transparent cursor-pointer border border-white/15"
-                      />
-                      <input
-                        type="text"
-                        value={accentColor}
-                        onChange={(e) => setAccentColor(e.target.value)}
-                        className="flex-1 px-3 py-2 rounded-xl bg-black/40 border border-white/15 text-sm text-white font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Dark Mode Background */}
-                  <div>
-                    <label className="block text-xs font-semibold text-[#b3b7a3] uppercase font-mono mb-2">
-                      Dark Background Color
-                    </label>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="color"
-                        value={darkBgColor}
-                        onChange={(e) => setDarkBgColor(e.target.value)}
-                        className="w-10 h-10 rounded-lg bg-transparent cursor-pointer border border-white/15"
-                      />
-                      <input
-                        type="text"
-                        value={darkBgColor}
-                        onChange={(e) => setDarkBgColor(e.target.value)}
-                        className="flex-1 px-3 py-2 rounded-xl bg-black/40 border border-white/15 text-sm text-white font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Font Family */}
-                  <div>
-                    <label className="block text-xs font-semibold text-[#b3b7a3] uppercase font-mono mb-2">
-                      Display Font Typography
-                    </label>
-                    <select
-                      value={fontFamily}
-                      onChange={(e) => setFontFamily(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-sm text-white focus:border-[#b8c460] outline-none cursor-pointer"
-                    >
-                      <option value="Familjen Grotesk">Familjen Grotesk (CourseIt Original)</option>
-                      <option value="Instrument Sans">Instrument Sans (Modern Minimal)</option>
-                      <option value="Outfit">Outfit (Clean Geometric)</option>
-                      <option value="Plus Jakarta Sans">Plus Jakarta Sans (SaaS Executive)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={savingBranding}
-                  className="w-full py-3.5 rounded-full bg-[#b8c460] text-[#0f1611] font-bold text-sm hover:bg-[#a6b350] transition-transform hover:-translate-y-0.5 shadow-xl shadow-[#b8c460]/10 cursor-pointer disabled:opacity-50"
-                >
-                  {savingBranding ? "Applying live updates..." : "Save & Apply Live to Entire Website"}
-                </button>
-              </form>
-            </div>
-          )}
-
-          {/* TAB 2: PLANS, PRICING & QUOTAS */}
-          {activeTab === "plans" && (
-            <div className="space-y-8 animate-in fade-in duration-200">
-              <div>
-                <h2 className="text-2xl font-bold font-display text-white">Monetization, Quotas & Platform Controls</h2>
-                <p className="text-xs sm:text-sm text-[#b3b7a3] mt-1">
-                  Adjust free tier allowances, Pro/Max pricing, generation quotas, and platform maintenance status.
-                </p>
-              </div>
-
-              <form onSubmit={handleSavePlans} className="space-y-6">
-                {/* VIP Testing Mode: Switch off 5-Hour Limit & Quotas */}
-                <div className={`p-6 rounded-3xl border transition-all ${
-                  unlimitedFreeMode
-                    ? "bg-[#182315] border-[#b8c460]/40 shadow-xl shadow-[#b8c460]/5"
-                    : "bg-[#121815] border-white/10"
-                }`}>
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl">🚀</span>
-                        <h3 className="text-base font-bold text-white">
-                          Unlimited Free Testing Mode (5-Hour Limit Bypass)
-                        </h3>
-                        {unlimitedFreeMode ? (
-                          <span className="px-2.5 py-0.5 rounded-full bg-[#b8c460] text-[#0f1611] text-[0.68rem] font-bold font-mono">
-                            ACTIVE · NO LIMITS
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-0.5 rounded-full bg-white/10 text-[#b3b7a3] text-[0.68rem] font-mono">
-                            ENFORCING TIERS
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-[#b3b7a3] max-w-2xl leading-relaxed">
-                        When enabled, the 5-hour video duration limit and monthly course generation quotas are completely switched OFF for all users. Anyone can generate courses of any length (e.g. 13h+ YouTube masterclasses) 100% free with unlimited lessons.
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setUnlimitedFreeMode(!unlimitedFreeMode)}
-                      className={`shrink-0 px-5 py-2.5 rounded-full font-bold text-xs cursor-pointer transition-all ${
-                        unlimitedFreeMode
-                          ? "bg-[#b8c460] text-[#0f1611] hover:bg-[#a6b350] shadow-md"
-                          : "bg-white/10 text-white hover:bg-white/20"
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[0.68rem] font-bold ${
+                        isFreeMode
+                          ? "bg-[#b8c460] text-[#0f1611]"
+                          : "bg-moss text-on-moss"
                       }`}
                     >
-                      {unlimitedFreeMode ? "Switch OFF Limits" : "Enable Unlimited Mode"}
+                      {isFreeMode ? "FREE MODE" : "PAID MODE"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      disabled={savingCategory === "site_plans"}
+                      onClick={() => handleOneClickModeSwitch(true)}
+                      className={`py-2.5 px-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+                        isFreeMode
+                          ? "bg-[#b8c460] text-[#0f1611] shadow-sm ring-2 ring-[#4b5e1e]/30"
+                          : "bg-surface text-ink-soft shadow-[inset_0_0_0_1px_var(--line)] hover:text-ink"
+                      }`}
+                    >
+                      🎉 Full Free
+                    </button>
+                    <button
+                      type="button"
+                      disabled={savingCategory === "site_plans"}
+                      onClick={() => handleOneClickModeSwitch(false)}
+                      className={`py-2.5 px-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+                        !isFreeMode
+                          ? "bg-moss text-on-moss shadow-sm"
+                          : "bg-surface text-ink-soft shadow-[inset_0_0_0_1px_var(--line)] hover:text-ink"
+                      }`}
+                    >
+                      💎 Paid Plans
                     </button>
                   </div>
+                  <p className="text-[0.7rem] text-ink-soft">
+                    {isFreeMode
+                      ? "All users currently have unlimited hours & courses free."
+                      : `Active quotas: Free ${plansForm.freeHoursLimit}h · Pro ${curr}${plansForm.proPriceMonthly}/mo · Max ${curr}${plansForm.maxPriceMonthly}/mo`}
+                  </p>
                 </div>
-
-                {/* Free Tier Controls */}
-                <div className="p-6 rounded-3xl bg-[#121815] border border-white/10 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                      <span>🌱</span> Free Tier Quotas
-                    </h3>
-                    <span className="px-2.5 py-0.5 rounded-full bg-white/10 text-[#b3b7a3] text-[0.68rem] font-mono">
-                      Default for all signups
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-[#b3b7a3] uppercase font-mono mb-2">
-                        Monthly Study Hours Quota (Hours)
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={100}
-                        value={freeHoursLimit}
-                        onChange={(e) => setFreeHoursLimit(Number(e.target.value))}
-                        className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-sm text-white focus:border-[#b8c460] outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[#b3b7a3] uppercase font-mono mb-2">
-                        Monthly Course Generations Limit
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={50}
-                        value={freeGenerationsLimit}
-                        onChange={(e) => setFreeGenerationsLimit(Number(e.target.value))}
-                        className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-sm text-white focus:border-[#b8c460] outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Pro Tier Controls */}
-                <div className="p-6 rounded-3xl bg-[#121815] border border-white/10 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-[#b8c460] flex items-center gap-2">
-                      <span>⚡</span> Pro Plan Controls
-                    </h3>
-                    <span className="px-2.5 py-0.5 rounded-full bg-[#b8c460]/20 text-[#b8c460] text-[0.68rem] font-mono font-bold">
-                      Popular Tier
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-[#b3b7a3] uppercase font-mono mb-2">
-                        Monthly Price ($ USD)
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={proPriceMonthly}
-                        onChange={(e) => setProPriceMonthly(Number(e.target.value))}
-                        className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-sm text-white focus:border-[#b8c460] outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[#b3b7a3] uppercase font-mono mb-2">
-                        Monthly Study Hours
-                      </label>
-                      <input
-                        type="number"
-                        min={5}
-                        value={proHoursLimit}
-                        onChange={(e) => setProHoursLimit(Number(e.target.value))}
-                        className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-sm text-white focus:border-[#b8c460] outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[#b3b7a3] uppercase font-mono mb-2">
-                        Course Generations
-                      </label>
-                      <input
-                        type="number"
-                        min={5}
-                        value={proGenerationsLimit}
-                        onChange={(e) => setProGenerationsLimit(Number(e.target.value))}
-                        className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-sm text-white focus:border-[#b8c460] outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Max Tier Controls */}
-                <div className="p-6 rounded-3xl bg-[#121815] border border-white/10 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-purple-400 flex items-center gap-2">
-                      <span>👑</span> Max Tier Controls
-                    </h3>
-                    <span className="px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[0.68rem] font-mono font-bold">
-                      Unlimited Power
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-[#b3b7a3] uppercase font-mono mb-2">
-                        Monthly Price ($ USD)
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={maxPriceMonthly}
-                        onChange={(e) => setMaxPriceMonthly(Number(e.target.value))}
-                        className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-sm text-white focus:border-[#b8c460] outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[#b3b7a3] uppercase font-mono mb-2">
-                        Monthly Study Hours
-                      </label>
-                      <input
-                        type="number"
-                        min={20}
-                        value={maxHoursLimit}
-                        onChange={(e) => setMaxHoursLimit(Number(e.target.value))}
-                        className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-sm text-white focus:border-[#b8c460] outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[#b3b7a3] uppercase font-mono mb-2">
-                        Course Generations
-                      </label>
-                      <input
-                        type="number"
-                        min={20}
-                        value={maxGenerationsLimit}
-                        onChange={(e) => setMaxGenerationsLimit(Number(e.target.value))}
-                        className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-sm text-white focus:border-[#b8c460] outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Platform Switches */}
-                <div className="p-6 rounded-3xl bg-[#121815] border border-white/10 space-y-4">
-                  <h3 className="text-xs font-bold uppercase font-mono text-[#b3b7a3]">Global Platform Gates</h3>
-                  <div className="space-y-4">
-                    <label className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/10 cursor-pointer">
-                      <div>
-                        <strong className="block text-sm font-semibold text-white">Allow Public User Signups</strong>
-                        <span className="text-xs text-[#b3b7a3]">
-                          When disabled, new visitor registrations are locked.
-                        </span>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={allowNewSignups}
-                        onChange={(e) => setAllowNewSignups(e.target.checked)}
-                        className="w-5 h-5 accent-[#b8c460] cursor-pointer"
-                      />
-                    </label>
-
-                    <label className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/10 cursor-pointer">
-                      <div>
-                        <strong className="block text-sm font-semibold text-white">Maintenance Mode</strong>
-                        <span className="text-xs text-[#b3b7a3]">
-                          Display scheduled maintenance warning banner to visitors.
-                        </span>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={maintenanceMode}
-                        onChange={(e) => setMaintenanceMode(e.target.checked)}
-                        className="w-5 h-5 accent-amber-500 cursor-pointer"
-                      />
-                    </label>
-
-                    {maintenanceMode && (
-                      <div>
-                        <label className="block text-xs font-semibold text-[#b3b7a3] mb-1.5">
-                          Maintenance Alert Message
-                        </label>
-                        <input
-                          type="text"
-                          value={maintenanceMessage}
-                          onChange={(e) => setMaintenanceMessage(e.target.value)}
-                          className="w-full px-4 py-2 rounded-xl bg-black/40 border border-white/15 text-sm text-white"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={savingPlans}
-                  className="w-full py-3.5 rounded-full bg-[#b8c460] text-[#0f1611] font-bold text-sm hover:bg-[#a6b350] transition-transform hover:-translate-y-0.5 shadow-xl shadow-[#b8c460]/10 cursor-pointer disabled:opacity-50"
-                >
-                  {savingPlans ? "Saving plan configuration..." : "Save Monetization & Quota Controls"}
-                </button>
-              </form>
-            </div>
-          )}
-
-          {/* TAB 3: AI ENGINE & INTELLIGENCE */}
-          {activeTab === "ai" && (
-            <div className="space-y-8 animate-in fade-in duration-200">
-              <div>
-                <h2 className="text-2xl font-bold font-display text-white">AI Engine & Provider Architecture</h2>
-                <p className="text-xs sm:text-sm text-[#b3b7a3] mt-1">
-                  Configure LLM orchestration for YouTube transcript summarization, active recall quiz generation, and placement questions.
-                </p>
               </div>
 
-              <form onSubmit={handleSaveAi} className="space-y-6">
-                <div className="p-6 rounded-3xl bg-[#121815] border border-white/10 space-y-4">
-                  <label className="block text-xs font-semibold text-[#b3b7a3] uppercase font-mono">
-                    Active AI Model Provider
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {[
-                      {
-                        id: "NVIDIA_NEMOTRON",
-                        title: "NVIDIA Nemotron 4 (Recommended)",
-                        desc: "High educational accuracy, structured JSON extraction",
-                        badge: "Default",
-                      },
-                      {
-                        id: "OPENAI_COMPATIBLE",
-                        title: "OpenAI Compatible",
-                        desc: "Direct support for GPT-4o, GPT-4o-mini, vLLM, Ollama",
-                        badge: "Fast",
-                      },
-                      {
-                        id: "GROQ",
-                        title: "Groq Cloud (Llama 3.3 70B)",
-                        desc: "Sub-second inference for instant course generation",
-                        badge: "Ultra-Fast",
-                      },
-                      {
-                        id: "HEURISTIC_MOCK",
-                        title: "Deterministic Heuristic Parser",
-                        desc: "Offline backup parser with zero token cost",
-                        badge: "Fallback",
-                      },
-                    ].map((p) => (
-                      <label
-                        key={p.id}
-                        onClick={() => setAiProvider(p.id)}
-                        className={`p-4 rounded-2xl border cursor-pointer transition-all ${
-                          aiProvider === p.id
-                            ? "bg-[#b8c460]/15 border-[#b8c460]"
-                            : "bg-white/5 border-white/10 hover:border-white/20"
+              {/* Signature Courseyl Connected Lime KPI Cards (Matching /dashboard!) */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="relative bg-[#b8c460] text-[#0f1611] rounded-3xl p-5 flex flex-col justify-between min-h-[140px] shadow-xs">
+                  <span className="text-[0.65rem] font-bold tracking-widest uppercase font-mono">
+                    👥 TOTAL LEARNERS
+                  </span>
+                  <div className="my-auto py-1">
+                    <h3 className="text-3xl sm:text-4xl font-display font-bold leading-none tabular-nums">
+                      {metrics?.totalUsers ?? users.length}
+                    </h3>
+                    <p className="text-xs text-[#0f1611]/75 mt-1.5">
+                      {metrics?.proSubscribers ?? 0} Pro / Max accounts
+                    </p>
+                  </div>
+                  <div className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-paper z-10" />
+                </div>
+
+                <div className="relative bg-[#b8c460] text-[#0f1611] rounded-3xl p-5 flex flex-col justify-between min-h-[140px] shadow-xs">
+                  <div className="hidden lg:block absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-paper z-10" />
+                  <span className="text-[0.65rem] font-bold tracking-widest uppercase font-mono">
+                    📚 TOTAL COURSES
+                  </span>
+                  <div className="my-auto py-1">
+                    <h3 className="text-3xl sm:text-4xl font-display font-bold leading-none tabular-nums">
+                      {metrics?.totalCourses ?? courses.length}
+                    </h3>
+                    <p className="text-xs text-[#0f1611]/75 mt-1.5">
+                      {metrics?.totalLessons ?? 0} lessons across catalog
+                    </p>
+                  </div>
+                  <div className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-paper z-10" />
+                </div>
+
+                <div className="relative bg-[#b8c460] text-[#0f1611] rounded-3xl p-5 flex flex-col justify-between min-h-[140px] shadow-xs">
+                  <div className="hidden lg:block absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-paper z-10" />
+                  <span className="text-[0.65rem] font-bold tracking-widest uppercase font-mono">
+                    ⏱ VIDEO HOURS
+                  </span>
+                  <div className="my-auto py-1">
+                    <h3 className="text-3xl sm:text-4xl font-display font-bold leading-none tabular-nums">
+                      {metrics?.totalLearningHours ?? 0}h
+                    </h3>
+                    <p className="text-xs text-[#0f1611]/75 mt-1.5">
+                      {metrics?.totalEnrollments ?? 0} active enrollments
+                    </p>
+                  </div>
+                  <div className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-paper z-10" />
+                </div>
+
+                <div className="relative bg-[#b8c460] text-[#0f1611] rounded-3xl p-5 flex flex-col justify-between min-h-[140px] shadow-xs">
+                  <div className="hidden lg:block absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-paper z-10" />
+                  <span className="text-[0.65rem] font-bold tracking-widest uppercase font-mono">
+                    🤖 AI ENGINE RATE
+                  </span>
+                  <div className="my-auto py-1">
+                    <h3 className="text-3xl sm:text-4xl font-display font-bold leading-none tabular-nums">
+                      {metrics?.aiSuccessRate ?? 100}%
+                    </h3>
+                    <p className="text-xs text-[#0f1611]/75 mt-1.5">
+                      {aiForm.activeProvider} active
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Autonomous Action Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("courses")}
+                  className="text-left rounded-[26px] bg-surface p-6 shadow-[0_0_0_1px_var(--line)] hover:border-moss/50 hover:-translate-y-0.5 transition-all cursor-pointer space-y-2"
+                >
+                  <span className="inline-block px-3 py-1 rounded-full bg-lime-soft text-pill-ink text-xs font-bold">
+                    + Course Studio
+                  </span>
+                  <h3 className="text-lg font-display font-bold text-ink">
+                    Add Dummy or YouTube Course
+                  </h3>
+                  <p className="text-xs text-ink-soft">
+                    Set custom <strong>Added By Name</strong> &amp; <strong>Learners Count</strong> in seconds.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("structure")}
+                  className="text-left rounded-[26px] bg-surface p-6 shadow-[0_0_0_1px_var(--line)] hover:border-moss/50 hover:-translate-y-0.5 transition-all cursor-pointer space-y-2"
+                >
+                  <span className="inline-block px-3 py-1 rounded-full bg-lime-soft text-pill-ink text-xs font-bold">
+                    🧩 Structure Engine
+                  </span>
+                  <h3 className="text-lg font-display font-bold text-ink">
+                    Reorder Sections & Edit Copy
+                  </h3>
+                  <p className="text-xs text-ink-soft">
+                    Move landing page blocks up/down, toggle visibility, and update links/footer.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("branding")}
+                  className="text-left rounded-[26px] bg-surface p-6 shadow-[0_0_0_1px_var(--line)] hover:border-moss/50 hover:-translate-y-0.5 transition-all cursor-pointer space-y-2"
+                >
+                  <span className="inline-block px-3 py-1 rounded-full bg-lime-soft text-pill-ink text-xs font-bold">
+                    🎨 Brand & Theme
+                  </span>
+                  <h3 className="text-lg font-display font-bold text-ink">
+                    Customize Logo, Fonts & Colors
+                  </h3>
+                  <p className="text-xs text-ink-soft">
+                    Live preview rich botanical/tech themes across both Light &amp; Dark modes.
+                  </p>
+                </button>
+              </div>
+
+              {/* Instant Safety Switches + Recent Users */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="rounded-[26px] bg-surface p-6 shadow-[0_0_0_1px_var(--line)] space-y-4">
+                  <h3 className="text-lg font-display font-bold text-ink">
+                    Instant Platform Switches
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)]">
+                      <div>
+                        <div className="text-sm font-semibold text-ink">Allow New User Signups</div>
+                        <div className="text-xs text-ink-soft">
+                          Toggle visitor registration cleanly across email &amp; password signup.
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleQuickPlanFlag("allowNewSignups")}
+                        className={`px-4 py-1.5 rounded-full text-xs font-bold cursor-pointer transition-colors ${
+                          plansForm.allowNewSignups
+                            ? "bg-moss text-on-moss"
+                            : "bg-red-500/15 text-red-600 dark:text-red-400"
                         }`}
                       >
-                        <div className="flex items-center justify-between mb-1">
-                          <strong className="text-sm font-semibold text-white">{p.title}</strong>
-                          <span className="text-[0.62rem] font-mono px-2 py-0.5 rounded-full bg-white/10 text-[#b3b7a3]">
-                            {p.badge}
+                        {plansForm.allowNewSignups ? "OPEN" : "PAUSED"}
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)]">
+                      <div>
+                        <div className="text-sm font-semibold text-ink">Maintenance Mode Overlay</div>
+                        <div className="text-xs text-ink-soft">
+                          Pause public visitor access cleanly (Studio Hub stays open for Admin).
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleQuickPlanFlag("maintenanceMode")}
+                        className={`px-4 py-1.5 rounded-full text-xs font-bold cursor-pointer transition-colors ${
+                          plansForm.maintenanceMode
+                            ? "bg-amber-500 text-white"
+                            : "bg-lime-soft text-pill-ink"
+                        }`}
+                      >
+                        {plansForm.maintenanceMode ? "MAINTENANCE ON" : "LIVE ONLINE"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-[26px] bg-surface p-6 shadow-[0_0_0_1px_var(--line)] space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-display font-bold text-ink">Latest Signups</h3>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("users")}
+                      className="text-xs font-semibold text-moss hover:underline cursor-pointer"
+                    >
+                      Manage all →
+                    </button>
+                  </div>
+                  <div className="space-y-2.5">
+                    {recentUsers.map((u) => (
+                      <div
+                        key={u.id}
+                        className="flex items-center justify-between p-3 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] text-xs"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-semibold text-ink truncate">{u.email}</div>
+                          <div className="text-ink-soft">
+                            Joined {new Date(u.createdAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="px-2.5 py-0.5 rounded-full bg-lime-soft text-pill-ink font-mono font-bold">
+                            {u.subscription?.tier || "FREE"}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full border border-line text-ink-soft font-mono">
+                            {u.role}
                           </span>
                         </div>
-                        <p className="text-xs text-[#b3b7a3]">{p.desc}</p>
-                      </label>
+                      </div>
                     ))}
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
 
-                <div className="p-6 rounded-3xl bg-[#121815] border border-white/10 space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-[#b3b7a3] uppercase font-mono mb-2">
-                      Model Identifier / Checkpoint
-                    </label>
-                    <input
-                      type="text"
-                      value={aiModel}
-                      onChange={(e) => setAiModel(e.target.value)}
-                      placeholder="e.g. nvidia/llama-3.1-nemotron-70b-instruct"
-                      className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-sm text-white focus:border-[#b8c460] outline-none font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-[#b3b7a3] uppercase font-mono mb-2">
-                      Provider API Key (Optional Override)
-                    </label>
-                    <input
-                      type="password"
-                      value={aiApiKey}
-                      onChange={(e) => setAiApiKey(e.target.value)}
-                      placeholder="Overrides server environment variable if set"
-                      className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-sm text-white focus:border-[#b8c460] outline-none font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-xs font-semibold text-[#b3b7a3] uppercase font-mono">
-                        Generation Temperature: {aiTemperature}
-                      </label>
-                      <span className="text-xs text-[#b3b7a3]">0 = Strict & Deterministic, 1 = Creative</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={1}
-                      step={0.05}
-                      value={aiTemperature}
-                      onChange={(e) => setAiTemperature(Number(e.target.value))}
-                      className="w-full accent-[#b8c460] cursor-pointer"
-                    />
-                  </div>
+          {/* ================= PLANS & PRICING TAB ================= */}
+          {activeTab === "plans" && (
+            <div className="space-y-8">
+              {/* Big 1-Click Free <-> Paid Header */}
+              <div className="rounded-[28px] bg-surface p-6 sm:p-8 shadow-[0_0_0_1px_var(--line)] flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-lime-soft px-3 py-1 font-mono text-[0.68rem] font-bold uppercase tracking-wider text-pill-ink">
+                    Monetization & Quota Control
+                  </span>
+                  <h2 className="mt-2 text-2xl font-display font-bold text-ink">
+                    1-Click Free Mode &{" "}
+                    <em className="italic text-moss font-serif">Live Plan Pricing</em>
+                  </h2>
+                  <p className="text-xs sm:text-sm text-ink-soft mt-1">
+                    Updates sync instantly to `/pricing`, `/billing`, `/api/billing`, Sidebar
+                    meters, and AI course generation quotas.
+                  </p>
                 </div>
 
-                {/* AI Interactive Test Runner */}
-                <div className="p-6 rounded-3xl bg-[#121815] border border-white/10 space-y-3">
-                  <h3 className="text-xs font-bold uppercase font-mono text-[#b3b7a3]">Live AI Test Playground</h3>
-                  <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2.5">
+                  <button
+                    type="button"
+                    disabled={savingCategory === "site_plans"}
+                    onClick={() => handleOneClickModeSwitch(true)}
+                    className={`px-5 py-3 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                      isFreeMode
+                        ? "bg-[#b8c460] text-[#0f1611] shadow-md ring-2 ring-[#4b5e1e]"
+                        : "bg-paper text-ink shadow-[inset_0_0_0_1px_var(--line)] hover:bg-muted"
+                    }`}
+                  >
+                    🎉 Enable 100% Free Mode
+                  </button>
+                  <button
+                    type="button"
+                    disabled={savingCategory === "site_plans"}
+                    onClick={() => handleOneClickModeSwitch(false)}
+                    className={`px-5 py-3 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                      !isFreeMode
+                        ? "bg-moss text-on-moss shadow-md"
+                        : "bg-paper text-ink shadow-[inset_0_0_0_1px_var(--line)] hover:bg-muted"
+                    }`}
+                  >
+                    💎 Switch to Paid Plans
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                {/* Editor Column */}
+                <div className="xl:col-span-2 rounded-[28px] bg-surface p-6 sm:p-8 shadow-[0_0_0_1px_var(--line)] space-y-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                        Currency Symbol
+                      </label>
+                      <input
+                        type="text"
+                        value={plansForm.currencySymbol || "$"}
+                        onChange={(e) =>
+                          setPlansForm({ ...plansForm, currencySymbol: e.target.value })
+                        }
+                        className="w-full h-10 rounded-xl bg-paper px-3 text-sm font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                        Free Plan Label
+                      </label>
+                      <input
+                        type="text"
+                        value={plansForm.freePlanName || "Free"}
+                        onChange={(e) =>
+                          setPlansForm({ ...plansForm, freePlanName: e.target.value })
+                        }
+                        className="w-full h-10 rounded-xl bg-paper px-3 text-sm text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                        Pro Plan Label
+                      </label>
+                      <input
+                        type="text"
+                        value={plansForm.proPlanName || "Pro"}
+                        onChange={(e) =>
+                          setPlansForm({ ...plansForm, proPlanName: e.target.value })
+                        }
+                        className="w-full h-10 rounded-xl bg-paper px-3 text-sm text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                        Max Plan Label
+                      </label>
+                      <input
+                        type="text"
+                        value={plansForm.maxPlanName || "Max"}
+                        onChange={(e) =>
+                          setPlansForm({ ...plansForm, maxPlanName: e.target.value })
+                        }
+                        className="w-full h-10 rounded-xl bg-paper px-3 text-sm text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Tier Inputs */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Free */}
+                    <div className="rounded-2xl bg-paper p-4 shadow-[inset_0_0_0_1px_var(--line)] space-y-3">
+                      <h4 className="font-display font-bold text-ink">
+                        {plansForm.freePlanName || "Free"} Tier
+                      </h4>
+                      <div>
+                        <label className="block text-[0.65rem] font-mono uppercase text-ink-soft mb-1">
+                          Hours Limit (Paid Mode)
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={plansForm.freeHoursLimit >= 999 ? 5 : plansForm.freeHoursLimit}
+                          onChange={(e) =>
+                            setPlansForm({
+                              ...plansForm,
+                              freeHoursLimit: Number(e.target.value),
+                            })
+                          }
+                          className="w-full h-9 rounded-lg bg-surface px-3 text-sm font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[0.65rem] font-mono uppercase text-ink-soft mb-1">
+                          Monthly Builds
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={
+                            plansForm.freeGenerationsLimit >= 999
+                              ? 5
+                              : plansForm.freeGenerationsLimit
+                          }
+                          onChange={(e) =>
+                            setPlansForm({
+                              ...plansForm,
+                              freeGenerationsLimit: Number(e.target.value),
+                            })
+                          }
+                          className="w-full h-9 rounded-lg bg-surface px-3 text-sm font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Pro */}
+                    <div className="rounded-2xl bg-paper p-4 shadow-[inset_0_0_0_2px_var(--moss)] space-y-3">
+                      <h4 className="font-display font-bold text-moss">
+                        {plansForm.proPlanName || "Pro"} Tier
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[0.62rem] font-mono uppercase text-ink-soft mb-1">
+                            Monthly ({curr})
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={plansForm.proPriceMonthly}
+                            onChange={(e) =>
+                              setPlansForm({
+                                ...plansForm,
+                                proPriceMonthly: Number(e.target.value),
+                              })
+                            }
+                            className="w-full h-9 rounded-lg bg-surface px-2.5 text-sm font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[0.62rem] font-mono uppercase text-ink-soft mb-1">
+                            Yearly /mo ({curr})
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={proYearlyDisplay}
+                            onChange={(e) =>
+                              setPlansForm({
+                                ...plansForm,
+                                proPriceYearly: Number(e.target.value),
+                              })
+                            }
+                            className="w-full h-9 rounded-lg bg-surface px-2.5 text-sm font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[0.62rem] font-mono uppercase text-ink-soft mb-1">
+                            Hours/mo
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={plansForm.proHoursLimit}
+                            onChange={(e) =>
+                              setPlansForm({
+                                ...plansForm,
+                                proHoursLimit: Number(e.target.value),
+                              })
+                            }
+                            className="w-full h-9 rounded-lg bg-surface px-2.5 text-sm font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[0.62rem] font-mono uppercase text-ink-soft mb-1">
+                            Courses/mo
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={plansForm.proGenerationsLimit}
+                            onChange={(e) =>
+                              setPlansForm({
+                                ...plansForm,
+                                proGenerationsLimit: Number(e.target.value),
+                              })
+                            }
+                            className="w-full h-9 rounded-lg bg-surface px-2.5 text-sm font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Max */}
+                    <div className="rounded-2xl bg-paper p-4 shadow-[inset_0_0_0_1px_var(--line)] space-y-3">
+                      <h4 className="font-display font-bold text-ink">
+                        {plansForm.maxPlanName || "Max"} Tier
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[0.62rem] font-mono uppercase text-ink-soft mb-1">
+                            Monthly ({curr})
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={plansForm.maxPriceMonthly}
+                            onChange={(e) =>
+                              setPlansForm({
+                                ...plansForm,
+                                maxPriceMonthly: Number(e.target.value),
+                              })
+                            }
+                            className="w-full h-9 rounded-lg bg-surface px-2.5 text-sm font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[0.62rem] font-mono uppercase text-ink-soft mb-1">
+                            Yearly /mo ({curr})
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={maxYearlyDisplay}
+                            onChange={(e) =>
+                              setPlansForm({
+                                ...plansForm,
+                                maxPriceYearly: Number(e.target.value),
+                              })
+                            }
+                            className="w-full h-9 rounded-lg bg-surface px-2.5 text-sm font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[0.62rem] font-mono uppercase text-ink-soft mb-1">
+                            Hours/mo
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={plansForm.maxHoursLimit}
+                            onChange={(e) =>
+                              setPlansForm({
+                                ...plansForm,
+                                maxHoursLimit: Number(e.target.value),
+                              })
+                            }
+                            className="w-full h-9 rounded-lg bg-surface px-2.5 text-sm font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[0.62rem] font-mono uppercase text-ink-soft mb-1">
+                            Courses/mo
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={plansForm.maxGenerationsLimit}
+                            onChange={(e) =>
+                              setPlansForm({
+                                ...plansForm,
+                                maxGenerationsLimit: Number(e.target.value),
+                              })
+                            }
+                            className="w-full h-9 rounded-lg bg-surface px-2.5 text-sm font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                      Maintenance Banner Message (Shown if Maintenance Mode ON)
+                    </label>
                     <input
                       type="text"
-                      value={testPrompt}
-                      onChange={(e) => setTestPrompt(e.target.value)}
-                      placeholder="Prompt to test AI response..."
-                      className="flex-1 px-4 py-2 rounded-xl bg-black/40 border border-white/15 text-sm text-white"
+                      value={plansForm.maintenanceMessage}
+                      onChange={(e) =>
+                        setPlansForm({ ...plansForm, maintenanceMessage: e.target.value })
+                      }
+                      className="w-full h-10 rounded-xl bg-paper px-3.5 text-sm text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
                     />
+                  </div>
+
+                  <div className="flex justify-end">
                     <button
                       type="button"
-                      onClick={handleTestAi}
-                      disabled={testingAi}
-                      className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-white transition-colors cursor-pointer disabled:opacity-50"
+                      disabled={savingCategory === "site_plans"}
+                      onClick={() =>
+                        saveCategory(
+                          "site_plans",
+                          plansForm,
+                          "Plan prices & quotas published live across the site!"
+                        )
+                      }
+                      className="px-6 py-3 rounded-full bg-moss text-on-moss hover:bg-moss-dark font-semibold text-sm shadow-sm cursor-pointer disabled:opacity-50"
                     >
-                      {testingAi ? "Querying LLM..." : "Test AI Call →"}
+                      {savingCategory === "site_plans"
+                        ? "Saving Plans..."
+                        : "Save All Prices & Quotas"}
                     </button>
                   </div>
-                  {testOutput && (
-                    <div className="p-3 rounded-xl bg-black/50 border border-white/10 text-xs font-mono text-[#b8c460] whitespace-pre-wrap">
-                      {testOutput}
-                    </div>
-                  )}
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={savingAi}
-                  className="w-full py-3.5 rounded-full bg-[#b8c460] text-[#0f1611] font-bold text-sm hover:bg-[#a6b350] transition-transform hover:-translate-y-0.5 shadow-xl shadow-[#b8c460]/10 cursor-pointer disabled:opacity-50"
-                >
-                  {savingAi ? "Saving AI parameters..." : "Save AI Engine Configuration"}
-                </button>
-              </form>
+                {/* Live Pricing Preview Column */}
+                <div className="rounded-[28px] bg-surface p-6 shadow-[0_0_0_1px_var(--line)] space-y-4">
+                  <div className="text-[0.68rem] font-mono font-bold uppercase tracking-wider text-ink-soft">
+                    Live /pricing Preview
+                  </div>
+                  <div className="rounded-2xl bg-paper p-5 shadow-[inset_0_0_0_2px_var(--moss)] space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-display font-bold text-lg text-ink">
+                        {plansForm.proPlanName || "Pro"}
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full bg-lime-soft text-moss text-[0.68rem] font-bold">
+                        {isFreeMode ? "🎉 Free Now" : "Most Popular"}
+                      </span>
+                    </div>
+                    <div className="text-3xl font-display font-bold text-ink">
+                      {isFreeMode ? `${curr}0` : `${curr}${plansForm.proPriceMonthly}`}
+                      <span className="text-xs font-normal text-ink-soft"> / month</span>
+                    </div>
+                    <div className="text-xs text-ink-soft">
+                      {isFreeMode
+                        ? "All Pro features unlocked 100% free"
+                        : `${curr}${proYearlyDisplay}/mo billed yearly · ${plansForm.proHoursLimit}h/mo`}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl bg-paper p-5 shadow-[inset_0_0_0_1px_var(--line)] space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-display font-bold text-base text-ink">
+                        {plansForm.maxPlanName || "Max"}
+                      </span>
+                      <span className="text-xs font-mono font-bold text-moss">
+                        {isFreeMode ? `${curr}0` : `${curr}${plansForm.maxPriceMonthly}/mo`}
+                      </span>
+                    </div>
+                    <p className="text-xs text-ink-soft">
+                      {plansForm.maxHoursLimit} hours &amp; {plansForm.maxGenerationsLimit}{" "}
+                      generations monthly.
+                    </p>
+                  </div>
+
+                  <Link
+                    href="/pricing"
+                    target="_blank"
+                    className="inline-flex w-full items-center justify-center h-10 rounded-full border border-line text-xs font-semibold text-ink hover:bg-muted transition-colors"
+                  >
+                    Open Live Pricing Page ↗
+                  </Link>
+                </div>
+              </div>
             </div>
           )}
 
-          {/* TAB 4: COURSES & CONTENT MANAGEMENT */}
+          {/* ================= COURSES & DUMMY STUDIO TAB ================= */}
           {activeTab === "courses" && (
-            <div className="space-y-8 animate-in fade-in duration-200">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <AdminCoursesStudio
+              courses={courses}
+              onRefreshCourses={refreshCourses}
+              onToast={showToast}
+            />
+          )}
+
+          {/* ================= SITE STRUCTURE & COPY TAB ================= */}
+          {activeTab === "structure" && (
+            <AdminStructureEditor
+              structure={structureForm}
+              onChange={setStructureForm}
+              saving={savingCategory === "site_structure"}
+              onSave={(next) =>
+                saveCategory(
+                  "site_structure",
+                  next || structureForm,
+                  "Site layout, section order, and copy published!"
+                )
+              }
+            />
+          )}
+
+          {/* ================= BRAND, LOGO & THEME TAB ================= */}
+          {activeTab === "branding" && (
+            <div className="space-y-8">
+              <div className="rounded-[28px] bg-surface p-6 sm:p-8 shadow-[0_0_0_1px_var(--line)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-2xl font-bold font-display text-white">Course & Content Management</h2>
-                  <p className="text-xs sm:text-sm text-[#b3b7a3] mt-1">
-                    Manage generated courses, toggle public visibility, or directly ingest YouTube content.
-                  </p>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-lime-soft px-3 py-1 font-mono text-[0.68rem] font-bold uppercase tracking-wider text-pill-ink">
+                    Visual Identity Studio
+                  </span>
+                  <h2 className="mt-2 text-2xl font-display font-bold text-ink">
+                    Site Name, Logo,{" "}
+                    <em className="italic text-moss font-serif">Rich Palette &amp; Fonts</em>
+                  </h2>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBrandingForm(DEFAULT_SETTINGS.branding);
+                      updateLiveColors(
+                        DEFAULT_SETTINGS.branding.primaryColor,
+                        DEFAULT_SETTINGS.branding.accentColor,
+                        DEFAULT_SETTINGS.branding.darkBgColor,
+                        DEFAULT_SETTINGS.branding.lightBgColor
+                      );
+                    }}
+                    className="px-4 py-2.5 rounded-full border border-line text-xs font-semibold text-ink-soft hover:text-ink cursor-pointer"
+                  >
+                    Reset Defaults
+                  </button>
+                  <button
+                    type="button"
+                    disabled={savingCategory === "site_branding"}
+                    onClick={() =>
+                      saveCategory(
+                        "site_branding",
+                        brandingForm,
+                        "Brand, logo & theme colors saved globally!"
+                      )
+                    }
+                    className="px-6 py-2.5 rounded-full bg-moss text-on-moss hover:bg-moss-dark font-semibold text-sm shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    {savingCategory === "site_branding" ? "Publishing..." : "Save Branding"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="xl:col-span-2 rounded-[28px] bg-surface p-6 sm:p-8 shadow-[0_0_0_1px_var(--line)] space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                        Platform Brand Name
+                      </label>
+                      <input
+                        type="text"
+                        value={brandingForm.brandName}
+                        onChange={(e) =>
+                          setBrandingForm({ ...brandingForm, brandName: e.target.value })
+                        }
+                        className="w-full h-11 rounded-xl bg-paper px-3.5 text-sm text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                        Highlighted End Suffix (e.g. &quot;yl&quot; in Courseyl)
+                      </label>
+                      <input
+                        type="text"
+                        value={brandingForm.brandSuffix}
+                        onChange={(e) =>
+                          setBrandingForm({ ...brandingForm, brandSuffix: e.target.value })
+                        }
+                        className="w-full h-11 rounded-xl bg-paper px-3.5 text-sm text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                        Logo Icon Style
+                      </label>
+                      <select
+                        value={brandingForm.logoIcon}
+                        onChange={(e) =>
+                          setBrandingForm({
+                            ...brandingForm,
+                            logoIcon: e.target.value as SiteBrandingSettings["logoIcon"],
+                          })
+                        }
+                        className="w-full h-11 rounded-xl bg-paper px-3.5 text-sm text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                      >
+                        <option value="grad-cap">🎓 Graduation Cap (Default)</option>
+                        <option value="sparkles">✨ AI Sparkles</option>
+                        <option value="code">💻 Developer Code</option>
+                        <option value="rocket">🚀 Launch Rocket</option>
+                        <option value="video">▶ Video Playmark</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                        Custom Logo Image URL (Optional Overrides Icon)
+                      </label>
+                      <input
+                        type="url"
+                        value={brandingForm.customLogoUrl}
+                        onChange={(e) =>
+                          setBrandingForm({ ...brandingForm, customLogoUrl: e.target.value })
+                        }
+                        placeholder="https://.../logo.png"
+                        className="w-full h-11 rounded-xl bg-paper px-3.5 text-sm text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-2">
+                      1-Click Rich Color Palettes
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                      {COLOR_PRESETS.map((preset) => (
+                        <button
+                          key={preset.name}
+                          type="button"
+                          onClick={() => {
+                            const next = {
+                              ...brandingForm,
+                              primaryColor: preset.primary,
+                              accentColor: preset.accent,
+                              lightBgColor: preset.lightBg,
+                              darkBgColor: preset.darkBg,
+                            };
+                            setBrandingForm(next);
+                            updateLiveColors(
+                              preset.primary,
+                              preset.accent,
+                              preset.darkBg,
+                              preset.lightBg
+                            );
+                          }}
+                          className="p-2.5 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] hover:border-moss text-left transition-all cursor-pointer space-y-1.5"
+                        >
+                          <div className="flex gap-1">
+                            <span
+                              className="w-5 h-5 rounded-full"
+                              style={{ background: preset.primary }}
+                            />
+                            <span
+                              className="w-5 h-5 rounded-full"
+                              style={{ background: preset.accent }}
+                            />
+                          </div>
+                          <div className="text-[0.7rem] font-bold text-ink leading-tight">
+                            {preset.name}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-[0.65rem] font-mono uppercase text-ink-soft mb-1">
+                        Primary Color
+                      </label>
+                      <div className="flex items-center gap-2 rounded-xl bg-paper p-2 shadow-[inset_0_0_0_1px_var(--line)]">
+                        <input
+                          type="color"
+                          value={brandingForm.primaryColor}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setBrandingForm({ ...brandingForm, primaryColor: val });
+                            updateLiveColors(
+                              val,
+                              brandingForm.accentColor,
+                              brandingForm.darkBgColor,
+                              brandingForm.lightBgColor
+                            );
+                          }}
+                          className="w-8 h-8 rounded cursor-pointer border-0 bg-transparent"
+                        />
+                        <span className="text-xs font-mono text-ink">
+                          {brandingForm.primaryColor}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[0.65rem] font-mono uppercase text-ink-soft mb-1">
+                        Accent Lime
+                      </label>
+                      <div className="flex items-center gap-2 rounded-xl bg-paper p-2 shadow-[inset_0_0_0_1px_var(--line)]">
+                        <input
+                          type="color"
+                          value={brandingForm.accentColor}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setBrandingForm({ ...brandingForm, accentColor: val });
+                            updateLiveColors(
+                              brandingForm.primaryColor,
+                              val,
+                              brandingForm.darkBgColor,
+                              brandingForm.lightBgColor
+                            );
+                          }}
+                          className="w-8 h-8 rounded cursor-pointer border-0 bg-transparent"
+                        />
+                        <span className="text-xs font-mono text-ink">
+                          {brandingForm.accentColor}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[0.65rem] font-mono uppercase text-ink-soft mb-1">
+                        Light Paper BG
+                      </label>
+                      <div className="flex items-center gap-2 rounded-xl bg-paper p-2 shadow-[inset_0_0_0_1px_var(--line)]">
+                        <input
+                          type="color"
+                          value={brandingForm.lightBgColor}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setBrandingForm({ ...brandingForm, lightBgColor: val });
+                            updateLiveColors(
+                              brandingForm.primaryColor,
+                              brandingForm.accentColor,
+                              brandingForm.darkBgColor,
+                              val
+                            );
+                          }}
+                          className="w-8 h-8 rounded cursor-pointer border-0 bg-transparent"
+                        />
+                        <span className="text-xs font-mono text-ink">
+                          {brandingForm.lightBgColor}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[0.65rem] font-mono uppercase text-ink-soft mb-1">
+                        Dark BG
+                      </label>
+                      <div className="flex items-center gap-2 rounded-xl bg-paper p-2 shadow-[inset_0_0_0_1px_var(--line)]">
+                        <input
+                          type="color"
+                          value={brandingForm.darkBgColor}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setBrandingForm({ ...brandingForm, darkBgColor: val });
+                            updateLiveColors(
+                              brandingForm.primaryColor,
+                              brandingForm.accentColor,
+                              val,
+                              brandingForm.lightBgColor
+                            );
+                          }}
+                          className="w-8 h-8 rounded cursor-pointer border-0 bg-transparent"
+                        />
+                        <span className="text-xs font-mono text-ink">
+                          {brandingForm.darkBgColor}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                        Display Font Family
+                      </label>
+                      <select
+                        value={brandingForm.fontFamily}
+                        onChange={(e) =>
+                          setBrandingForm({ ...brandingForm, fontFamily: e.target.value })
+                        }
+                        className="w-full h-11 rounded-xl bg-paper px-3.5 text-sm text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                      >
+                        {FONT_OPTIONS.map((f) => (
+                          <option key={f} value={f}>
+                            {f}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                        Hero Badge Copy
+                      </label>
+                      <input
+                        type="text"
+                        value={brandingForm.badgeText}
+                        onChange={(e) =>
+                          setBrandingForm({ ...brandingForm, badgeText: e.target.value })
+                        }
+                        className="w-full h-11 rounded-xl bg-paper px-3.5 text-sm text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                      Hero Sub-Tagline &amp; Meta Description
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={brandingForm.subTagline}
+                      onChange={(e) =>
+                        setBrandingForm({ ...brandingForm, subTagline: e.target.value })
+                      }
+                      className="w-full rounded-xl bg-paper p-3 text-sm text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Live Theme Preview Panel */}
+                <div className="rounded-[28px] bg-surface p-6 shadow-[0_0_0_1px_var(--line)] space-y-5">
+                  <div className="text-[0.68rem] font-mono font-bold uppercase tracking-wider text-ink-soft">
+                    Live Identity Preview
+                  </div>
+                  <div
+                    className="rounded-3xl p-6 space-y-4 border border-line"
+                    style={{
+                      backgroundColor: isDark
+                        ? brandingForm.darkBgColor
+                        : brandingForm.lightBgColor,
+                    }}
+                  >
+                    <CourseItLogo size="lg" href="/studio-hub" />
+                    <span
+                      className="inline-block px-3 py-1 rounded-full text-xs font-semibold"
+                      style={{
+                        backgroundColor: brandingForm.accentColor,
+                        color: "#0f1611",
+                      }}
+                    >
+                      {brandingForm.badgeText || "Powered by AI"}
+                    </span>
+                    <h3
+                      className="text-xl font-bold leading-snug text-ink"
+                      style={{ fontFamily: `"${brandingForm.fontFamily}", sans-serif` }}
+                    >
+                      {brandingForm.brandName} turns any video into{" "}
+                      <span
+                        className="italic font-serif"
+                        style={{ color: brandingForm.primaryColor }}
+                      >
+                        structured mastery.
+                      </span>
+                    </h3>
+                    <button
+                      type="button"
+                      className="px-5 py-2.5 rounded-full text-white text-xs font-semibold shadow-sm"
+                      style={{ backgroundColor: brandingForm.primaryColor }}
+                    >
+                      Start Learning →
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ================= AI & PROMPTS TAB ================= */}
+          {activeTab === "ai" && (
+            <div className="rounded-[28px] bg-surface p-6 sm:p-8 shadow-[0_0_0_1px_var(--line)] space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-line pb-5">
+                <div>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-lime-soft px-3 py-1 font-mono text-[0.68rem] font-bold uppercase tracking-wider text-pill-ink">
+                    Curriculum Engine
+                  </span>
+                  <h2 className="mt-2 text-2xl font-display font-bold text-ink">
+                    AI Model, Temperature &amp;{" "}
+                    <em className="italic text-moss font-serif">Prompt Control</em>
+                  </h2>
                 </div>
                 <button
                   type="button"
-                  onClick={loadCourses}
-                  className="px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/15 text-xs font-semibold text-white self-start transition-colors cursor-pointer"
+                  disabled={savingCategory === "site_ai"}
+                  onClick={() =>
+                    saveCategory("site_ai", aiForm, "AI model configuration saved!")
+                  }
+                  className="px-6 py-2.5 rounded-full bg-moss text-on-moss hover:bg-moss-dark font-semibold text-sm shadow-sm cursor-pointer disabled:opacity-50"
                 >
-                  ↻ Refresh Courses
+                  {savingCategory === "site_ai" ? "Saving..." : "Save AI Config"}
                 </button>
               </div>
 
-              {/* Direct YouTube Ingest Tool */}
-              <form onSubmit={handleIngestCourse} className="p-5 rounded-3xl bg-[#121815] border border-white/10 space-y-3">
-                <h3 className="text-xs font-bold uppercase font-mono text-[#b3b7a3]">Direct Admin YouTube Ingestion</h3>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="url"
-                    placeholder="Paste YouTube Video or Playlist URL (e.g. https://www.youtube.com/watch?v=...)"
-                    value={ingestUrl}
-                    onChange={(e) => setIngestUrl(e.target.value)}
-                    className="flex-1 px-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-sm text-white focus:border-[#b8c460] outline-none"
-                  />
-                  <button
-                    type="submit"
-                    disabled={ingesting || !ingestUrl.trim()}
-                    className="px-6 py-2.5 rounded-xl bg-[#b8c460] text-[#0f1611] font-bold text-sm hover:bg-[#a6b350] transition-colors disabled:opacity-50 cursor-pointer"
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                    Active Provider
+                  </label>
+                  <select
+                    value={aiForm.activeProvider}
+                    onChange={(e) => setAiForm({ ...aiForm, activeProvider: e.target.value })}
+                    className="w-full h-11 rounded-xl bg-paper px-3.5 text-sm text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
                   >
-                    {ingesting ? "Ingesting..." : "+ Ingest Course"}
-                  </button>
+                    <option value="NVIDIA_NEMOTRON">NVIDIA Nemotron (Recommended)</option>
+                    <option value="OPENAI">OpenAI GPT-4o</option>
+                    <option value="GOOGLE_GEMINI">Google Gemini</option>
+                  </select>
                 </div>
-              </form>
 
-              {/* Search Bar */}
-              <div className="flex items-center gap-3">
+                <div>
+                  <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                    Model Name
+                  </label>
+                  <input
+                    type="text"
+                    value={aiForm.modelName}
+                    onChange={(e) => setAiForm({ ...aiForm, modelName: e.target.value })}
+                    className="w-full h-11 rounded-xl bg-paper px-3.5 text-sm font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                    Temperature ({aiForm.temperature})
+                  </label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.1}
+                    value={aiForm.temperature}
+                    onChange={(e) =>
+                      setAiForm({ ...aiForm, temperature: Number(e.target.value) })
+                    }
+                    className="w-full mt-3 accent-[#4b5e1e]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                  Override API Key (Leave blank to keep server `.env` key)
+                </label>
                 <input
-                  type="text"
-                  placeholder="Filter courses by title, slug, or creator..."
-                  value={courseSearch}
-                  onChange={(e) => setCourseSearch(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-2xl bg-[#121815] border border-white/10 text-sm text-white focus:border-[#b8c460] outline-none"
+                  type="password"
+                  value={aiForm.apiKey}
+                  onChange={(e) => setAiForm({ ...aiForm, apiKey: e.target.value })}
+                  placeholder="nvapi-... or sk-..."
+                  className="w-full h-11 rounded-xl bg-paper px-3.5 text-sm font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
                 />
               </div>
 
-              {/* Course Table */}
-              <div className="rounded-3xl bg-[#121815] border border-white/10 overflow-hidden">
-                {coursesLoading ? (
-                  <div className="p-12 text-center text-xs text-[#b3b7a3]">Loading courses from database...</div>
-                ) : courses.length === 0 ? (
-                  <div className="p-12 text-center text-xs text-[#b3b7a3]">No courses found matching filter.</div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs sm:text-sm">
-                      <thead className="bg-white/5 border-b border-white/10 text-[#b3b7a3] font-mono text-[0.7rem] uppercase">
-                        <tr>
-                          <th className="p-4">Course</th>
-                          <th className="p-4">Creator</th>
-                          <th className="p-4">Chapters</th>
-                          <th className="p-4">Duration</th>
-                          <th className="p-4">Visibility</th>
-                          <th className="p-4 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/5">
-                        {courses
-                          .filter(
-                            (c) =>
-                              !courseSearch ||
-                              c.title.toLowerCase().includes(courseSearch.toLowerCase()) ||
-                              c.creatorEmail.toLowerCase().includes(courseSearch.toLowerCase())
-                          )
-                          .map((c) => (
-                            <tr key={c.id} className="hover:bg-white/5 transition-colors">
-                              <td className="p-4">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-12 h-8 rounded-lg bg-black overflow-hidden shrink-0 border border-white/10">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                      src={c.thumbnailUrl || "https://i.ytimg.com/vi/LSk5KaEGVK4/hqdefault.jpg"}
-                                      alt=""
-                                      className="w-full h-full object-cover"
-                                    />
-                                  </div>
-                                  <div className="min-w-0">
-                                    <strong className="block text-white truncate max-w-[200px] sm:max-w-xs">
-                                      {c.title}
-                                    </strong>
-                                    <span className="text-[0.7rem] font-mono text-[#b3b7a3]">/{c.slug}</span>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="p-4 text-[#b3b7a3] truncate max-w-[140px]">{c.creatorEmail}</td>
-                              <td className="p-4 font-mono">{c.chapterCount} ch</td>
-                              <td className="p-4 font-mono">
-                                {Math.round((c.durationSeconds / 60) * 10) / 10}m
-                              </td>
-                              <td className="p-4">
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleCourseVisibility(c.id, c.isPublic)}
-                                  className={`px-2.5 py-1 rounded-full text-[0.68rem] font-mono font-bold cursor-pointer transition-colors ${
-                                    c.isPublic
-                                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                                      : "bg-white/10 text-[#b3b7a3] border border-white/15"
-                                  }`}
-                                >
-                                  {c.isPublic ? "PUBLIC" : "PRIVATE"}
-                                </button>
-                              </td>
-                              <td className="p-4 text-right">
-                                <div className="flex items-center justify-end gap-2">
-                                  <Link
-                                    href={`/courses/${c.slug}`}
-                                    target="_blank"
-                                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[#b3b7a3] hover:text-white transition-colors"
-                                    title="View Course"
-                                  >
-                                    ↗
-                                  </Link>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteCourse(c.id, c.title)}
-                                    className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors cursor-pointer"
-                                    title="Delete Course"
-                                  >
-                                    🗑
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+              <div>
+                <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                  System Prompt Custom Override (Optional)
+                </label>
+                <textarea
+                  rows={4}
+                  value={aiForm.systemPromptOverride}
+                  onChange={(e) =>
+                    setAiForm({ ...aiForm, systemPromptOverride: e.target.value })
+                  }
+                  placeholder="Optional custom instructions appended to curriculum generation..."
+                  className="w-full rounded-xl bg-paper p-3.5 text-sm text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                />
               </div>
             </div>
           )}
 
-          {/* TAB 5: USERS & ROLES */}
+          {/* ================= USERS & ROLES TAB ================= */}
           {activeTab === "users" && (
-            <div className="space-y-8 animate-in fade-in duration-200">
+            <div className="rounded-[28px] bg-surface p-6 sm:p-8 shadow-[0_0_0_1px_var(--line)] space-y-5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-2xl font-bold font-display text-white">User Accounts & Roles</h2>
-                  <p className="text-xs sm:text-sm text-[#b3b7a3] mt-1">
-                    Manage registered accounts, promote to Administrator, adjust subscription plans, and edit study streaks.
+                  <h2 className="text-2xl font-display font-bold text-ink">
+                    Platform Learners ({users.length})
+                  </h2>
+                  <p className="text-xs text-ink-soft">
+                    Promote administrators or manually grant Free / Pro / Max plan tiers instantly.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={loadUsers}
-                  className="px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/15 text-xs font-semibold text-white self-start transition-colors cursor-pointer"
-                >
-                  ↻ Refresh Users
-                </button>
-              </div>
-
-              {/* Quick Admin Grant Form */}
-              <form onSubmit={handleQuickPromote} className="p-5 rounded-3xl bg-[#121815] border border-white/10 space-y-3">
-                <h3 className="text-xs font-bold uppercase font-mono text-[#b3b7a3]">1-Click Make Admin</h3>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="email"
-                    placeholder="Enter user email to grant Administrator rights..."
-                    value={quickAdminEmail}
-                    onChange={(e) => setQuickAdminEmail(e.target.value)}
-                    className="flex-1 px-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-sm text-white focus:border-[#b8c460] outline-none"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!quickAdminEmail.trim()}
-                    className="px-6 py-2.5 rounded-xl bg-[#b8c460] text-[#0f1611] font-bold text-sm hover:bg-[#a6b350] transition-colors disabled:opacity-50 cursor-pointer"
-                  >
-                    Promote to Admin
-                  </button>
-                </div>
-              </form>
-
-              {/* Search Bar */}
-              <div className="flex items-center gap-3">
                 <input
-                  type="text"
-                  placeholder="Filter users by email or name..."
+                  type="search"
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-2xl bg-[#121815] border border-white/10 text-sm text-white focus:border-[#b8c460] outline-none"
+                  placeholder="Search email or display name..."
+                  className="w-full sm:w-72 h-10 rounded-full bg-paper px-4 text-xs sm:text-sm text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
                 />
               </div>
 
-              {/* Users Table */}
-              <div className="rounded-3xl bg-[#121815] border border-white/10 overflow-hidden">
-                {usersLoading ? (
-                  <div className="p-12 text-center text-xs text-[#b3b7a3]">Loading users...</div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs sm:text-sm">
-                      <thead className="bg-white/5 border-b border-white/10 text-[#b3b7a3] font-mono text-[0.7rem] uppercase">
-                        <tr>
-                          <th className="p-4">User</th>
-                          <th className="p-4">Role</th>
-                          <th className="p-4">Plan Tier</th>
-                          <th className="p-4">Streak</th>
-                          <th className="p-4">Enrolled</th>
-                          <th className="p-4 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/5">
-                        {users
-                          .filter(
-                            (u) =>
-                              !userSearch ||
-                              u.email.toLowerCase().includes(userSearch.toLowerCase()) ||
-                              u.displayName.toLowerCase().includes(userSearch.toLowerCase())
-                          )
-                          .map((u) => (
-                            <tr key={u.id} className="hover:bg-white/5 transition-colors">
-                              <td className="p-4">
-                                <strong className="block text-white font-medium">{u.displayName}</strong>
-                                <span className="text-[0.7rem] font-mono text-[#b3b7a3]">{u.email}</span>
-                              </td>
-                              <td className="p-4">
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateUserRole(u.id, u.role)}
-                                  className={`px-2.5 py-1 rounded-full text-[0.68rem] font-mono font-bold cursor-pointer transition-colors ${
-                                    u.role === "ADMIN"
-                                      ? "bg-[#b8c460] text-[#0f1611]"
-                                      : "bg-white/10 text-[#b3b7a3] hover:text-white"
-                                  }`}
-                                  title="Click to toggle Role"
-                                >
-                                  {u.role}
-                                </button>
-                              </td>
-                              <td className="p-4">
-                                <select
-                                  value={u.tier}
-                                  onChange={(e) => handleUpdateUserTier(u.id, e.target.value)}
-                                  className="px-2 py-1 rounded-lg bg-black/40 border border-white/15 text-xs text-white cursor-pointer font-mono"
-                                >
-                                  <option value="FREE">FREE</option>
-                                  <option value="PRO">PRO</option>
-                                  <option value="MAX">MAX</option>
-                                </select>
-                              </td>
-                              <td className="p-4 font-mono font-semibold text-[#b8c460]">🔥 {u.streakDays}d</td>
-                              <td className="p-4 font-mono">{u.coursesEnrolled}</td>
-                              <td className="p-4 text-right">
-                                {u.id !== "cmw9msul9000007jn52uweaq0" && u.email !== userEmail && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteUser(u.id, u.email)}
-                                    className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors cursor-pointer"
-                                    title="Delete User"
-                                  >
-                                    🗑
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                  <thead>
+                    <tr className="border-b border-line text-[0.68rem] font-mono uppercase text-ink-soft">
+                      <th className="py-3 pr-4">User</th>
+                      <th className="py-3 px-4">Activity</th>
+                      <th className="py-3 px-4">Role</th>
+                      <th className="py-3 pl-4">Plan Tier</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line">
+                    {filteredUsers.map((u) => (
+                      <tr key={u.id} className="hover:bg-paper/60 transition-colors">
+                        <td className="py-3.5 pr-4">
+                          <div className="font-semibold text-ink">{u.displayName}</div>
+                          <div className="text-xs text-ink-soft">{u.email}</div>
+                        </td>
+                        <td className="py-3.5 px-4 text-xs text-ink-soft font-mono">
+                          {u.coursesCreated} built · {u.coursesEnrolled} enrolled · {u.notesCount} notes
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <select
+                            value={u.role}
+                            onChange={(e) => handleUpdateUser(u.id, { role: e.target.value })}
+                            className="h-8 rounded-lg bg-paper px-2.5 text-xs font-semibold text-ink shadow-[inset_0_0_0_1px_var(--line)]"
+                          >
+                            <option value="USER">USER</option>
+                            <option value="ADMIN">ADMIN</option>
+                          </select>
+                        </td>
+                        <td className="py-3.5 pl-4">
+                          <select
+                            value={u.tier}
+                            onChange={(e) => handleUpdateUser(u.id, { tier: e.target.value })}
+                            className="h-8 rounded-lg bg-paper px-2.5 text-xs font-semibold text-ink shadow-[inset_0_0_0_1px_var(--line)]"
+                          >
+                            <option value="FREE">FREE</option>
+                            <option value="PRO">PRO</option>
+                            <option value="MAX">MAX</option>
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
 
-          {/* TAB 6: TELEMETRY & HEALTH */}
-          {activeTab === "metrics" && (
-            <div className="space-y-8 animate-in fade-in duration-200">
-              <div>
-                <h2 className="text-2xl font-bold font-display text-white">Platform Telemetry & Metrics</h2>
-                <p className="text-xs sm:text-sm text-[#b3b7a3] mt-1">
-                  Live counters, database status, and aggregate learning activity.
-                </p>
-              </div>
-
-              {/* 5 High-Impact Stat Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-                {[
-                  { label: "Total Users", val: metrics?.totalUsers ?? users.length, icon: "👥" },
-                  { label: "Active Courses", val: metrics?.totalCourses ?? courses.length, icon: "📚" },
-                  { label: "Total Lessons", val: metrics?.totalLessons ?? 0, icon: "📝" },
-                  { label: "Study Hours", val: `${metrics?.totalLearningHours ?? 0}h`, icon: "⏱" },
-                  { label: "AI Jobs Done", val: metrics?.completedJobs ?? 0, icon: "⚡" },
-                ].map((stat, idx) => (
-                  <div key={idx} className="p-5 rounded-3xl bg-[#121815] border border-white/10 space-y-1 shadow-sm">
-                    <div className="flex items-center justify-between text-[#b3b7a3] text-xs">
-                      <span>{stat.label}</span>
-                      <span>{stat.icon}</span>
-                    </div>
-                    <p className="text-3xl font-display font-bold text-white pt-1">{stat.val}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Health Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="p-5 rounded-3xl bg-[#121815] border border-white/10 space-y-2">
-                  <span className="text-[0.68rem] font-mono text-emerald-400 uppercase font-bold">● Healthy</span>
-                  <h4 className="text-sm font-bold text-white">PostgreSQL Database</h4>
-                  <p className="text-xs text-[#b3b7a3]">Connected to Supabase production cluster.</p>
-                </div>
-                <div className="p-5 rounded-3xl bg-[#121815] border border-white/10 space-y-2">
-                  <span className="text-[0.68rem] font-mono text-emerald-400 uppercase font-bold">● Operational</span>
-                  <h4 className="text-sm font-bold text-white">AI Generation Pipeline</h4>
-                  <p className="text-xs text-[#b3b7a3]">NVIDIA Nemotron LLM endpoint responsive.</p>
-                </div>
-                <div className="p-5 rounded-3xl bg-[#121815] border border-white/10 space-y-2">
-                  <span className="text-[0.68rem] font-mono text-emerald-400 uppercase font-bold">● Protected</span>
-                  <h4 className="text-sm font-bold text-white">Route Security Shield</h4>
-                  <p className="text-xs text-[#b3b7a3]">/admin blocked; /studio-hub protected.</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 7: ROUTE & SECURITY SHIELD */}
+          {/* ================= SECURITY TAB ================= */}
           {activeTab === "security" && (
-            <div className="space-y-8 animate-in fade-in duration-200">
+            <div className="rounded-[28px] bg-surface p-6 sm:p-8 shadow-[0_0_0_1px_var(--line)] space-y-6">
               <div>
-                <h2 className="text-2xl font-bold font-display text-white">Security & Obfuscation Shield</h2>
-                <p className="text-xs sm:text-sm text-[#b3b7a3] mt-1">
-                  Route privacy status and administrator authentication configuration.
-                </p>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-lime-soft px-3 py-1 font-mono text-[0.68rem] font-bold uppercase tracking-wider text-pill-ink">
+                  Platform Protection
+                </span>
+                <h2 className="mt-2 text-2xl font-display font-bold text-ink">
+                  Security Shield &amp; Route Protection
+                </h2>
               </div>
 
-              <div className="p-6 rounded-3xl bg-[#121815] border border-white/10 space-y-4">
-                <h3 className="text-sm font-bold text-white">Route Protection Strategy</h3>
-                <div className="space-y-3 text-xs text-[#b3b7a3] leading-relaxed">
-                  <p>
-                    ✓ <strong className="text-white">Public /admin Trapped:</strong> Any unauthorized bot or visitor attempting to visit{" "}
-                    <code className="text-red-400 font-mono">/admin</code> is instantly served an HTTP 404 Not Found error page.
-                  </p>
-                  <p>
-                    ✓ <strong className="text-white">Active Vault Route:</strong> The administration hub is only accessible at{" "}
-                    <code className="text-[#b8c460] font-mono">/studio-hub</code>.
-                  </p>
-                  <p>
-                    ✓ <strong className="text-white">Role-Based Clearance:</strong> Only users verified in Postgres with{" "}
-                    <code className="text-white font-mono">role: &quot;ADMIN&quot;</code> can access this hub.
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-5 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] space-y-1.5">
+                  <div className="text-xs font-mono font-bold uppercase text-moss">● Stealth Decoy</div>
+                  <div className="font-semibold text-sm text-ink">`/admin` Route Blocked (404)</div>
+                  <p className="text-xs text-ink-soft">
+                    Public `/admin` probes return HTTP 404; administrative controls live at `/studio-hub`.
                   </p>
                 </div>
-              </div>
-
-              <div className="p-6 rounded-3xl bg-[#121815] border border-white/10 space-y-4">
-                <h3 className="text-sm font-bold text-white">Emergency Admin Authorization</h3>
-                <p className="text-xs text-[#b3b7a3]">
-                  If you need to grant admin access to another device or account without modifying SQL:
-                </p>
-                <div className="p-4 rounded-2xl bg-black/40 border border-white/10 font-mono text-xs space-y-1">
-                  <p className="text-[#b3b7a3]">Passphrase:</p>
-                  <p className="text-[#b8c460] font-bold">courseyl_admin_vault_2026</p>
+                <div className="p-5 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] space-y-1.5">
+                  <div className="text-xs font-mono font-bold uppercase text-moss">● RBAC Guard</div>
+                  <div className="font-semibold text-sm text-ink">Strict ADMIN Session Gate</div>
+                  <p className="text-xs text-ink-soft">
+                    All `/api/admin/*` endpoints verify signed JWT + live `ADMIN` role on PostgreSQL.
+                  </p>
+                </div>
+                <div className="p-5 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] space-y-1.5">
+                  <div className="text-xs font-mono font-bold uppercase text-moss">● Production DB</div>
+                  <div className="font-semibold text-sm text-ink">Supabase Pooler Active</div>
+                  <p className="text-xs text-ink-soft">
+                    All course, billing, and layout changes persist cleanly without downtime.
+                  </p>
                 </div>
               </div>
             </div>
@@ -1790,4 +1852,3 @@ export default function StudioHubAdminPage() {
     </div>
   );
 }
-

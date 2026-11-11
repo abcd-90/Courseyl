@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { signToken, getAuthCookieOptions, hashPassword } from "@/lib/auth";
+import { getPublicSettings } from "@/lib/settings";
 
 export async function POST(req: Request) {
   try {
@@ -32,6 +33,14 @@ export async function POST(req: Request) {
     let isNew = false;
 
     if (!user) {
+      const settings = await getPublicSettings().catch(() => null);
+      if (settings && settings.plans.allowNewSignups === false) {
+        return NextResponse.json(
+          { error: "New registrations are temporarily paused by administrator." },
+          { status: 403 }
+        );
+      }
+
       isNew = true;
       const defaultName = cleanEmail.split("@")[0].replace(/[._-]/g, " ");
       const formattedName =

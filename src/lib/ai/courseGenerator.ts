@@ -103,21 +103,33 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
   const tier = sub?.tier || "FREE";
   const role = user.role;
 
-  // Tier limits: allow comprehensive multi-hour masterclasses (including 24h+ marathons)
+  const siteSettings = await getFullSettings().catch(() => null);
+  const plans = siteSettings?.plans;
+
+  const isUnlimitedMode =
+    plans?.unlimitedFreeMode === true ||
+    (plans?.unlimitedFreeMode === undefined && plans?.freeHoursLimit && plans.freeHoursLimit >= 999) ||
+    role === "ADMIN";
+
+  const resolvedFreeHours = plans?.freeHoursLimit && plans.freeHoursLimit < 999 ? plans.freeHoursLimit : 5;
+  const resolvedFreeGens = plans?.freeGenerationsLimit && plans.freeGenerationsLimit < 999 ? plans.freeGenerationsLimit : 5;
+
   const tierLimits = {
-    FREE: { maxCourses: 5, maxDurationSec: 108000 },
-    PRO: { maxCourses: 20, maxDurationSec: 144000 },
-    MAX: { maxCourses: 50, maxDurationSec: 180000 },
+    FREE: {
+      maxCourses: resolvedFreeGens,
+      maxDurationSec: resolvedFreeHours * 3600,
+    },
+    PRO: {
+      maxCourses: plans?.proGenerationsLimit || 25,
+      maxDurationSec: (plans?.proHoursLimit || 20) * 3600,
+    },
+    MAX: {
+      maxCourses: plans?.maxGenerationsLimit || 100,
+      maxDurationSec: (plans?.maxHoursLimit || 40) * 3600,
+    },
   };
 
   const currentLimit = tierLimits[tier as keyof typeof tierLimits] || tierLimits.FREE;
-
-  // Check if admin has enabled unlimited free testing mode
-  const siteSettings = await getFullSettings().catch(() => null);
-  const isUnlimitedMode =
-    siteSettings?.plans?.unlimitedFreeMode ||
-    (siteSettings?.plans?.freeHoursLimit && siteSettings.plans.freeHoursLimit >= 999) ||
-    role === "ADMIN";
 
   if (!isUnlimitedMode) {
     if (sub && sub.monthlyGenerationsUsed >= currentLimit.maxCourses) {
@@ -130,11 +142,11 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
   // 4. Ingest video metadata
   const meta = await fetchYouTubeMetadata(parsedUrl.videoId);
 
-  if (!isUnlimitedMode && meta.durationSeconds > currentLimit.maxDurationSec) {
+  if (!isUnlimitedMode && (sub?.monthlyHoursUsedSeconds || 0) + meta.durationSeconds > currentLimit.maxDurationSec) {
     throw new Error(
-      `Video duration (${formatDuration(meta.durationSeconds)}) exceeds your ${tier} plan limit of ${
+      `Video duration (${formatDuration(meta.durationSeconds)}) exceeds your remaining ${tier} plan quota of ${Math.round(
         currentLimit.maxDurationSec / 3600
-      } hours. Please upgrade to process longer videos.`
+      )} hours. Please upgrade to process longer videos.`
     );
   }
 

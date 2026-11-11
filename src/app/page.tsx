@@ -6,21 +6,45 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { MarketingNavbar } from "@/components/MarketingNavbar";
 import { CourseItFooter } from "@/components/CourseItFooter";
+import { useSiteSettings } from "@/components/SiteSettingsProvider";
+import { DEFAULT_HOME_SECTIONS, HomeSectionConfig, HomeSectionId } from "@/lib/settings-types";
+import { getCleanThumbnailUrl } from "@/lib/thumbnail";
 import { LandscapeIllustration, DuskLandscapeIllustration } from "@/components/LandscapeHero";
 
 export default function HomePage() {
   const router = useRouter();
+  const { settings } = useSiteSettings();
   const [selectedMinutes, setSelectedMinutes] = useState<number>(120);
   const [activeTab, setActiveTab] = useState<"video" | "article">("video");
   const [copiedLink, setCopiedLink] = useState(false);
   const [scrollY, setScrollY] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [liveCourses, setLiveCourses] = useState<any[]>([]);
 
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => r.json())
       .then((d) => setIsAuthenticated(!!d?.authenticated))
       .catch(() => setIsAuthenticated(false));
+
+    fetch("/api/courses?limit=6", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.courses && Array.isArray(data.courses) && data.courses.length > 0) {
+          setLiveCourses(
+            data.courses.map((c: any) => ({
+              title: c.title,
+              author: c.creator || "Instructor",
+              duration: c.duration,
+              addedBy: c.creatorName || "Creator",
+              learningCount: c.enrollmentCount || 1,
+              thumbnail: getCleanThumbnailUrl(c.thumbnailUrl, c.slug, c.source?.youtubeId),
+              slug: c.slug,
+            }))
+          );
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // Tour section ref for 3D scroll tilt animation
@@ -141,11 +165,43 @@ export default function HomePage() {
     return 2;
   };
 
-  return (
-    <div className="min-h-screen flex flex-col bg-[#fcfcfa] text-[#0f1611]">
-      <MarketingNavbar />
+  const sectionConfigs =
+    settings?.structure?.sections && settings.structure.sections.length > 0
+      ? settings.structure.sections
+      : DEFAULT_HOME_SECTIONS;
 
-      {/* 1. INTRO HERO SECTION (relative h-[980px] overflow-hidden) */}
+  const getSection = (id: HomeSectionId): HomeSectionConfig =>
+    sectionConfigs.find((s) => s.id === id) ||
+    DEFAULT_HOME_SECTIONS.find((s) => s.id === id)!;
+
+  const orderedSections = sectionConfigs.filter((s) => s.visible !== false);
+  const heroVisibleIdx = orderedSections.findIndex((s) => s.id === "hero");
+  const tourVisibleIdx = orderedSections.findIndex((s) => s.id === "tour");
+  const tourFollowsHero = heroVisibleIdx >= 0 && tourVisibleIdx === heroVisibleIdx + 1;
+
+  const heroSec = getSection("hero");
+  const tourSec = getSection("tour");
+  const numbersSec = getSection("numbers");
+  const featuresSec = getSection("features");
+  const howSec = getSection("howItWorks");
+  const coursesSec = getSection("courses");
+  const storiesSec = getSection("stories");
+  const ctaSec = getSection("cta");
+
+  const brandName = settings?.branding?.brandName || "Courseyl";
+  const heroBadge = settings?.branding?.badgeText || heroSec.badge || "Powered by NVIDIA Nemotron";
+  const heroHeadline = settings?.structure?.heroHeadline || heroSec.title || "Turn any YouTube video into a course you";
+  const heroHighlight = settings?.structure?.heroHeadlineHighlight || heroSec.titleHighlight || "actually finish.";
+  const heroSub =
+    settings?.branding?.subTagline ||
+    heroSec.subtitle ||
+    "Bite-sized lessons, quizzes that replay what you missed, and a daily plan that fits your pace.";
+  const heroPrimaryCta = settings?.structure?.heroPrimaryCtaLabel || "Start with a link";
+  const heroSecondaryCta = settings?.structure?.heroSecondaryCtaLabel || "How it works";
+  const displayedHomeCourses = liveCourses.length > 0 ? liveCourses : sampleCourses;
+
+  const sectionElements: Record<HomeSectionId, React.ReactNode> = {
+    hero: (
       <section aria-label="Intro" className="relative h-[980px] overflow-hidden">
         {/* Parallax Sunrise Landscape Illustration */}
         <div
@@ -170,22 +226,22 @@ export default function HomePage() {
               <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 fill-[#76b900]">
                 <path d="M8.948 8.798v-1.43a6.7 6.7 0 0 1 .424-.018c3.922-.124 6.493 3.374 6.493 3.374s-2.774 3.851-5.75 3.851c-.398 0-.787-.062-1.158-.185v-4.346c1.528.185 1.837.857 2.747 2.385l2.04-1.714s-1.492-1.952-4-1.952a6.016 6.016 0 0 0-.796.035m0-4.735v2.138l.424-.027c5.45-.185 9.01 4.47 9.01 4.47s-4.08 4.964-8.33 4.964c-.37 0-.733-.035-1.095-.097v1.325c.3.035.61.062.91.062 3.957 0 6.82-2.023 9.593-4.408.459.371 2.34 1.263 2.73 1.652-2.633 2.208-8.772 3.984-12.253 3.984-.335 0-.653-.018-.971-.053v1.864H24V4.063zm0 10.326v1.131c-3.657-.654-4.673-4.46-4.673-4.46s1.758-1.944 4.673-2.262v1.237H8.94c-1.528-.186-2.73 1.245-2.73 1.245s.68 2.412 2.739 3.11M2.456 10.9s2.164-3.197 6.5-3.533V6.201C4.153 6.59 0 10.653 0 10.653s2.35 6.802 8.948 7.42v-1.237c-4.84-.6-6.492-5.936-6.492-5.936z" />
               </svg>
-              Powered by NVIDIA Nemotron
+              {heroBadge}
             </span>
           </div>
 
           {/* Heading */}
           <div>
             <h1 className="text-h1 text-ink">
-              Turn any YouTube video into a course you{" "}
-              <em className="italic text-moss font-serif">actually finish.</em>
+              {heroHeadline}{" "}
+              <em className="italic text-moss font-serif">{heroHighlight}</em>
             </h1>
           </div>
 
           {/* Subtitle */}
           <div>
             <p className="max-w-[560px] text-[1.1rem] text-ink-soft leading-relaxed">
-              Bite-sized lessons, quizzes that replay what you missed, and a daily plan that fits your pace.
+              {heroSub}
             </p>
           </div>
 
@@ -195,20 +251,20 @@ export default function HomePage() {
               href={isAuthenticated ? "/dashboard" : "/login?next=/dashboard"}
               className="inline-flex shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground hover:-translate-y-px hover:bg-moss-dark transition-all h-12 gap-2 px-7 text-[0.92rem] font-semibold shadow-sm cursor-pointer"
             >
-              Start with a link
+              {heroPrimaryCta}
             </Link>
             <a
               href="#how-it-works"
               className="inline-flex shrink-0 items-center justify-center rounded-full bg-surface text-ink shadow-[inset_0_0_0_1px_var(--line)] hover:bg-muted transition-all h-12 gap-2 px-7 text-[0.92rem] font-medium"
             >
-              How it works
+              {heroSecondaryCta}
             </a>
           </div>
         </div>
       </section>
-
-      {/* 2. PRODUCT TOUR WITH AUTHENTIC 3D TILT-TO-FLAT SCROLL ANIMATION */}
-      <section aria-label="Product tour" className="relative z-20 -mt-[230px] px-6">
+    ),
+    tour: (
+      <section aria-label={tourSec.badge || "Product tour"} className={`relative z-20 px-6 ${tourFollowsHero ? "-mt-[230px]" : "pt-28 pb-10"}`}>
         <div
           ref={tourRef}
           className="mx-auto aspect-[1600/1038] w-[min(100%,calc((100vh-140px)*1600/1038))] max-w-[1200px] overflow-hidden rounded-[32px] bg-card shadow-[0_0_0_6px_var(--surface),0_40px_80px_-30px_rgba(22,49,92,0.5)] transition-transform duration-100 ease-out"
@@ -225,21 +281,22 @@ export default function HomePage() {
             autoPlay
             playsInline
             preload="metadata"
-            aria-label="CourseIt demo: paste a YouTube link, get a course with a placement test, lessons and quizzes"
+            aria-label={`${brandName} demo: paste a YouTube link, get a course with a placement test, lessons and quizzes`}
             className="size-full object-cover"
           />
         </div>
       </section>
-
-      {/* 3. BY THE NUMBERS SECTION (#numbers) */}
+    ),
+    numbers: (
       <section id="numbers" aria-labelledby="numbers-title" className="scroll-mt-24 px-6 py-[110px]">
         <div className="mx-auto max-w-[1200px]">
           <div className="flex flex-col items-center gap-[18px] text-center">
             <span className="inline-flex items-center gap-2 rounded-full bg-lime-soft px-3.5 py-[7px] text-[0.78rem] font-medium text-pill-ink">
-              By the numbers
+              {numbersSec.badge || "By the numbers"}
             </span>
             <h2 id="numbers-title" className="text-h2 text-ink">
-              Real learners, <em className="italic text-moss font-serif">real courses.</em>
+              {numbersSec.title || "Real learners,"}{" "}
+              {numbersSec.titleHighlight ? <em className="italic text-moss font-serif">{numbersSec.titleHighlight}</em> : null}
             </h2>
           </div>
 
@@ -290,20 +347,21 @@ export default function HomePage() {
           </div>
 
           <p className="mt-6 text-center text-[0.85rem] text-ink-soft">
-            Counted live from Courseyl, updated every hour.
+            {numbersSec.subtitle || `Counted live from ${brandName}, updated every hour.`}
           </p>
         </div>
       </section>
-
-      {/* 4. FEATURES BENTO GRID (#features) */}
+    ),
+    features: (
       <section id="features" aria-labelledby="features-title" className="scroll-mt-24 px-6 py-[110px]">
         <div className="mx-auto max-w-[1200px]">
           <div className="flex flex-col items-center gap-[18px] text-center">
             <span className="inline-flex items-center gap-2 rounded-full bg-lime-soft px-3.5 py-[7px] text-[0.78rem] font-medium text-pill-ink">
-              Features
+              {featuresSec.badge || "Features"}
             </span>
             <h2 id="features-title" className="text-h2 text-ink">
-              Everything you need to <em className="italic text-moss font-serif">finish that 6-hour playlist.</em>
+              {featuresSec.title || "Everything you need to"}{" "}
+              {featuresSec.titleHighlight ? <em className="italic text-moss font-serif">{featuresSec.titleHighlight}</em> : null}
             </h2>
           </div>
 
@@ -721,16 +779,17 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      {/* 5. HOW IT WORKS SECTION (#how-it-works) */}
+    ),
+    howItWorks: (
       <section id="how-it-works" aria-labelledby="how-title" className="scroll-mt-24 px-6 py-[110px]">
         <div className="mx-auto max-w-[1200px]">
           <div className="flex flex-col items-center gap-[18px] text-center">
             <span className="inline-flex items-center gap-2 rounded-full bg-lime-soft px-3.5 py-[7px] text-[0.78rem] font-medium text-pill-ink">
-              How it works
+              {howSec.badge || "How it works"}
             </span>
             <h2 id="how-title" className="text-h2 text-ink">
-              From a 6-hour video to <em className="italic text-moss font-serif">a plan you finish.</em>
+              {howSec.title || "From a 6-hour video to"}{" "}
+              {howSec.titleHighlight ? <em className="italic text-moss font-serif">{howSec.titleHighlight}</em> : null}
             </h2>
           </div>
 
@@ -777,22 +836,23 @@ export default function HomePage() {
           </ol>
         </div>
       </section>
-
-      {/* 6. POPULAR COURSES SECTION (#courses) */}
+    ),
+    courses: (
       <section id="courses" aria-labelledby="courses-title" className="scroll-mt-24 px-6 py-[110px]">
         <div className="mx-auto max-w-[1200px]">
           <div className="flex flex-col items-center gap-[18px] text-center">
             <span className="inline-flex items-center gap-2 rounded-full bg-lime-soft px-3.5 py-[7px] text-[0.78rem] font-medium text-pill-ink">
-              Popular courses
+              {coursesSec.badge || "Popular courses"}
             </span>
             <h2 id="courses-title" className="text-h2 text-ink">
-              Courses learners are <em className="italic text-moss font-serif">taking right now.</em>
+              {coursesSec.title || "Courses learners are"}{" "}
+              {coursesSec.titleHighlight ? <em className="italic text-moss font-serif">{coursesSec.titleHighlight}</em> : null}
             </h2>
           </div>
 
           <div className="mt-12 grid grid-cols-[repeat(auto-fill,minmax(min(300px,100%),1fr))] gap-5">
-            {sampleCourses.map((c, i) => (
-              <div key={i} className="flex">
+            {displayedHomeCourses.map((c, i) => (
+              <div key={c.slug || i} className="flex">
                 <Link
                   href={`/courses/${c.slug}`}
                   className="flex w-full flex-col gap-3 rounded-card bg-surface p-2.5 shadow-[0_0_0_1px_var(--line)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_30px_60px_-30px_rgba(22,49,92,0.45),0_0_0_1px_var(--line)]"
@@ -802,6 +862,10 @@ export default function HomePage() {
                       src={c.thumbnail}
                       alt={c.title}
                       loading="lazy"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src =
+                          "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg";
+                      }}
                       className="size-full object-cover"
                     />
                     <span className="absolute right-3 bottom-3 rounded-full bg-surface px-2.5 py-1.5 font-mono text-[0.72rem] tracking-[0.07em] text-ink tabular-nums font-semibold shadow-sm">
@@ -830,16 +894,17 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      {/* 7. STORIES & TESTIMONIALS SECTION (#stories) */}
+    ),
+    stories: (
       <section id="stories" aria-labelledby="stories-title" className="scroll-mt-24 px-6 py-[110px]">
         <div className="mx-auto max-w-[1200px]">
           <div className="flex flex-col items-center gap-[18px] text-center">
             <span className="inline-flex items-center gap-2 rounded-full bg-lime-soft px-3.5 py-[7px] text-[0.78rem] font-medium text-pill-ink">
-              Learners
+              {storiesSec.badge || "Learners"}
             </span>
             <h2 id="stories-title" className="text-h2 text-ink">
-              People who <em className="italic text-moss font-serif">actually finished.</em>
+              {storiesSec.title || "People who"}{" "}
+              {storiesSec.titleHighlight ? <em className="italic text-moss font-serif">{storiesSec.titleHighlight}</em> : null}
             </h2>
           </div>
 
@@ -916,8 +981,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      {/* 8. DUSK CALL TO ACTION SECTION */}
+    ),
+    cta: (
       <section aria-labelledby="cta-title" className="px-6 pt-5 pb-[110px]">
         <div className="relative mx-auto h-[620px] max-w-[1200px] overflow-hidden rounded-panel shadow-blue">
           {/* Sunset Dusk Landscape SVG */}
@@ -932,13 +997,14 @@ export default function HomePage() {
           <div className="absolute inset-0 flex items-center justify-center p-6">
             <div className="glass flex w-full max-w-[640px] flex-col items-center gap-4 rounded-panel px-8 py-12 text-center">
               <span className="inline-flex items-center gap-2 rounded-full bg-lime-soft px-3.5 py-[7px] text-[0.78rem] font-medium text-pill-ink">
-                Start today
+                {ctaSec.badge || "Start today"}
               </span>
               <h2 id="cta-title" className="text-h2 text-ink">
-                Your next course starts <em className="italic text-moss font-serif">today.</em>
+                {ctaSec.title || "Your next course starts"}{" "}
+                {ctaSec.titleHighlight ? <em className="italic text-moss font-serif">{ctaSec.titleHighlight}</em> : null}
               </h2>
               <p className="text-ink-soft max-w-md leading-relaxed text-sm sm:text-base">
-                Paste a video or playlist and start lesson 1 while the rest of the course builds.
+                {ctaSec.subtitle || "Paste a video or playlist and start lesson 1 while the rest of the course builds."}
               </p>
               <div className="mt-2 flex flex-wrap justify-center gap-2.5">
                 <Link
@@ -958,8 +1024,15 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+    ),
+  };
 
-      {/* 9. WARM OLIVE COURSEIT FOOTER */}
+  return (
+    <div className="min-h-screen flex flex-col bg-paper text-ink">
+      <MarketingNavbar />
+      {orderedSections.map((sec) => (
+        <React.Fragment key={sec.id}>{sectionElements[sec.id]}</React.Fragment>
+      ))}
       <CourseItFooter />
     </div>
   );

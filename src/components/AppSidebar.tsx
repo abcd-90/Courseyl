@@ -16,9 +16,20 @@ export function AppSidebar() {
   const [enrolledCount, setEnrolledCount] = useState<number>(0);
 
   const isUnlimitedMode =
-    settings?.plans?.unlimitedFreeMode ||
-    (settings?.plans?.freeHoursLimit && settings.plans.freeHoursLimit >= 999);
-  const effectiveFreeHours = settings?.plans?.freeHoursLimit || 5;
+    settings?.plans?.unlimitedFreeMode === true ||
+    (settings?.plans?.unlimitedFreeMode === undefined &&
+      settings?.plans?.freeHoursLimit &&
+      settings.plans.freeHoursLimit >= 999);
+  const rawFreeHours =
+    settings?.plans?.freeHoursLimit && settings.plans.freeHoursLimit < 999
+      ? settings.plans.freeHoursLimit
+      : 5;
+  const effectiveFreeHours =
+    currentUser?.subscription?.tier === "MAX"
+      ? settings?.plans?.maxHoursLimit || 40
+      : currentUser?.subscription?.tier === "PRO"
+      ? settings?.plans?.proHoursLimit || 20
+      : rawFreeHours;
 
   // Dynamic recent courses from user's actual activity
   const [recents, setRecents] = useState<any[]>([]);

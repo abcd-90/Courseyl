@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { SiteSettingsProvider } from "@/components/SiteSettingsProvider";
+import { GlobalPlatformShell } from "@/components/GlobalPlatformShell";
 import { getPublicSettings } from "@/lib/settings";
+
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getPublicSettings();
@@ -47,7 +50,7 @@ export default async function RootLayout({
       </head>
       <body className="min-h-full flex flex-col selection:bg-[#4b5e1e] selection:text-[#f6f8ec]">
         <SiteSettingsProvider initialSettings={publicSettings as any}>
-          {children}
+          <GlobalPlatformShell>{children}</GlobalPlatformShell>
         </SiteSettingsProvider>
       </body>
     </html>

@@ -82,12 +82,25 @@ export function CourseItLogo({
     );
   };
 
+  const rawBrand = settings?.branding?.brandName?.trim() || "Courseyl";
+  const rawSuffix = settings?.branding?.brandSuffix?.trim() || "";
+  const matchesEnd =
+    rawSuffix.length > 0 &&
+    rawBrand.length > rawSuffix.length &&
+    rawBrand.toLowerCase().endsWith(rawSuffix.toLowerCase());
+  const brandPrefix = matchesEnd
+    ? rawBrand.slice(0, rawBrand.length - rawSuffix.length)
+    : rawBrand;
+  const brandHighlight = matchesEnd
+    ? rawBrand.slice(rawBrand.length - rawSuffix.length)
+    : "";
+
   const Content = (
     <div className={`inline-flex items-center gap-2 font-display font-bold tracking-tight ${className}`}>
       {renderIcon()}
       <span className={`${textSizes[size]} font-bold tracking-tight`}>
-        <span className="text-[#0f1611] dark:text-[#f1f3ea]">Course</span>
-        <span className="text-[#4b5e1e] dark:text-[#78903c]">yl</span>
+        <span className="text-ink">{brandPrefix}</span>
+        {brandHighlight ? <span className="text-moss">{brandHighlight}</span> : null}
       </span>
     </div>
   );

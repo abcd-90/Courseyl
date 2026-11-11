@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { getFullSettings, saveSettingsCategory } from "@/lib/settings";
 
@@ -29,11 +30,14 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { category, data } = body;
 
-    if (!["site_branding", "site_plans", "site_ai"].includes(category)) {
+    if (!["site_branding", "site_plans", "site_ai", "site_structure"].includes(category)) {
       return NextResponse.json({ error: "Invalid settings category." }, { status: 400 });
     }
 
     await saveSettingsCategory(category, data);
+    try {
+      revalidatePath("/", "layout");
+    } catch {}
 
     const updated = await getFullSettings();
     return NextResponse.json({

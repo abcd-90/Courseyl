@@ -3,11 +3,14 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppSidebar } from "@/components/AppSidebar";
+import { useSiteSettings } from "@/components/SiteSettingsProvider";
 
 export default function BillingPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
+  const { settings } = useSiteSettings();
+  const isUnlimitedFree = settings?.plans?.unlimitedFreeMode === true || data?.unlimitedFreeMode === true;
   const [message, setMessage] = useState("");
   const [dates, setDates] = useState({ today: "Active Period", end: "End of billing cycle" });
 
@@ -61,13 +64,20 @@ export default function BillingPage() {
   const limits = data?.limits;
   const isFree = !sub || sub?.tier === "FREE";
 
+  const tierName =
+    sub?.tier === "MAX"
+      ? settings?.plans?.maxPlanName || "Max"
+      : sub?.tier === "PRO"
+      ? settings?.plans?.proPlanName || "Pro"
+      : settings?.plans?.freePlanName || "Free";
+
   const coursesUsed = sub?.monthlyGenerationsUsed || 0;
-  const maxCourses = limits?.maxCoursesPerMonth || 1;
-  const coursePercent = Math.min(100, Math.round((coursesUsed / maxCourses) * 100));
+  const maxCourses = isUnlimitedFree ? 9999 : limits?.maxCoursesPerMonth || 5;
+  const coursePercent = isUnlimitedFree ? 100 : Math.min(100, Math.round((coursesUsed / maxCourses) * 100));
 
   const hoursUsed = sub?.monthlyHoursUsed || 0;
-  const maxHours = limits?.maxTotalHoursMonth || (sub?.tier === "MAX" ? 40 : sub?.tier === "PRO" ? 20 : 5);
-  const hoursPercent = Math.min(100, Math.round((hoursUsed / maxHours) * 100));
+  const maxHours = isUnlimitedFree ? 9999 : limits?.maxTotalHoursMonth || (sub?.tier === "MAX" ? 40 : sub?.tier === "PRO" ? 20 : 5);
+  const hoursPercent = isUnlimitedFree ? 100 : Math.min(100, Math.round((hoursUsed / maxHours) * 100));
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-paper text-ink">
@@ -111,26 +121,36 @@ export default function BillingPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-line">
             <div>
               <span className="inline-block px-3 py-1 rounded-full bg-lime-soft text-moss text-xs font-bold uppercase tracking-wider mb-2">
-                Active Plan: {sub?.tier || "FREE"}
+                {isUnlimitedFree ? "Active Mode: Unlimited Free" : `Active Plan: ${tierName}`}
               </span>
               <h2 className="text-2xl font-display font-bold text-ink">
-                {sub?.tier === "MAX" ? "Max Plan" : sub?.tier === "PRO" ? "Pro Plan" : "Free Starter"}
+                {isUnlimitedFree ? "Full Free Access" : `${tierName} Plan`}
               </h2>
               <p className="text-xs sm:text-sm text-ink-soft mt-1">
-                {sub?.tier === "MAX"
-                  ? "40 hours/month · Private courses · Priority Nemotron support"
+                {isUnlimitedFree
+                  ? "Unlimited hours/month · Full AI generation unlocked free by admin"
+                  : sub?.tier === "MAX"
+                  ? `${maxHours} hours/month · Private courses · Priority AI support`
                   : sub?.tier === "PRO"
-                  ? "20 hours/month · Private courses · Early bird pricing"
-                  : "5 hours/month · Public community courses"}
+                  ? `${maxHours} hours/month · Private courses · Priority building`
+                  : `${maxHours} hours/month · Public community courses`}
               </p>
             </div>
 
             <div className="text-right">
               <div className="text-3xl font-display font-bold text-ink">
-                {sub?.tier === "MAX" ? "$49" : sub?.tier === "PRO" ? "$19" : "$0"}
-                <span className="text-xs font-normal text-[#4c4c3d]"> / month</span>
+                {isUnlimitedFree
+                  ? `${settings?.plans?.currencySymbol || "$"}0`
+                  : sub?.tier === "MAX"
+                  ? `${settings?.plans?.currencySymbol || "$"}${settings?.plans?.maxPriceMonthly ?? 49}`
+                  : sub?.tier === "PRO"
+                  ? `${settings?.plans?.currencySymbol || "$"}${settings?.plans?.proPriceMonthly ?? 19}`
+                  : `${settings?.plans?.currencySymbol || "$"}0`}
+                <span className="text-xs font-normal text-ink-soft"> / month</span>
               </div>
-              <span className="text-xs text-[#4c4c3d]">Renews 8 Dec</span>
+              <span className="text-xs text-ink-soft">
+                {isUnlimitedFree ? "Full free access enabled" : `Renews ${dates.end}`}
+              </span>
             </div>
           </div>
 
@@ -139,7 +159,9 @@ export default function BillingPage() {
             <div className="p-5 rounded-2xl bg-sidebar border border-line space-y-3">
               <div className="flex items-center justify-between text-xs font-semibold">
                 <span className="text-ink">Hours used this cycle</span>
-                <span className="text-moss">{hoursUsed}h / {maxHours}h</span>
+                <span className="text-moss">
+                  {isUnlimitedFree ? "Unlimited" : `${hoursUsed}h / ${maxHours}h`}
+                </span>
               </div>
               <div className="w-full bg-lime-soft h-2 rounded-full overflow-hidden">
                 <div
@@ -148,14 +170,18 @@ export default function BillingPage() {
                 />
               </div>
               <p className="text-[0.72rem] text-ink-soft">
-                {maxHours - hoursUsed} hours remaining to turn YouTube videos into interactive courses.
+                {isUnlimitedFree
+                  ? "Unlimited video processing hours active."
+                  : `${Math.max(0, maxHours - hoursUsed)} hours remaining to turn YouTube videos into interactive courses.`}
               </p>
             </div>
 
             <div className="p-5 rounded-2xl bg-sidebar border border-line space-y-3">
               <div className="flex items-center justify-between text-xs font-semibold">
                 <span className="text-ink">Courses generated</span>
-                <span className="text-moss">{coursesUsed} / {maxCourses}</span>
+                <span className="text-moss">
+                  {isUnlimitedFree ? `${coursesUsed} / Unlimited` : `${coursesUsed} / ${maxCourses}`}
+                </span>
               </div>
               <div className="w-full bg-lime-soft h-2 rounded-full overflow-hidden">
                 <div
