@@ -30,12 +30,15 @@ This codebase serves production learners. Whenever modifying features, UI, or ba
 8. **Database Connection Pooling & Admin Security:**
    - Keep Supabase pooler (`DATABASE_URL` / `@/lib/db`) usage efficient without leaking transactions on long serverless runs.
    - Keep `/admin` blocked (`notFound()` 404 decoy) and require `user.role === "ADMIN"` on all `/studio-hub` & `/api/admin/*` endpoints.
+   - Preserve Admin Studio's safe user deletion pipeline (`DELETE /api/admin/users` blocking self-delete & last-admin delete while purging both `User` and `AuthVerificationToken` rows in a transaction).
 
 9. **Verification Before Pushing:**
    - Run `npm run build` (`prisma generate && next build`) and confirm zero TypeScript or Next.js build errors after edits.
 
 10. **Simple & Authentic Auth Surface (Google OAuth + Verified Email Only):**
     - Keep authentication strictly scoped to **Google OAuth** and **Verified Email** (`Continue with Google` + `Continue with Email`) — never re-add unrequested third-party OAuth clutter (such as GitHub or X buttons/routes) onto `/login` or `/studio-hub`.
+    - NEVER conditionally hide or break the `/login` **`Sign in` | `Create account`** (`Full name`, `Email address`, `Set password`) workflow behind `allowNewSignups` or plan flag changes; keep both tabs permanently visible (showing a notice inside `Create account` if signups are intentionally paused) and require confirmation in `/studio-hub` before pausing `allowNewSignups`.
+    - NEVER couple the post-verification redirect (`window.location.assign(destination)`) inside the `/api/auth/email/status` polling `useEffect` whose cleanup (`[step, verifySynced]`) sets `cancelled = true`; always run redirect timers in a dedicated `useEffect([verifySynced])` so cross-device verification reliably lands on `/dashboard` without getting stuck on `"Redirecting to dashboard…"`.
     - NEVER issue a `courseit_session` cookie or mark a user `emailVerified: true` on raw `/api/auth/email` or `/api/auth/register` submissions before inbox ownership is proven.
     - Enforce syntax, typo/dummy/disposable blocking, and live DNS MX validation (`validateRealEmailAddress`) before dispatching any verification link via custom SMTP/Resend or Supabase fallback.
     - Require `bcrypt` password verification on `/api/auth/login` (`403` for unverified users), verify `accessToken` server-side on `/api/auth/social`, enforce CSRF `state` nonces on Google OAuth, and preserve zero-OTP 1-click verification + cross-device session sync (`courseyl_pending_verify` + `/api/auth/email/status` atomic claim) so both the clicking device and the waiting `/login` tab open `/dashboard` automatically.
