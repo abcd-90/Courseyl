@@ -342,15 +342,20 @@ model PlatformSetting {
 }
 
 model AuthVerificationToken {
-  id         String    @id @default(cuid())
-  email      String
-  purpose    String    @default("LOGIN_OTP") // LOGIN_OTP | VERIFY_EMAIL | RESET_PASSWORD
-  codeHash   String
-  tokenHash  String    @unique
-  attempts   Int       @default(0)
-  expiresAt  DateTime
-  consumedAt DateTime?
-  createdAt  DateTime  @default(now())
+  id             String    @id @default(cuid())
+  email          String
+  purpose        String    @default("LOGIN_OTP") // LOGIN_OTP | VERIFY_EMAIL | RESET_PASSWORD
+  codeHash       String
+  tokenHash      String    @unique
+  pollHash       String?
+  nextPath       String    @default("/dashboard")
+  attempts       Int       @default(0)
+  expiresAt      DateTime
+  consumedAt     DateTime?
+  verifiedAt     DateTime?
+  pollConsumedAt DateTime?
+  createdAt      DateTime  @default(now())
 
   @@index([email, purpose])
+  @@index([pollHash])
 }

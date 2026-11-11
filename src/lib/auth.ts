@@ -9,11 +9,18 @@ import { getPublicSettings } from "./settings";
 const JWT_SECRET =
   process.env.JWT_SECRET || "courseit-default-secret-jwt-key-2026-production";
 const COOKIE_NAME = "courseit_session";
+const PENDING_VERIFY_COOKIE = "courseyl_pending_verify";
 
 export interface SessionPayload {
   userId: string;
   email: string;
   role: string;
+}
+
+export interface PendingVerifyPayload {
+  email: string;
+  pollSecret: string;
+  next: string;
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -242,5 +249,44 @@ export function attachSessionCookie(
   });
   const cookieOpts = getAuthCookieOptions();
   response.cookies.set(cookieOpts.name, token, cookieOpts);
+  return response;
+}
+
+export function attachPendingVerifyCookie(
+  response: NextResponse,
+  payload: PendingVerifyPayload
+): NextResponse {
+  const signed = jwt.sign(payload, JWT_SECRET, { expiresIn: "15m" });
+  response.cookies.set(PENDING_VERIFY_COOKIE, signed, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 15 * 60,
+    path: "/",
+  });
+  return response;
+}
+
+export async function readPendingVerifyCookie(): Promise<PendingVerifyPayload | null> {
+  try {
+    const cookieStore = await cookies();
+    const raw = cookieStore.get(PENDING_VERIFY_COOKIE)?.value;
+    if (!raw) return null;
+    const decoded = jwt.verify(raw, JWT_SECRET) as PendingVerifyPayload;
+    if (!decoded?.email || !decoded?.pollSecret) return null;
+    return decoded;
+  } catch {
+    return null;
+  }
+}
+
+export function clearPendingVerifyCookie(response: NextResponse): NextResponse {
+  response.cookies.set(PENDING_VERIFY_COOKIE, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 0,
+    path: "/",
+  });
   return response;
 }

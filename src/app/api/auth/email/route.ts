@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { getRequestOrigin, sanitizeNextPath } from "@/lib/auth";
+import {
+  attachPendingVerifyCookie,
+  getRequestOrigin,
+  readPendingVerifyCookie,
+  sanitizeNextPath,
+} from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { validateRealEmailAddress } from "@/lib/email-validation";
 import { issueAndSendEmailVerification } from "@/lib/mailer";
@@ -46,6 +51,7 @@ export async function POST(req: Request) {
       }
     }
 
+    const pendingCookie = await readPendingVerifyCookie();
     const purpose =
       body?.purpose === "VERIFY_EMAIL" ? "VERIFY_EMAIL" : "LOGIN_OTP";
 
@@ -54,6 +60,8 @@ export async function POST(req: Request) {
       purpose,
       origin,
       next,
+      existingPollSecret:
+        pendingCookie?.email === cleanEmail ? pendingCookie.pollSecret : undefined,
     });
 
     if (!delivery.ok) {
@@ -63,13 +71,23 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       success: true,
       requiresVerification: true,
       deliveryMode: delivery.mode,
       email: cleanEmail,
       message: delivery.message,
     });
+
+    if (delivery.pollSecret) {
+      attachPendingVerifyCookie(res, {
+        email: cleanEmail,
+        pollSecret: delivery.pollSecret,
+        next,
+      });
+    }
+
+    return res;
   } catch (err: unknown) {
     console.error("Email verification initiation error:", err);
     const msg =

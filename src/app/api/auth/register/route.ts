@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import {
+  attachPendingVerifyCookie,
   getRequestOrigin,
   hashPassword,
+  readPendingVerifyCookie,
   sanitizeNextPath,
 } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -109,12 +111,15 @@ export async function POST(req: Request) {
 
     const origin = getRequestOrigin(req);
     const safeNext = sanitizeNextPath(next);
+    const pendingCookie = await readPendingVerifyCookie();
 
     const delivery = await issueAndSendEmailVerification({
       email: cleanEmail,
       purpose: "VERIFY_EMAIL",
       origin,
       next: safeNext,
+      existingPollSecret:
+        pendingCookie?.email === cleanEmail ? pendingCookie.pollSecret : undefined,
     });
 
     if (!delivery.ok) {
@@ -129,13 +134,23 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       success: true,
       requiresVerification: true,
       deliveryMode: delivery.mode,
       email: cleanEmail,
       message: delivery.message,
     });
+
+    if (delivery.pollSecret) {
+      attachPendingVerifyCookie(res, {
+        email: cleanEmail,
+        pollSecret: delivery.pollSecret,
+        next: safeNext,
+      });
+    }
+
+    return res;
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     return NextResponse.json({ error: msg }, { status: 500 });

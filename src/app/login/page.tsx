@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MarketingNavbar } from "@/components/MarketingNavbar";
@@ -56,9 +56,10 @@ export default function LoginPage() {
   const [fullName, setFullName] = useState("");
   const [emailInput, setEmailInput] = useState("");
   const [password, setPassword] = useState("");
-  const [otpCode, setOtpCode] = useState("");
   const [pendingEmail, setPendingEmail] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [verifySynced, setVerifySynced] = useState(false);
+  const pollInFlightRef = useRef(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -91,6 +92,58 @@ export default function LoginPage() {
     }, 1000);
     return () => clearInterval(timer);
   }, [resendCooldown]);
+
+  useEffect(() => {
+    if (step !== "verify" || verifySynced) return;
+    let cancelled = false;
+
+    const checkVerificationStatus = async () => {
+      if (cancelled || pollInFlightRef.current) return;
+      pollInFlightRef.current = true;
+      try {
+        const res = await fetch("/api/auth/email/status", {
+          method: "GET",
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data?.verified && !cancelled) {
+          setVerifySynced(true);
+          setError("");
+          setSuccessMsg("");
+          window.dispatchEvent(new Event("user-updated"));
+          const destination = data.redirectTo || getNextUrl();
+          setTimeout(() => {
+            if (!cancelled) {
+              router.push(destination);
+              router.refresh();
+            }
+          }, 550);
+        }
+      } catch {
+        // Transient network hiccup; next interval retries cleanly
+      } finally {
+        pollInFlightRef.current = false;
+      }
+    };
+
+    checkVerificationStatus();
+    const intervalId = setInterval(checkVerificationStatus, 2500);
+    const onFocusOrVisible = () => {
+      if (document.visibilityState === "visible") {
+        checkVerificationStatus();
+      }
+    };
+    window.addEventListener("focus", onFocusOrVisible);
+    document.addEventListener("visibilitychange", onFocusOrVisible);
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+      window.removeEventListener("focus", onFocusOrVisible);
+      document.removeEventListener("visibilitychange", onFocusOrVisible);
+    };
+  }, [step, verifySynced, router]);
 
   const getNextUrl = () => {
     if (typeof window !== "undefined") {
@@ -145,7 +198,7 @@ export default function LoginPage() {
     )}`;
   };
 
-  // 4. SEND REAL EMAIL VERIFICATION LINK + BACKUP CODE
+  // 4. SEND REAL EMAIL VERIFICATION LINK
   const handleSendEmailOtp = async (
     e?: React.FormEvent,
     overrideEmail?: string,
@@ -178,15 +231,13 @@ export default function LoginPage() {
         );
       }
 
+      const isResend = Boolean(overrideEmail);
       setPendingEmail(data.email || targetEmail);
       setVerifyPurpose(purpose);
+      setVerifySynced(false);
       setStep("verify");
       setResendCooldown(60);
-      setOtpCode("");
-      setSuccessMsg(
-        data.message ||
-          `Confirmation link & 6-digit verification code sent to ${targetEmail}.`
-      );
+      setSuccessMsg(isResend ? "Confirmation email resent." : "");
     } catch (err: unknown) {
       setError(
         err instanceof Error
@@ -198,46 +249,7 @@ export default function LoginPage() {
     }
   };
 
-  // 5. VERIFY 6-DIGIT EMAIL CODE
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanCode = otpCode.trim().replace(/\s+/g, "");
-    if (!cleanCode) return;
-
-    setLoading(true);
-    setError("");
-    setSuccessMsg("");
-
-    try {
-      const res = await fetch("/api/auth/email/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: pendingEmail,
-          code: cleanCode,
-          next: getNextUrl(),
-        }),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Invalid or expired verification code.");
-      }
-
-      setSuccessMsg("Email verified! Opening your dashboard...");
-      window.dispatchEvent(new Event("user-updated"));
-      router.push(data.redirectTo || getNextUrl());
-      router.refresh();
-    } catch (err: unknown) {
-      setError(
-        err instanceof Error ? err.message : "Code verification failed."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 6. PASSWORD LOGIN / REGISTER (WITH MANDATORY EMAIL CONFIRMATION)
+  // 5. PASSWORD LOGIN / REGISTER (WITH MANDATORY EMAIL CONFIRMATION)
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanEmail = emailInput.trim().toLowerCase();
@@ -266,13 +278,10 @@ export default function LoginPage() {
 
         setPendingEmail(data.email || cleanEmail);
         setVerifyPurpose("VERIFY_EMAIL");
+        setVerifySynced(false);
         setStep("verify");
         setResendCooldown(60);
-        setOtpCode("");
-        setSuccessMsg(
-          data.message ||
-            `Confirmation email sent to ${cleanEmail}! Click the Verify button in your inbox to open your dashboard.`
-        );
+        setSuccessMsg("");
       } else {
         const res = await fetch("/api/auth/login", {
           method: "POST",
@@ -288,12 +297,11 @@ export default function LoginPage() {
         if (res.status === 403 && data?.requiresVerification) {
           setPendingEmail(data.email || cleanEmail);
           setVerifyPurpose("VERIFY_EMAIL");
+          setVerifySynced(false);
+          setError("");
+          setSuccessMsg("");
           setStep("verify");
           setResendCooldown(60);
-          setSuccessMsg(
-            data.error ||
-              `Confirmation link sent to ${cleanEmail}. Click Verify in your inbox first.`
-          );
           return;
         }
 
@@ -604,107 +612,142 @@ export default function LoginPage() {
               </>
             ) : (
               /* ================= STEP 2: EMAIL VERIFICATION SCREEN ================= */
-              <div className="w-full space-y-4">
-                <div className="inline-flex items-center px-3 py-1 rounded-full bg-[#e4e9c6] dark:bg-[#283117] text-[#3c4c16] dark:text-[#d5df88] text-[0.7rem] font-mono font-bold uppercase tracking-wider">
-                  Confirm Your Email
+              <div className="w-full space-y-5 py-2 flex flex-col items-center text-center">
+                {/* Animated Mail / Verified Ring */}
+                <div className="relative w-16 h-16 flex items-center justify-center">
+                  {!verifySynced ? (
+                    <>
+                      <span
+                        className="absolute inset-0 rounded-full border-2 border-[#4b5e1e]/20 dark:border-[#b8c460]/20"
+                        aria-hidden="true"
+                      />
+                      <span
+                        className="absolute inset-0 rounded-full border-2 border-transparent border-t-[#4b5e1e] dark:border-t-[#b8c460] animate-spin"
+                        style={{ animationDuration: "1.4s" }}
+                        aria-hidden="true"
+                      />
+                      <div className="w-12 h-12 rounded-full bg-[#e4e9c6]/80 dark:bg-[#283117]/80 flex items-center justify-center text-[#4b5e1e] dark:text-[#b8c460]">
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={1.8}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                          />
+                        </svg>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="w-14 h-14 rounded-full bg-[#4b5e1e] dark:bg-[#b8c460] text-[#f6f8ec] dark:text-[#0f1611] flex items-center justify-center shadow-lg transition-all">
+                      <svg
+                        className="w-7 h-7"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2.4}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    </div>
+                  )}
                 </div>
 
-                <h2 className="text-2xl font-display font-medium text-[#0f1611] dark:text-[#f5f7f2] tracking-tight">
-                  Check your{" "}
-                  <em className="italic font-serif text-[#4b5e1e] dark:text-[#b8c460]">
-                    inbox.
-                  </em>
-                </h2>
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-display font-medium text-[#0f1611] dark:text-[#f5f7f2] tracking-tight">
+                    {verifySynced ? (
+                      <>
+                        Email{" "}
+                        <em className="italic font-serif text-[#4b5e1e] dark:text-[#b8c460]">
+                          verified.
+                        </em>
+                      </>
+                    ) : (
+                      <>
+                        Check your{" "}
+                        <em className="italic font-serif text-[#4b5e1e] dark:text-[#b8c460]">
+                          inbox.
+                        </em>
+                      </>
+                    )}
+                  </h2>
 
-                <p className="text-xs sm:text-[0.82rem] text-[#4c4c3d] dark:text-white/70 leading-relaxed">
-                  We sent a confirmation link to{" "}
-                  <strong className="text-[#0f1611] dark:text-white font-semibold">
-                    {pendingEmail}
-                  </strong>
-                  . Click <strong className="text-[#0f1611] dark:text-white">Verify Email &amp; Go to Dashboard</strong> inside your email to auto-login. Next time, sign in anytime with your email and password!
-                </p>
+                  <p className="text-xs sm:text-[0.84rem] text-[#4c4c3d] dark:text-white/70 leading-relaxed max-w-[300px] mx-auto">
+                    {verifySynced ? (
+                      "Signing you in & opening your dashboard…"
+                    ) : (
+                      <>
+                        We sent a confirmation link to{" "}
+                        <strong className="text-[#0f1611] dark:text-white font-semibold break-all">
+                          {pendingEmail}
+                        </strong>
+                        .
+                      </>
+                    )}
+                  </p>
+                </div>
+
+                {/* Live Sync Status Pill */}
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/65 dark:bg-white/[0.08] border border-[#0f1611]/10 dark:border-white/15 text-xs font-medium text-[#3c4c16] dark:text-[#d5df88]">
+                  <span
+                    className={`w-2 h-2 rounded-full bg-[#4b5e1e] dark:bg-[#b8c460] ${
+                      verifySynced ? "" : "animate-pulse"
+                    }`}
+                  />
+                  {verifySynced
+                    ? "Redirecting to dashboard…"
+                    : "Waiting for verification…"}
+                </div>
 
                 {error && (
-                  <div className="w-full p-3 rounded-2xl bg-red-500/12 dark:bg-red-500/15 border border-red-600/25 dark:border-red-400/30 text-xs text-red-900 dark:text-red-200 text-left">
+                  <div className="w-full p-3 rounded-2xl bg-red-500/12 dark:bg-red-500/15 border border-red-600/25 dark:border-red-400/30 text-xs text-red-900 dark:text-red-200 text-center">
                     {error}
                   </div>
                 )}
 
-                {successMsg && (
-                  <div className="w-full p-3 rounded-2xl bg-[#eef2da]/90 dark:bg-[#b8c460]/15 border border-[#4b5e1e]/25 dark:border-[#b8c460]/30 text-xs text-[#3c4c16] dark:text-[#d5df88] font-medium">
+                {successMsg && !verifySynced && (
+                  <div className="w-full px-3 py-2 rounded-2xl bg-[#eef2da]/90 dark:bg-[#b8c460]/15 border border-[#4b5e1e]/20 dark:border-[#b8c460]/25 text-xs text-[#3c4c16] dark:text-[#d5df88] font-medium">
                     {successMsg}
                   </div>
                 )}
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmailInput(pendingEmail);
-                    setEmailSectionOpen(true);
-                    setEmailAuthMode("password-login");
-                    setStep("choose");
-                    setError("");
-                    setSuccessMsg("");
-                  }}
-                  className="w-full h-11 rounded-full border border-[#0f1611]/15 dark:border-white/20 bg-white/55 hover:bg-white/80 dark:bg-white/[0.06] dark:hover:bg-white/[0.12] text-[#0f1611] dark:text-white font-medium text-xs sm:text-sm transition-all cursor-pointer"
-                >
-                  Verified on another device? Sign in with password →
-                </button>
-
-                <form onSubmit={handleVerifyOtp} className="space-y-2.5 pt-2 border-t border-[#0f1611]/10 dark:border-white/10">
-                  <p className="text-[0.68rem] text-[#4c4c3d]/80 dark:text-white/55">
-                    Or enter the 6-digit verification code from that email:
-                  </p>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      maxLength={8}
-                      required
-                      value={otpCode}
-                      onChange={(e) =>
-                        setOtpCode(e.target.value.replace(/[^\d]/g, ""))
-                      }
-                      placeholder="000000"
-                      className="flex-1 h-11 px-4 rounded-full border border-[#0f1611]/15 dark:border-white/20 bg-white/70 dark:bg-white/[0.06] text-center font-mono text-base tracking-[0.35em] text-[#0f1611] dark:text-white placeholder-[#4c4c3d]/35 dark:placeholder-white/25 outline-none focus:border-[#4b5e1e] dark:focus:border-[#b8c460]"
-                    />
+                {!verifySynced && (
+                  <div className="w-full flex items-center justify-between pt-3 border-t border-[#0f1611]/10 dark:border-white/10 text-xs">
                     <button
-                      type="submit"
-                      disabled={loading || otpCode.length < 6}
-                      className="px-5 h-11 rounded-full bg-[#4b5e1e] hover:bg-[#3c4c16] text-[#f6f8ec] dark:bg-[#b8c460] dark:hover:bg-[#a6b350] dark:text-[#0f1611] font-semibold text-xs sm:text-sm transition-colors cursor-pointer disabled:opacity-45 shrink-0"
+                      type="button"
+                      onClick={() => {
+                        setStep("choose");
+                        setVerifySynced(false);
+                        setError("");
+                        setSuccessMsg("");
+                      }}
+                      className="text-[#4c4c3d] dark:text-white/60 hover:text-[#0f1611] dark:hover:text-white transition-colors cursor-pointer"
                     >
-                      {loading ? "..." : "Verify →"}
+                      ← Use another email
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={loading || resendCooldown > 0}
+                      onClick={() =>
+                        handleSendEmailOtp(undefined, pendingEmail, verifyPurpose)
+                      }
+                      className="font-semibold text-[#4b5e1e] dark:text-[#b8c460] hover:underline disabled:opacity-45 cursor-pointer"
+                    >
+                      {resendCooldown > 0
+                        ? `Resend in ${resendCooldown}s`
+                        : "Resend email"}
                     </button>
                   </div>
-                </form>
-
-                <div className="flex items-center justify-between pt-1 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStep("choose");
-                      setError("");
-                      setSuccessMsg("");
-                    }}
-                    className="text-[#4c4c3d] dark:text-white/60 hover:text-[#0f1611] dark:hover:text-white transition-colors cursor-pointer"
-                  >
-                    ← Use a different account
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={loading || resendCooldown > 0}
-                    onClick={() =>
-                      handleSendEmailOtp(undefined, pendingEmail, verifyPurpose)
-                    }
-                    className="font-semibold text-[#4b5e1e] dark:text-[#b8c460] hover:underline disabled:opacity-45 cursor-pointer"
-                  >
-                    {resendCooldown > 0
-                      ? `Resend in ${resendCooldown}s`
-                      : "Resend verification email"}
-                  </button>
-                </div>
+                )}
               </div>
             )}
           </div>

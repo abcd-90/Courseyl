@@ -49,10 +49,24 @@ export async function GET(req: Request) {
       );
     }
 
+    const now = new Date();
     await prisma.authVerificationToken.update({
       where: { id: record.id },
-      data: { consumedAt: new Date() },
+      data: { consumedAt: now, verifiedAt: now },
     });
+
+    if (record.pollHash) {
+      await prisma.authVerificationToken
+        .updateMany({
+          where: {
+            email,
+            pollHash: record.pollHash,
+            verifiedAt: null,
+          },
+          data: { verifiedAt: now },
+        })
+        .catch(() => {});
+    }
 
     const user = await upsertVerifiedUser({
       email,

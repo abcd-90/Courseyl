@@ -12,13 +12,13 @@ export interface SendVerificationResult {
   ok: boolean;
   mode: "resend" | "smtp" | "supabase";
   message: string;
+  pollSecret?: string;
   error?: string;
   statusCode?: number;
 }
 
 function renderVerificationHtml(params: {
   brandName: string;
-  code: string;
   confirmUrl: string;
   purpose: VerificationPurpose;
 }) {
@@ -27,6 +27,16 @@ function renderVerificationHtml(params: {
       ? `Verify your email for ${params.brandName}`
       : `Sign in to ${params.brandName}`;
 
+  const introCopy =
+    params.purpose === "VERIFY_EMAIL"
+      ? `Click the button below to confirm your email and open your ${params.brandName} dashboard.`
+      : `Click the button below to sign in to ${params.brandName}.`;
+
+  const ctaLabel =
+    params.purpose === "VERIFY_EMAIL"
+      ? "Verify Email →"
+      : `Sign in to ${params.brandName} →`;
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -34,32 +44,22 @@ function renderVerificationHtml(params: {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${actionHeading}</title>
 </head>
-<body style="margin: 0; padding: 24px 12px; background: #f6f8ec; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; color: #0f1611;">
-  <div style="max-width: 500px; margin: 0 auto; padding: 28px 24px; background: #ffffff; border: 1px solid #e4e9c6; border-radius: 16px;">
-    <p style="font-size: 13px; color: #4b5e1e; font-weight: 600; margin: 0 0 8px;">
-      ${params.brandName} Account Verification
+<body style="margin: 0; padding: 28px 12px; background: #f6f8ec; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; color: #0f1611;">
+  <div style="max-width: 480px; margin: 0 auto; padding: 32px 28px; background: #ffffff; border: 1px solid #e4e9c6; border-radius: 18px;">
+    <p style="font-size: 13px; color: #4b5e1e; font-weight: 600; margin: 0 0 10px;">
+      ${params.brandName}
     </p>
     <h1 style="font-size: 22px; font-weight: 700; margin: 0 0 12px; color: #0f1611;">${actionHeading}</h1>
-    <p style="font-size: 15px; line-height: 1.55; color: #4c4c3d; margin: 0 0 22px;">
-      ${
-        params.purpose === "VERIFY_EMAIL"
-          ? `Click the button below to confirm your email address. You will be signed in straight to your ${params.brandName} dashboard, and you can use your email and password to sign in anytime after.`
-          : `Click the button below to sign in to ${params.brandName}, or enter the 6-digit verification code if prompted. This verification stays valid for 10 minutes.`
-      }
+    <p style="font-size: 15px; line-height: 1.55; color: #4c4c3d; margin: 0 0 24px;">
+      ${introCopy}
     </p>
-    <p style="text-align: center; margin: 0 0 22px;">
+    <p style="margin: 0 0 24px;">
       <a href="${params.confirmUrl}" style="display: inline-block; background: #4b5e1e; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 15px; padding: 13px 28px; border-radius: 999px;">
-        Verify Email &amp; Go to Dashboard →
+        ${ctaLabel}
       </a>
     </p>
-    <div style="background: #f6f8ec; border: 1px solid #d5df88; border-radius: 12px; padding: 14px; text-align: center; margin-bottom: 18px;">
-      <p style="font-size: 11px; color: #4c4c3d; margin: 0 0 6px;">Or enter this 6-digit code manually:</p>
-      <span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24px; font-weight: 700; letter-spacing: 5px; color: #0f1611;">
-        ${params.code}
-      </span>
-    </div>
     <p style="font-size: 12px; line-height: 1.5; color: #666656; margin: 0;">
-      If you did not try to sign in to ${params.brandName}, you can safely ignore this email.
+      This confirmation link expires in 15 minutes. If you didn&apos;t request this, you can safely ignore this email.
     </p>
   </div>
 </body>
@@ -68,18 +68,15 @@ function renderVerificationHtml(params: {
 
 function renderVerificationText(params: {
   brandName: string;
-  code: string;
   confirmUrl: string;
 }) {
   return [
-    `${params.brandName} — Email Verification`,
+    `${params.brandName} — Confirm your email`,
     "",
-    `Your 6-digit verification code is: ${params.code}`,
-    "",
-    "Enter this code on the login page (expires in 10 minutes), or open the link below to sign in directly:",
+    "Open the link below to verify your email and sign in to your dashboard:",
     params.confirmUrl,
     "",
-    `If you didn't request this email, you can ignore it.`,
+    "This link expires in 15 minutes. If you didn't request this, you can safely ignore this email.",
   ].join("\n");
 }
 
@@ -129,7 +126,7 @@ async function deliverViaConfiguredMailer(params: {
     return {
       ok: true,
       mode: "resend",
-      message: `Confirmation link & 6-digit code sent to ${to}.`,
+      message: `Confirmation link sent to ${to}.`,
     };
   }
 
@@ -161,7 +158,7 @@ async function deliverViaConfiguredMailer(params: {
       return {
         ok: true,
         mode: "smtp",
-        message: `Confirmation link & 6-digit code sent to ${to}.`,
+        message: `Confirmation link sent to ${to}.`,
       };
     } catch (smtpErr: unknown) {
       console.error("SMTP sendMail failed:", smtpErr);
@@ -191,6 +188,7 @@ export async function issueAndSendEmailVerification(params: {
   purpose: VerificationPurpose;
   origin: string;
   next?: string;
+  existingPollSecret?: string;
 }): Promise<SendVerificationResult> {
   const cleanEmail = params.email.trim().toLowerCase();
   const safeNext = sanitizeNextPath(params.next);
@@ -204,18 +202,11 @@ export async function issueAndSendEmailVerification(params: {
   const hasSmtp = Boolean(cfg.smtpHost && cfg.smtpUser && cfg.smtpPass);
 
   if (hasResend || hasSmtp) {
-    // Invalidate older unconsumed codes for this email & purpose
-    await prisma.authVerificationToken.updateMany({
-      where: {
-        email: cleanEmail,
-        purpose: params.purpose,
-        consumedAt: null,
-      },
-      data: { consumedAt: new Date() },
-    });
-
     const code = String(crypto.randomInt(100000, 1000000));
     const rawToken = crypto.randomBytes(32).toString("hex");
+    const pollSecret =
+      params.existingPollSecret?.trim() ||
+      crypto.randomBytes(32).toString("hex");
 
     await prisma.authVerificationToken.create({
       data: {
@@ -223,7 +214,9 @@ export async function issueAndSendEmailVerification(params: {
         purpose: params.purpose,
         codeHash: hashVerificationSecret(code),
         tokenHash: hashVerificationSecret(rawToken),
-        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        pollHash: hashVerificationSecret(pollSecret),
+        nextPath: safeNext,
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
       },
     });
 
@@ -234,17 +227,15 @@ export async function issueAndSendEmailVerification(params: {
     const subject =
       params.purpose === "VERIFY_EMAIL"
         ? `Confirm your email for ${brandName}`
-        : `${code} is your ${brandName} sign-in code`;
+        : `Sign in to ${brandName}`;
 
     const html = renderVerificationHtml({
       brandName,
-      code,
       confirmUrl,
       purpose: params.purpose,
     });
     const text = renderVerificationText({
       brandName,
-      code,
       confirmUrl,
     });
 
@@ -257,7 +248,13 @@ export async function issueAndSendEmailVerification(params: {
       text,
     });
     if (delivered) {
-      return delivered;
+      return delivered.ok
+        ? {
+            ...delivered,
+            pollSecret,
+            message: `We sent a confirmation link to ${cleanEmail}.`,
+          }
+        : delivered;
     }
   }
 
@@ -306,7 +303,7 @@ export async function issueAndSendEmailVerification(params: {
   return {
     ok: true,
     mode: "supabase",
-    message: `Confirmation email sent to ${cleanEmail}. Click the confirmation link in your inbox or enter your 6-digit code below.`,
+    message: `We sent a confirmation link to ${cleanEmail}.`,
   };
 }
 
@@ -339,17 +336,14 @@ export async function sendAdminMailerTestEmail(params: {
     };
   }
 
-  const testCode = String(crypto.randomInt(100000, 1000000));
   const confirmUrl = `${params.origin}/login`;
   const html = renderVerificationHtml({
     brandName,
-    code: testCode,
     confirmUrl,
     purpose: "VERIFY_EMAIL",
   });
   const text = renderVerificationText({
     brandName,
-    code: testCode,
     confirmUrl,
   });
 
@@ -357,7 +351,7 @@ export async function sendAdminMailerTestEmail(params: {
     cfg,
     brandName,
     to,
-    subject: `${testCode} is your ${brandName} verification code`,
+    subject: `${brandName} email delivery active`,
     html,
     text,
   });
