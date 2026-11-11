@@ -43,12 +43,15 @@ export default function LoginPage() {
   const [successMsg, setSuccessMsg] = useState("");
   const [providers, setProviders] = useState<AuthProvidersMap | null>(null);
 
-  // Email flow state: "choose" (OAuth + Email initiation) vs "verify" (6-digit OTP verification)
+  // Email flow state: "choose" (OAuth + Email initiation) vs "verify" (Email confirmation screen)
   const [step, setStep] = useState<"choose" | "verify">("choose");
   const [emailSectionOpen, setEmailSectionOpen] = useState(false);
   const [emailAuthMode, setEmailAuthMode] = useState<
-    "otp" | "password-login" | "password-signup"
-  >("otp");
+    "password-login" | "password-signup" | "otp"
+  >("password-login");
+  const [verifyPurpose, setVerifyPurpose] = useState<"VERIFY_EMAIL" | "LOGIN_OTP">(
+    "VERIFY_EMAIL"
+  );
 
   const [fullName, setFullName] = useState("");
   const [emailInput, setEmailInput] = useState("");
@@ -67,7 +70,9 @@ export default function LoginPage() {
       const modeParam = params.get("mode");
       if (modeParam === "email" || modeParam === "signup") {
         setEmailSectionOpen(true);
-        if (modeParam === "signup") setEmailAuthMode("password-signup");
+        setEmailAuthMode(
+          modeParam === "signup" ? "password-signup" : "password-login"
+        );
       }
     }
 
@@ -140,11 +145,16 @@ export default function LoginPage() {
     )}`;
   };
 
-  // 4. SEND REAL EMAIL VERIFICATION CODE + MAGIC LINK
-  const handleSendEmailOtp = async (e?: React.FormEvent, overrideEmail?: string) => {
+  // 4. SEND REAL EMAIL VERIFICATION LINK + BACKUP CODE
+  const handleSendEmailOtp = async (
+    e?: React.FormEvent,
+    overrideEmail?: string,
+    overridePurpose?: "VERIFY_EMAIL" | "LOGIN_OTP"
+  ) => {
     if (e) e.preventDefault();
     const targetEmail = (overrideEmail ?? emailInput).trim().toLowerCase();
     if (!targetEmail) return;
+    const purpose = overridePurpose ?? "LOGIN_OTP";
 
     setLoading(true);
     setError("");
@@ -156,6 +166,7 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: targetEmail,
+          purpose,
           next: getNextUrl(),
         }),
       });
@@ -168,6 +179,7 @@ export default function LoginPage() {
       }
 
       setPendingEmail(data.email || targetEmail);
+      setVerifyPurpose(purpose);
       setStep("verify");
       setResendCooldown(60);
       setOtpCode("");
@@ -253,12 +265,13 @@ export default function LoginPage() {
         }
 
         setPendingEmail(data.email || cleanEmail);
+        setVerifyPurpose("VERIFY_EMAIL");
         setStep("verify");
         setResendCooldown(60);
         setOtpCode("");
         setSuccessMsg(
           data.message ||
-            `Account created! Enter the confirmation code sent to ${cleanEmail}.`
+            `Confirmation email sent to ${cleanEmail}! Click the Verify button in your inbox to open your dashboard.`
         );
       } else {
         const res = await fetch("/api/auth/login", {
@@ -274,11 +287,12 @@ export default function LoginPage() {
 
         if (res.status === 403 && data?.requiresVerification) {
           setPendingEmail(data.email || cleanEmail);
+          setVerifyPurpose("VERIFY_EMAIL");
           setStep("verify");
           setResendCooldown(60);
           setSuccessMsg(
             data.error ||
-              `Confirmation code sent to ${cleanEmail}. Please verify your email first.`
+              `Confirmation link sent to ${cleanEmail}. Click Verify in your inbox first.`
           );
           return;
         }
@@ -438,35 +452,21 @@ export default function LoginPage() {
 
                   {emailSectionOpen && (
                     <div className="mt-3 space-y-3 animate-in fade-in duration-200">
-                      {/* Email Method Selector Pills */}
+                      {/* Clean 2-Tab Selector: Returning Sign In vs New Account Setup */}
                       <div className="inline-flex p-1 rounded-full bg-white/40 dark:bg-white/[0.05] border border-[#0f1611]/10 dark:border-white/10 text-[0.72rem] font-medium">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEmailAuthMode("otp");
-                            setError("");
-                          }}
-                          className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
-                            emailAuthMode === "otp"
-                              ? "bg-[#4b5e1e] text-[#f6f8ec] dark:bg-[#b8c460] dark:text-[#0f1611] shadow-xs"
-                              : "text-[#4c4c3d] dark:text-white/65 hover:text-[#0f1611] dark:hover:text-white"
-                          }`}
-                        >
-                          Email Code
-                        </button>
                         <button
                           type="button"
                           onClick={() => {
                             setEmailAuthMode("password-login");
                             setError("");
                           }}
-                          className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
+                          className={`px-3.5 py-1 rounded-full transition-all cursor-pointer ${
                             emailAuthMode === "password-login"
                               ? "bg-[#4b5e1e] text-[#f6f8ec] dark:bg-[#b8c460] dark:text-[#0f1611] shadow-xs"
                               : "text-[#4c4c3d] dark:text-white/65 hover:text-[#0f1611] dark:hover:text-white"
                           }`}
                         >
-                          Password
+                          Sign in
                         </button>
                         {allowSignups && (
                           <button
@@ -475,7 +475,7 @@ export default function LoginPage() {
                               setEmailAuthMode("password-signup");
                               setError("");
                             }}
-                            className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
+                            className={`px-3.5 py-1 rounded-full transition-all cursor-pointer ${
                               emailAuthMode === "password-signup"
                                 ? "bg-[#4b5e1e] text-[#f6f8ec] dark:bg-[#b8c460] dark:text-[#0f1611] shadow-xs"
                                 : "text-[#4c4c3d] dark:text-white/65 hover:text-[#0f1611] dark:hover:text-white"
@@ -502,12 +502,24 @@ export default function LoginPage() {
                               disabled={loading || !emailInput.trim()}
                               className="absolute right-1.5 h-8 px-3.5 rounded-full bg-[#4b5e1e] hover:bg-[#3c4c16] text-[#f6f8ec] dark:bg-[#b8c460] dark:hover:bg-[#a6b350] dark:text-[#0f1611] font-semibold text-xs transition-colors disabled:opacity-40 cursor-pointer flex items-center gap-1"
                             >
-                              {loading ? "..." : "Send code →"}
+                              {loading ? "..." : "Send link →"}
                             </button>
                           </div>
-                          <p className="text-[0.68rem] text-[#4c4c3d]/80 dark:text-white/50">
-                            We&apos;ll send a real confirmation email &amp; 6-digit code to verify your inbox.
-                          </p>
+                          <div className="flex items-center justify-between text-[0.68rem] px-1">
+                            <span className="text-[#4c4c3d]/80 dark:text-white/50">
+                              Instant sign-in link sent to your inbox.
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEmailAuthMode("password-login");
+                                setError("");
+                              }}
+                              className="font-medium text-[#4b5e1e] dark:text-[#b8c460] hover:underline cursor-pointer"
+                            >
+                              Use password
+                            </button>
+                          </div>
                         </form>
                       ) : (
                         <form onSubmit={handlePasswordSubmit} className="space-y-2 text-left">
@@ -537,7 +549,7 @@ export default function LoginPage() {
                             onChange={(e) => setPassword(e.target.value)}
                             placeholder={
                               emailAuthMode === "password-signup"
-                                ? "Password (min 8 characters)"
+                                ? "Set password (min 8 characters)"
                                 : "Password"
                             }
                             className="w-full h-11 px-4 rounded-full border border-[#0f1611]/15 dark:border-white/15 bg-white/60 dark:bg-white/[0.06] text-[#0f1611] dark:text-white placeholder-[#4c4c3d]/60 dark:placeholder-white/40 text-xs sm:text-sm outline-none focus:border-[#4b5e1e] dark:focus:border-[#b8c460]"
@@ -553,6 +565,18 @@ export default function LoginPage() {
                               ? "Create Account & Verify Email →"
                               : "Sign In →"}
                           </button>
+                          <div className="text-center pt-0.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEmailAuthMode("otp");
+                                setError("");
+                              }}
+                              className="text-[0.68rem] text-[#4c4c3d]/80 dark:text-white/50 hover:text-[#4b5e1e] dark:hover:text-[#b8c460] transition-colors cursor-pointer"
+                            >
+                              Or sign in with a one-time email link
+                            </button>
+                          </div>
                         </form>
                       )}
                     </div>
@@ -579,25 +603,25 @@ export default function LoginPage() {
                 </p>
               </>
             ) : (
-              /* ================= STEP 2: EMAIL VERIFICATION CODE SCREEN ================= */
+              /* ================= STEP 2: EMAIL VERIFICATION SCREEN ================= */
               <div className="w-full space-y-4">
                 <div className="inline-flex items-center px-3 py-1 rounded-full bg-[#e4e9c6] dark:bg-[#283117] text-[#3c4c16] dark:text-[#d5df88] text-[0.7rem] font-mono font-bold uppercase tracking-wider">
-                  Check Your Inbox
+                  Confirm Your Email
                 </div>
 
                 <h2 className="text-2xl font-display font-medium text-[#0f1611] dark:text-[#f5f7f2] tracking-tight">
-                  Verify your{" "}
+                  Check your{" "}
                   <em className="italic font-serif text-[#4b5e1e] dark:text-[#b8c460]">
-                    email.
+                    inbox.
                   </em>
                 </h2>
 
                 <p className="text-xs sm:text-[0.82rem] text-[#4c4c3d] dark:text-white/70 leading-relaxed">
-                  Click the confirmation link sent to{" "}
+                  We sent a confirmation link to{" "}
                   <strong className="text-[#0f1611] dark:text-white font-semibold">
                     {pendingEmail}
-                  </strong>{" "}
-                  or enter the 6-digit code below.
+                  </strong>
+                  . Click <strong className="text-[#0f1611] dark:text-white">Verify Email &amp; Go to Dashboard</strong> inside your email to auto-login. Next time, sign in anytime with your email and password!
                 </p>
 
                 {error && (
@@ -612,31 +636,50 @@ export default function LoginPage() {
                   </div>
                 )}
 
-                <form onSubmit={handleVerifyOtp} className="space-y-3 pt-1">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    maxLength={8}
-                    required
-                    value={otpCode}
-                    onChange={(e) =>
-                      setOtpCode(e.target.value.replace(/[^\d]/g, ""))
-                    }
-                    placeholder="000000"
-                    className="w-full h-13 px-5 rounded-full border border-[#0f1611]/15 dark:border-white/20 bg-white/70 dark:bg-white/[0.06] text-center font-mono text-xl tracking-[0.4em] text-[#0f1611] dark:text-white placeholder-[#4c4c3d]/35 dark:placeholder-white/25 outline-none focus:border-[#4b5e1e] dark:focus:border-[#b8c460]"
-                  />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmailInput(pendingEmail);
+                    setEmailSectionOpen(true);
+                    setEmailAuthMode("password-login");
+                    setStep("choose");
+                    setError("");
+                    setSuccessMsg("");
+                  }}
+                  className="w-full h-11 rounded-full border border-[#0f1611]/15 dark:border-white/20 bg-white/55 hover:bg-white/80 dark:bg-white/[0.06] dark:hover:bg-white/[0.12] text-[#0f1611] dark:text-white font-medium text-xs sm:text-sm transition-all cursor-pointer"
+                >
+                  Verified on another device? Sign in with password →
+                </button>
 
-                  <button
-                    type="submit"
-                    disabled={loading || otpCode.length < 6}
-                    className="w-full h-12 rounded-full bg-[#4b5e1e] hover:bg-[#3c4c16] text-[#f6f8ec] dark:bg-[#b8c460] dark:hover:bg-[#a6b350] dark:text-[#0f1611] font-semibold text-sm transition-colors cursor-pointer disabled:opacity-45"
-                  >
-                    {loading ? "Verifying..." : "Verify & Sign In →"}
-                  </button>
+                <form onSubmit={handleVerifyOtp} className="space-y-2.5 pt-2 border-t border-[#0f1611]/10 dark:border-white/10">
+                  <p className="text-[0.68rem] text-[#4c4c3d]/80 dark:text-white/55">
+                    Or enter the 6-digit verification code from that email:
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={8}
+                      required
+                      value={otpCode}
+                      onChange={(e) =>
+                        setOtpCode(e.target.value.replace(/[^\d]/g, ""))
+                      }
+                      placeholder="000000"
+                      className="flex-1 h-11 px-4 rounded-full border border-[#0f1611]/15 dark:border-white/20 bg-white/70 dark:bg-white/[0.06] text-center font-mono text-base tracking-[0.35em] text-[#0f1611] dark:text-white placeholder-[#4c4c3d]/35 dark:placeholder-white/25 outline-none focus:border-[#4b5e1e] dark:focus:border-[#b8c460]"
+                    />
+                    <button
+                      type="submit"
+                      disabled={loading || otpCode.length < 6}
+                      className="px-5 h-11 rounded-full bg-[#4b5e1e] hover:bg-[#3c4c16] text-[#f6f8ec] dark:bg-[#b8c460] dark:hover:bg-[#a6b350] dark:text-[#0f1611] font-semibold text-xs sm:text-sm transition-colors cursor-pointer disabled:opacity-45 shrink-0"
+                    >
+                      {loading ? "..." : "Verify →"}
+                    </button>
+                  </div>
                 </form>
 
-                <div className="flex items-center justify-between pt-2 text-xs">
+                <div className="flex items-center justify-between pt-1 text-xs">
                   <button
                     type="button"
                     onClick={() => {
@@ -652,12 +695,14 @@ export default function LoginPage() {
                   <button
                     type="button"
                     disabled={loading || resendCooldown > 0}
-                    onClick={() => handleSendEmailOtp(undefined, pendingEmail)}
+                    onClick={() =>
+                      handleSendEmailOtp(undefined, pendingEmail, verifyPurpose)
+                    }
                     className="font-semibold text-[#4b5e1e] dark:text-[#b8c460] hover:underline disabled:opacity-45 cursor-pointer"
                   >
                     {resendCooldown > 0
                       ? `Resend in ${resendCooldown}s`
-                      : "Resend code"}
+                      : "Resend verification email"}
                   </button>
                 </div>
               </div>

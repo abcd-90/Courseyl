@@ -46,9 +46,12 @@ export async function POST(req: Request) {
       }
     }
 
+    const purpose =
+      body?.purpose === "VERIFY_EMAIL" ? "VERIFY_EMAIL" : "LOGIN_OTP";
+
     const delivery = await issueAndSendEmailVerification({
       email: cleanEmail,
-      purpose: "LOGIN_OTP",
+      purpose,
       origin,
       next,
     });

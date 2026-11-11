@@ -40,19 +40,24 @@ function renderVerificationHtml(params: {
       ${params.brandName} Account Verification
     </p>
     <h1 style="font-size: 22px; font-weight: 700; margin: 0 0 12px; color: #0f1611;">${actionHeading}</h1>
-    <p style="font-size: 15px; line-height: 1.55; color: #4c4c3d; margin: 0 0 20px;">
-      Enter the 6-digit verification code below on the sign-in screen, or use the direct confirmation button. The code stays valid for 10 minutes.
+    <p style="font-size: 15px; line-height: 1.55; color: #4c4c3d; margin: 0 0 22px;">
+      ${
+        params.purpose === "VERIFY_EMAIL"
+          ? `Click the button below to confirm your email address. You will be signed in straight to your ${params.brandName} dashboard, and you can use your email and password to sign in anytime after.`
+          : `Click the button below to sign in to ${params.brandName}, or enter the 6-digit verification code if prompted. This verification stays valid for 10 minutes.`
+      }
     </p>
-    <div style="background: #f6f8ec; border: 1px solid #d5df88; border-radius: 12px; padding: 16px; text-align: center; margin-bottom: 20px;">
-      <span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 30px; font-weight: 700; letter-spacing: 6px; color: #0f1611;">
+    <p style="text-align: center; margin: 0 0 22px;">
+      <a href="${params.confirmUrl}" style="display: inline-block; background: #4b5e1e; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 15px; padding: 13px 28px; border-radius: 999px;">
+        Verify Email &amp; Go to Dashboard →
+      </a>
+    </p>
+    <div style="background: #f6f8ec; border: 1px solid #d5df88; border-radius: 12px; padding: 14px; text-align: center; margin-bottom: 18px;">
+      <p style="font-size: 11px; color: #4c4c3d; margin: 0 0 6px;">Or enter this 6-digit code manually:</p>
+      <span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24px; font-weight: 700; letter-spacing: 5px; color: #0f1611;">
         ${params.code}
       </span>
     </div>
-    <p style="text-align: center; margin: 0 0 20px;">
-      <a href="${params.confirmUrl}" style="display: inline-block; background: #4b5e1e; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 11px 24px; border-radius: 999px;">
-        Confirm email and continue
-      </a>
-    </p>
     <p style="font-size: 12px; line-height: 1.5; color: #666656; margin: 0;">
       If you did not try to sign in to ${params.brandName}, you can safely ignore this email.
     </p>
@@ -228,7 +233,7 @@ export async function issueAndSendEmailVerification(params: {
 
     const subject =
       params.purpose === "VERIFY_EMAIL"
-        ? `Confirm your email for ${brandName} (${code})`
+        ? `Confirm your email for ${brandName}`
         : `${code} is your ${brandName} sign-in code`;
 
     const html = renderVerificationHtml({

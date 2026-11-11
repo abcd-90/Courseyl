@@ -56,16 +56,30 @@ export async function POST(req: Request) {
 
     if (!user.emailVerified) {
       const origin = getRequestOrigin(req);
-      const delivery = await issueAndSendEmailVerification({
-        email: cleanEmail,
-        purpose: "VERIFY_EMAIL",
-        origin,
-        next: sanitizeNextPath(next),
-      }).catch(() => null);
+      const recentToken = await prisma.authVerificationToken.findFirst({
+        where: {
+          email: cleanEmail,
+          consumedAt: null,
+          expiresAt: { gt: new Date() },
+          createdAt: { gt: new Date(Date.now() - 60_000) },
+        },
+        select: { id: true },
+      });
+
+      const delivery = recentToken
+        ? null
+        : await issueAndSendEmailVerification({
+            email: cleanEmail,
+            purpose: "VERIFY_EMAIL",
+            origin,
+            next: sanitizeNextPath(next),
+          }).catch(() => null);
 
       return NextResponse.json(
         {
-          error: delivery?.ok
+          error: recentToken
+            ? `A confirmation link was already sent to ${cleanEmail}. Check your inbox or wait a moment to resend.`
+            : delivery?.ok
             ? `Your email is not verified yet. We just sent a new confirmation link & code to ${cleanEmail}.`
             : "Your email is not verified yet. Please check your inbox and verify your email first.",
           requiresVerification: true,
