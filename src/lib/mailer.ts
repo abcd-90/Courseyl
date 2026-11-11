@@ -25,31 +25,57 @@ function renderVerificationHtml(params: {
   const actionHeading =
     params.purpose === "VERIFY_EMAIL"
       ? `Verify your email for ${params.brandName}`
-      : `Your ${params.brandName} sign-in code`;
+      : `Sign in to ${params.brandName}`;
 
-  return `
-  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background: #fcfcfa; color: #0f1611; border: 1px solid #e4e9c6; border-radius: 20px;">
-    <p style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #4b5e1e; font-weight: 700; margin: 0 0 10px;">
-      ${params.brandName} Security Verification
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${actionHeading}</title>
+</head>
+<body style="margin: 0; padding: 24px 12px; background: #f6f8ec; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; color: #0f1611;">
+  <div style="max-width: 500px; margin: 0 auto; padding: 28px 24px; background: #ffffff; border: 1px solid #e4e9c6; border-radius: 16px;">
+    <p style="font-size: 13px; color: #4b5e1e; font-weight: 600; margin: 0 0 8px;">
+      ${params.brandName} Account Verification
     </p>
-    <h1 style="font-size: 24px; margin: 0 0 12px; color: #0f1611;">${actionHeading}</h1>
-    <p style="font-size: 15px; line-height: 1.6; color: #4c4c3d; margin: 0 0 22px;">
-      Enter this 6-digit verification code on the login page, or click the confirmation button below. This code expires in 10 minutes.
+    <h1 style="font-size: 22px; font-weight: 700; margin: 0 0 12px; color: #0f1611;">${actionHeading}</h1>
+    <p style="font-size: 15px; line-height: 1.55; color: #4c4c3d; margin: 0 0 20px;">
+      Enter the 6-digit verification code below on the sign-in screen, or use the direct confirmation button. The code stays valid for 10 minutes.
     </p>
-    <div style="background: #eef2da; border: 1px solid #b8c460; border-radius: 14px; padding: 18px; text-align: center; margin-bottom: 24px;">
-      <span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #0f1611;">
+    <div style="background: #f6f8ec; border: 1px solid #d5df88; border-radius: 12px; padding: 16px; text-align: center; margin-bottom: 20px;">
+      <span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 30px; font-weight: 700; letter-spacing: 6px; color: #0f1611;">
         ${params.code}
       </span>
     </div>
-    <div style="text-align: center; margin-bottom: 24px;">
-      <a href="${params.confirmUrl}" style="display: inline-block; background: #4b5e1e; color: #f6f8ec; text-decoration: none; font-weight: 600; font-size: 14px; padding: 12px 26px; border-radius: 999px;">
-        Confirm Email &amp; Sign In →
+    <p style="text-align: center; margin: 0 0 20px;">
+      <a href="${params.confirmUrl}" style="display: inline-block; background: #4b5e1e; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 11px 24px; border-radius: 999px;">
+        Confirm email and continue
       </a>
-    </div>
-    <p style="font-size: 12px; color: #4c4c3d; margin: 0;">
-      If you did not request this verification email, you can safely ignore it.
     </p>
-  </div>`;
+    <p style="font-size: 12px; line-height: 1.5; color: #666656; margin: 0;">
+      If you did not try to sign in to ${params.brandName}, you can safely ignore this email.
+    </p>
+  </div>
+</body>
+</html>`;
+}
+
+function renderVerificationText(params: {
+  brandName: string;
+  code: string;
+  confirmUrl: string;
+}) {
+  return [
+    `${params.brandName} — Email Verification`,
+    "",
+    `Your 6-digit verification code is: ${params.code}`,
+    "",
+    "Enter this code on the login page (expires in 10 minutes), or open the link below to sign in directly:",
+    params.confirmUrl,
+    "",
+    `If you didn't request this email, you can ignore it.`,
+  ].join("\n");
 }
 
 async function deliverViaConfiguredMailer(params: {
@@ -58,8 +84,9 @@ async function deliverViaConfiguredMailer(params: {
   to: string;
   subject: string;
   html: string;
+  text: string;
 }): Promise<SendVerificationResult | null> {
-  const { cfg, brandName, to, subject, html } = params;
+  const { cfg, brandName, to, subject, html, text } = params;
   const hasResend = Boolean(cfg.resendApiKey);
   const hasSmtp = Boolean(cfg.smtpHost && cfg.smtpUser && cfg.smtpPass);
 
@@ -74,8 +101,10 @@ async function deliverViaConfiguredMailer(params: {
       body: JSON.stringify({
         from: fromAddr,
         to: [to],
+        reply_to: cfg.smtpUser || undefined,
         subject,
         html,
+        text,
       }),
     });
 
@@ -117,8 +146,10 @@ async function deliverViaConfiguredMailer(params: {
 
       await transporter.sendMail({
         from: cfg.smtpFrom || `${brandName} <${cfg.smtpUser}>`,
+        replyTo: cfg.smtpUser || undefined,
         to,
         subject,
+        text,
         html,
       });
 
@@ -206,6 +237,11 @@ export async function issueAndSendEmailVerification(params: {
       confirmUrl,
       purpose: params.purpose,
     });
+    const text = renderVerificationText({
+      brandName,
+      code,
+      confirmUrl,
+    });
 
     const delivered = await deliverViaConfiguredMailer({
       cfg,
@@ -213,6 +249,7 @@ export async function issueAndSendEmailVerification(params: {
       to: cleanEmail,
       subject,
       html,
+      text,
     });
     if (delivered) {
       return delivered;
@@ -297,19 +334,27 @@ export async function sendAdminMailerTestEmail(params: {
     };
   }
 
+  const testCode = String(crypto.randomInt(100000, 1000000));
+  const confirmUrl = `${params.origin}/login`;
   const html = renderVerificationHtml({
     brandName,
-    code: "123456",
-    confirmUrl: `${params.origin}/login`,
+    code: testCode,
+    confirmUrl,
     purpose: "VERIFY_EMAIL",
+  });
+  const text = renderVerificationText({
+    brandName,
+    code: testCode,
+    confirmUrl,
   });
 
   const result = await deliverViaConfiguredMailer({
     cfg,
     brandName,
     to,
-    subject: `${brandName} Custom Mailer Test (Success)`,
+    subject: `${testCode} is your ${brandName} verification code`,
     html,
+    text,
   });
 
   if (!result) {
