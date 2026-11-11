@@ -1,91 +1,143 @@
 import { NextResponse } from "next/server";
+import {
+  getRequestOrigin,
+  hashPassword,
+  sanitizeNextPath,
+} from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { hashPassword, signToken, getAuthCookieOptions } from "@/lib/auth";
+import { validateRealEmailAddress } from "@/lib/email-validation";
+import { issueAndSendEmailVerification } from "@/lib/mailer";
 import { getPublicSettings } from "@/lib/settings";
 
+/**
+ * POST /api/auth/register
+ * Creates an unverified account with hashed password and sends a mandatory email confirmation code/link.
+ * Does NOT sign an active session cookie until the user proves ownership of the inbox.
+ */
 export async function POST(req: Request) {
   try {
     const settings = await getPublicSettings().catch(() => null);
     if (settings && settings.plans.allowNewSignups === false) {
       return NextResponse.json(
-        { error: "New registrations are temporarily paused by administrator." },
+        {
+          error:
+            "New registrations are temporarily paused by administrator.",
+        },
         { status: 403 }
       );
     }
 
-    const { email, password, name } = await req.json();
+    const body = await req.json();
+    const { email, password, name, next } = body;
 
-    if (!email || !password) {
-      return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
+    const validation = await validateRealEmailAddress(email);
+    if (!validation.valid) {
+      return NextResponse.json(
+        { error: validation.error || "Please enter a valid email address." },
+        { status: 400 }
+      );
     }
 
-    if (password.length < 8) {
-      return NextResponse.json({ error: "Password must be at least 8 characters long." }, { status: 400 });
+    if (!password || typeof password !== "string" || password.length < 8) {
+      return NextResponse.json(
+        { error: "Password must be at least 8 characters long." },
+        { status: 400 }
+      );
     }
+
+    const cleanEmail = validation.cleanEmail;
+    const passwordHash = await hashPassword(password);
+    const fallbackName = cleanEmail.split("@")[0];
+    const displayName =
+      typeof name === "string" && name.trim().length > 0
+        ? name.trim()
+        : fallbackName;
 
     const existingUser = await prisma.user.findUnique({
-      where: { email: email.toLowerCase().trim() },
+      where: { email: cleanEmail },
+      include: { profile: true, subscription: true },
     });
 
-    if (existingUser) {
-      return NextResponse.json({ error: "An account with this email already exists." }, { status: 400 });
+    if (existingUser?.emailVerified) {
+      return NextResponse.json(
+        { error: "An account with this email already exists. Please sign in." },
+        { status: 409 }
+      );
     }
 
-    const passwordHash = await hashPassword(password);
-    const displayName = name?.trim() || email.split("@")[0];
-
-    const user = await prisma.user.create({
-      data: {
-        email: email.toLowerCase().trim(),
-        passwordHash,
-        role: "USER",
-        profile: {
-          create: {
-            displayName,
-            dailyStudyMinutes: 60,
-            currentStreakDays: 1,
-            lastStudyDate: new Date(),
+    if (existingUser && !existingUser.emailVerified) {
+      await prisma.user.update({
+        where: { id: existingUser.id },
+        data: { passwordHash },
+      });
+      if (displayName && existingUser.profile) {
+        await prisma.profile.update({
+          where: { userId: existingUser.id },
+          data: { displayName },
+        });
+      }
+    } else {
+      await prisma.user.create({
+        data: {
+          email: cleanEmail,
+          passwordHash,
+          role: "USER",
+          emailVerified: false,
+          authProvider: "email",
+          profile: {
+            create: {
+              displayName,
+              avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
+                displayName
+              )}&backgroundColor=b8c460`,
+              dailyStudyMinutes: 60,
+              currentStreakDays: 1,
+              lastStudyDate: new Date(),
+            },
+          },
+          subscription: {
+            create: {
+              tier: "FREE",
+              status: "ACTIVE",
+              monthlyGenerationsUsed: 0,
+              monthlyHoursUsedSeconds: 0,
+            },
           },
         },
-        subscription: {
-          create: {
-            tier: "FREE",
-            status: "ACTIVE",
-            monthlyGenerationsUsed: 0,
-            monthlyHoursUsedSeconds: 0,
-          },
+      });
+    }
+
+    const origin = getRequestOrigin(req);
+    const safeNext = sanitizeNextPath(next);
+
+    const delivery = await issueAndSendEmailVerification({
+      email: cleanEmail,
+      purpose: "VERIFY_EMAIL",
+      origin,
+      next: safeNext,
+    });
+
+    if (!delivery.ok) {
+      return NextResponse.json(
+        {
+          error:
+            delivery.error ||
+            "Account created, but confirmation email could not be sent.",
+          requiresVerification: true,
         },
-      },
-      include: {
-        profile: true,
-        subscription: true,
-      },
-    });
+        { status: delivery.statusCode || 502 }
+      );
+    }
 
-    const token = signToken({
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-    });
-
-    const res = NextResponse.json({
+    return NextResponse.json({
       success: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        profile: user.profile,
-        subscription: user.subscription,
-      },
+      requiresVerification: true,
+      deliveryMode: delivery.mode,
+      email: cleanEmail,
+      message: delivery.message,
     });
-
-    const cookieOptions = getAuthCookieOptions();
-    res.cookies.set(cookieOptions.name, token, cookieOptions);
-
-    return res;
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
-

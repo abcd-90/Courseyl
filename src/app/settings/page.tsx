@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/AppSidebar";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -83,6 +84,7 @@ export default function SettingsPage() {
   };
 
   const handleLogout = async () => {
+    await supabase.auth.signOut().catch(() => {});
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
   };

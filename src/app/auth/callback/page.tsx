@@ -2,83 +2,101 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { LandscapeIllustration } from "@/components/LandscapeHero";
+import { MarketingNavbar } from "@/components/MarketingNavbar";
 import { supabase } from "@/lib/supabaseClient";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
-  const [status, setStatus] = useState("Completing authentication...");
+  const [status, setStatus] = useState("Verifying your authentication session...");
+  const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
     async function handleAuth() {
       try {
-        const { data, error } = await supabase.auth.getSession();
-        if (error) throw error;
+        const params = new URLSearchParams(window.location.search);
+        const hashParams = new URLSearchParams(
+          window.location.hash.replace(/^#/, "")
+        );
+        const nextUrl = params.get("next") || "/dashboard";
+        const urlError =
+          params.get("error_description") ||
+          params.get("error") ||
+          hashParams.get("error_description") ||
+          hashParams.get("error");
 
-        if (data?.session?.user) {
-          const user = data.session.user;
-          const email = user.email;
-          const name =
-            user.user_metadata?.full_name ||
-            user.user_metadata?.name ||
-            email?.split("@")[0] ||
-            "Learner";
-          const avatarUrl =
-            user.user_metadata?.avatar_url ||
-            user.user_metadata?.picture ||
-            `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
-              name
-            )}&backgroundColor=b8c460`;
-
-          // Sync with our PostgreSQL database and set session cookie
-          const res = await fetch("/api/auth/social", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              provider: user.app_metadata?.provider || "Google",
-              email,
-              name,
-              avatarUrl,
-            }),
-          });
-
-          if (!res.ok) {
-            throw new Error("Failed to sync user session.");
-          }
-
-          setStatus("Authenticated! Redirecting to your dashboard...");
-          const nextUrl =
-            new URLSearchParams(window.location.search).get("next") || "/dashboard";
-          router.replace(nextUrl);
-        } else {
-          // Check if code param exists in search
-          const code = new URLSearchParams(window.location.search).get("code");
-          if (code) {
-            const { data: exchangeData, error: exchangeError } =
-              await supabase.auth.exchangeCodeForSession(code);
-            if (exchangeError) throw exchangeError;
-            if (exchangeData?.user?.email) {
-              const u = exchangeData.user;
-              const uEmail = u.email || "";
-              await fetch("/api/auth/social", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  provider: "Google",
-                  email: uEmail,
-                  name: u.user_metadata?.full_name || uEmail.split("@")[0] || "Learner",
-                  avatarUrl: u.user_metadata?.avatar_url,
-                }),
-              });
-              router.replace("/dashboard");
-              return;
-            }
-          }
-          router.replace("/dashboard");
+        if (urlError) {
+          throw new Error(urlError);
         }
-      } catch (err: any) {
-        console.error("Auth callback error:", err);
-        setStatus("Redirecting to dashboard...");
-        router.replace("/dashboard");
+
+        const code = params.get("code");
+        const tokenHash = params.get("token_hash");
+        const otpType = params.get("type");
+
+        let accessToken: string | undefined;
+
+        if (code) {
+          const { data: exchangeData, error: exchangeError } =
+            await supabase.auth.exchangeCodeForSession(code);
+          if (exchangeError) throw exchangeError;
+          accessToken = exchangeData?.session?.access_token;
+        } else if (tokenHash && otpType) {
+          const validType = (
+            ["email", "magiclink", "signup", "recovery"].includes(otpType)
+              ? otpType
+              : "email"
+          ) as "email" | "magiclink" | "signup" | "recovery";
+
+          const { data: verifyData, error: verifyError } =
+            await supabase.auth.verifyOtp({
+              token_hash: tokenHash,
+              type: validType,
+            });
+          if (verifyError) throw verifyError;
+          accessToken = verifyData?.session?.access_token;
+        } else {
+          accessToken = hashParams.get("access_token") || undefined;
+          if (!accessToken) {
+            const { data, error } = await supabase.auth.getSession();
+            if (error) throw error;
+            accessToken = data?.session?.access_token;
+          }
+        }
+
+        if (!accessToken) {
+          throw new Error(
+            "Verification link expired or invalid. Please sign in again."
+          );
+        }
+
+        const res = await fetch("/api/auth/social", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ accessToken }),
+        });
+
+        const json = await res.json();
+        if (!res.ok) {
+          throw new Error(json?.error || "Failed to verify user session.");
+        }
+
+        setStatus("Verified! Taking you to your workspace...");
+        const safeNext =
+          nextUrl.startsWith("/") && !nextUrl.startsWith("//")
+            ? nextUrl
+            : "/dashboard";
+        router.replace(safeNext);
+      } catch (err: unknown) {
+        const msg =
+          err instanceof Error
+            ? err.message
+            : "Authentication verification failed.";
+        console.error("Auth callback error:", msg);
+        setErrorMsg(msg);
+        setStatus("Verification unsuccessful. Returning to sign in...");
+        setTimeout(() => {
+          router.replace(`/login?error=${encodeURIComponent(msg)}`);
+        }, 1200);
       }
     }
 
@@ -86,11 +104,22 @@ export default function AuthCallbackPage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen bg-[#0e1311] flex flex-col items-center justify-center p-4 text-white">
-      <div className="flex items-center gap-3 text-sm text-[#b8c460]">
-        <div className="w-6 h-6 border-2 border-[#b8c460] border-t-transparent rounded-full animate-spin" />
-        <span>{status}</span>
-      </div>
+    <div className="relative min-h-screen bg-paper text-ink flex flex-col justify-between overflow-hidden">
+      <MarketingNavbar />
+      <LandscapeIllustration className="opacity-70" />
+      <main className="relative z-20 flex-1 flex items-center justify-center p-6 pt-28">
+        <div className="w-full max-w-[400px] rounded-[28px] bg-white/65 dark:bg-[#131e26]/75 backdrop-blur-2xl border border-white/75 dark:border-white/15 p-8 shadow-2xl text-center space-y-3">
+          {!errorMsg ? (
+            <div className="w-7 h-7 mx-auto border-2 border-[#4b5e1e] dark:border-[#b8c460] border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <div className="w-9 h-9 mx-auto rounded-full bg-err-bg text-err-fg flex items-center justify-center font-bold text-sm">
+              !
+            </div>
+          )}
+          <p className="text-sm font-semibold text-ink">{status}</p>
+          {errorMsg && <p className="text-xs text-err-fg">{errorMsg}</p>}
+        </div>
+      </main>
     </div>
   );
 }

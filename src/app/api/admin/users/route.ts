@@ -41,6 +41,8 @@ export async function GET(req: Request) {
       id: u.id,
       email: u.email,
       role: u.role,
+      emailVerified: u.emailVerified,
+      authProvider: u.authProvider || "email",
       displayName: u.profile?.displayName || u.email.split("@")[0],
       avatarUrl: u.profile?.avatarUrl,
       tier: u.subscription?.tier || "FREE",
@@ -67,20 +69,28 @@ export async function PATCH(req: Request) {
     }
 
     const body = await req.json();
-    const { targetUserId, role, tier, streakDays } = body;
+    const { targetUserId, role, tier, streakDays, emailVerified } = body;
 
     if (!targetUserId) {
       return NextResponse.json({ error: "targetUserId is required." }, { status: 400 });
     }
 
-    // 1. Update Role if specified
-    if (role) {
-      if (!["USER", "ADMIN"].includes(role)) {
+    // 1. Update Role and/or Verification if specified
+    if (role || typeof emailVerified === "boolean") {
+      if (role && !["USER", "ADMIN"].includes(role)) {
         return NextResponse.json({ error: "Invalid role specified." }, { status: 400 });
       }
       await prisma.user.update({
         where: { id: targetUserId },
-        data: { role },
+        data: {
+          ...(role ? { role } : {}),
+          ...(typeof emailVerified === "boolean"
+            ? {
+                emailVerified,
+                emailVerifiedAt: emailVerified ? new Date() : null,
+              }
+            : {}),
+        },
       });
     }
 

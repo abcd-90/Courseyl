@@ -20,6 +20,8 @@ export async function GET() {
       id: user.id,
       email: user.email,
       role: user.role,
+      emailVerified: user.emailVerified,
+      authProvider: user.authProvider,
       name: effectiveDisplayName,
       displayName: effectiveDisplayName,
       profile: user.profile,

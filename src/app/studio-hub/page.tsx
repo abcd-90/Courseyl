@@ -52,12 +52,27 @@ interface AdminUserRow {
   id: string;
   email: string;
   role: string;
+  emailVerified?: boolean;
+  authProvider?: string;
   displayName: string;
   tier: string;
   coursesCreated: number;
   coursesEnrolled: number;
   notesCount: number;
   createdAt: string;
+}
+
+interface AuthSecretsForm {
+  githubClientId: string;
+  githubClientSecret: string;
+  xClientId: string;
+  xClientSecret: string;
+  resendApiKey: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpUser: string;
+  smtpPass: string;
+  smtpFrom: string;
 }
 
 const COLOR_PRESETS = [
@@ -158,6 +173,19 @@ export default function StudioHubAdminPage() {
   const [courses, setCourses] = useState<AdminCourseItem[]>([]);
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [userSearch, setUserSearch] = useState("");
+  const [authProvidersStatus, setAuthProvidersStatus] = useState<any>(null);
+  const [authSecretsForm, setAuthSecretsForm] = useState<AuthSecretsForm>({
+    githubClientId: "",
+    githubClientSecret: "",
+    xClientId: "",
+    xClientSecret: "",
+    resendApiKey: "",
+    smtpHost: "",
+    smtpPort: 587,
+    smtpUser: "",
+    smtpPass: "",
+    smtpFrom: "",
+  });
 
   const showToast = useCallback((type: "success" | "error", text: string) => {
     setToast({ type, text });
@@ -183,6 +211,24 @@ export default function StudioHubAdminPage() {
           setPlansForm({ ...DEFAULT_SETTINGS.plans, ...s.plans });
           setAiForm({ ...DEFAULT_SETTINGS.ai, ...s.ai });
           setStructureForm({ ...DEFAULT_SETTINGS.structure, ...(s.structure || {}) });
+        }
+        if (sData?.authProviders) {
+          setAuthProvidersStatus(sData.authProviders);
+        }
+        if (sData?.authSecrets) {
+          setAuthSecretsForm((prev) => ({
+            ...prev,
+            githubClientId: sData.authSecrets.githubClientId || "",
+            githubClientSecret: sData.authSecrets.githubHasSecret ? "••••••••••••" : "",
+            xClientId: sData.authSecrets.xClientId || "",
+            xClientSecret: sData.authSecrets.xHasSecret ? "••••••••••••" : "",
+            resendApiKey: sData.authSecrets.hasResendKey ? "••••••••••••" : "",
+            smtpHost: sData.authSecrets.smtpHost || "",
+            smtpPort: sData.authSecrets.smtpPort || 587,
+            smtpUser: sData.authSecrets.smtpUser || "",
+            smtpPass: sData.authSecrets.smtpHasPass ? "••••••••••••" : "",
+            smtpFrom: sData.authSecrets.smtpFrom || "",
+          }));
         }
       }
 
@@ -250,7 +296,7 @@ export default function StudioHubAdminPage() {
       const res = await fetch("/api/admin/claim", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ secretCode: claimSecret }),
+        body: JSON.stringify({ secretKey: claimSecret }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -266,7 +312,12 @@ export default function StudioHubAdminPage() {
   };
 
   const saveCategory = async (
-    category: "site_branding" | "site_plans" | "site_ai" | "site_structure",
+    category:
+      | "site_branding"
+      | "site_plans"
+      | "site_ai"
+      | "site_structure"
+      | "site_auth_secrets",
     payload: any,
     customSuccessMsg?: string
   ) => {
@@ -282,6 +333,7 @@ export default function StudioHubAdminPage() {
         showToast("error", data.error || "Failed to save settings.");
         return;
       }
+      if (data?.authProviders) setAuthProvidersStatus(data.authProviders);
       await refreshSettings();
       showToast("success", customSuccessMsg || data.message || "Saved & live site-wide!");
     } catch {
@@ -337,7 +389,7 @@ export default function StudioHubAdminPage() {
 
   const handleUpdateUser = async (
     targetUserId: string,
-    updates: { role?: string; tier?: string }
+    updates: { role?: string; tier?: string; emailVerified?: boolean }
   ) => {
     try {
       const res = await fetch("/api/admin/users", {
@@ -1766,6 +1818,7 @@ export default function StudioHubAdminPage() {
                   <thead>
                     <tr className="border-b border-line text-[0.68rem] font-mono uppercase text-ink-soft">
                       <th className="py-3 pr-4">User</th>
+                      <th className="py-3 px-4">Verification</th>
                       <th className="py-3 px-4">Activity</th>
                       <th className="py-3 px-4">Role</th>
                       <th className="py-3 pl-4">Plan Tier</th>
@@ -1777,6 +1830,23 @@ export default function StudioHubAdminPage() {
                         <td className="py-3.5 pr-4">
                           <div className="font-semibold text-ink">{u.displayName}</div>
                           <div className="text-xs text-ink-soft">{u.email}</div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleUpdateUser(u.id, {
+                                emailVerified: !(u.emailVerified ?? false),
+                              })
+                            }
+                            className={`px-2.5 py-1 rounded-full text-[0.68rem] font-mono font-bold uppercase cursor-pointer transition-colors ${
+                              u.emailVerified
+                                ? "bg-ok-bg text-ok-fg"
+                                : "bg-warn-bg text-warn-fg"
+                            }`}
+                          >
+                            {u.emailVerified ? `✓ ${u.authProvider || "email"}` : "Pending"}
+                          </button>
                         </td>
                         <td className="py-3.5 px-4 text-xs text-ink-soft font-mono">
                           {u.coursesCreated} built · {u.coursesEnrolled} enrolled · {u.notesCount} notes
@@ -1810,19 +1880,239 @@ export default function StudioHubAdminPage() {
             </div>
           )}
 
-          {/* ================= SECURITY TAB ================= */}
+          {/* ================= SECURITY & AUTH TAB ================= */}
           {activeTab === "security" && (
-            <div className="rounded-[28px] bg-surface p-6 sm:p-8 shadow-[0_0_0_1px_var(--line)] space-y-6">
-              <div>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-lime-soft px-3 py-1 font-mono text-[0.68rem] font-bold uppercase tracking-wider text-pill-ink">
-                  Platform Protection
-                </span>
-                <h2 className="mt-2 text-2xl font-display font-bold text-ink">
-                  Security Shield &amp; Route Protection
-                </h2>
+            <div className="space-y-6">
+              <div className="rounded-[28px] bg-surface p-6 sm:p-8 shadow-[0_0_0_1px_var(--line)] space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-lime-soft px-3 py-1 font-mono text-[0.68rem] font-bold uppercase tracking-wider text-pill-ink">
+                      Authentication &amp; Shield
+                    </span>
+                    <h2 className="mt-2 text-2xl font-display font-bold text-ink">
+                      Real OAuth Providers &amp;{" "}
+                      <em className="italic text-moss font-serif">Email Verification</em>
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={savingCategory === "site_auth_secrets"}
+                    onClick={() =>
+                      saveCategory(
+                        "site_auth_secrets",
+                        authSecretsForm,
+                        "OAuth & Email delivery credentials saved!"
+                      )
+                    }
+                    className="px-6 py-2.5 rounded-full bg-moss text-on-moss hover:bg-moss-dark font-semibold text-sm shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    {savingCategory === "site_auth_secrets"
+                      ? "Saving..."
+                      : "Save Auth Credentials"}
+                  </button>
+                </div>
+
+                {/* Live Provider Readiness Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                  <div className="p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] space-y-1">
+                    <div className="text-[0.68rem] font-mono font-bold uppercase text-ink-soft">
+                      Google OAuth
+                    </div>
+                    <div className="text-sm font-bold text-ink">
+                      {authProvidersStatus?.google?.enabled ? "● Active (Direct)" : "○ Needs Keys"}
+                    </div>
+                    <div className="text-[0.68rem] text-ink-soft font-mono break-all">
+                      /api/auth/google/callback
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] space-y-1">
+                    <div className="text-[0.68rem] font-mono font-bold uppercase text-ink-soft">
+                      GitHub OAuth
+                    </div>
+                    <div className="text-sm font-bold text-ink">
+                      {authProvidersStatus?.github?.enabled
+                        ? `● Active (${authProvidersStatus.github.mode})`
+                        : "○ Needs Client ID/Secret"}
+                    </div>
+                    <div className="text-[0.68rem] text-ink-soft font-mono break-all">
+                      /api/auth/github/callback
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] space-y-1">
+                    <div className="text-[0.68rem] font-mono font-bold uppercase text-ink-soft">
+                      X (Twitter) OAuth
+                    </div>
+                    <div className="text-sm font-bold text-ink">
+                      {authProvidersStatus?.x?.enabled
+                        ? `● Active (${authProvidersStatus.x.mode})`
+                        : "○ Needs Client ID/Secret"}
+                    </div>
+                    <div className="text-[0.68rem] text-ink-soft font-mono break-all">
+                      /api/auth/x/callback
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] space-y-1">
+                    <div className="text-[0.68rem] font-mono font-bold uppercase text-ink-soft">
+                      Email Confirmation
+                    </div>
+                    <div className="text-sm font-bold text-ink">
+                      ● Enforced ({authProvidersStatus?.email?.mode || "supabase"})
+                    </div>
+                    <div className="text-[0.68rem] text-ink-soft">
+                      MX check + 6-digit OTP / link
+                    </div>
+                  </div>
+                </div>
+
+                {/* OAuth Credentials Inputs */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-line">
+                  <div className="space-y-3 p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)]">
+                    <div className="text-xs font-mono font-bold uppercase text-moss">
+                      GitHub OAuth App
+                    </div>
+                    <input
+                      type="text"
+                      value={authSecretsForm.githubClientId}
+                      onChange={(e) =>
+                        setAuthSecretsForm({
+                          ...authSecretsForm,
+                          githubClientId: e.target.value,
+                        })
+                      }
+                      placeholder="GitHub Client ID (Ov23li...)"
+                      className="w-full h-10 rounded-xl bg-surface px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                    />
+                    <input
+                      type="password"
+                      value={authSecretsForm.githubClientSecret}
+                      onChange={(e) =>
+                        setAuthSecretsForm({
+                          ...authSecretsForm,
+                          githubClientSecret: e.target.value,
+                        })
+                      }
+                      placeholder="GitHub Client Secret"
+                      className="w-full h-10 rounded-xl bg-surface px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-3 p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)]">
+                    <div className="text-xs font-mono font-bold uppercase text-moss">
+                      X (Twitter) OAuth 2.0 App
+                    </div>
+                    <input
+                      type="text"
+                      value={authSecretsForm.xClientId}
+                      onChange={(e) =>
+                        setAuthSecretsForm({
+                          ...authSecretsForm,
+                          xClientId: e.target.value,
+                        })
+                      }
+                      placeholder="X OAuth 2.0 Client ID"
+                      className="w-full h-10 rounded-xl bg-surface px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                    />
+                    <input
+                      type="password"
+                      value={authSecretsForm.xClientSecret}
+                      onChange={(e) =>
+                        setAuthSecretsForm({
+                          ...authSecretsForm,
+                          xClientSecret: e.target.value,
+                        })
+                      }
+                      placeholder="X OAuth 2.0 Client Secret"
+                      className="w-full h-10 rounded-xl bg-surface px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Custom Email Mailer (Resend / SMTP) */}
+                <div className="space-y-3 p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)]">
+                  <div className="text-xs font-mono font-bold uppercase text-moss">
+                    Custom Confirmation Mailer (Optional — Resend API or Gmail/Custom SMTP)
+                  </div>
+                  <p className="text-xs text-ink-soft">
+                    Without Custom SMTP or Resend, Supabase built-in email confirmation is used (free projects limit built-in mail). Adding Resend or Gmail App Password SMTP removes all limits cleanly.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <input
+                      type="password"
+                      value={authSecretsForm.resendApiKey}
+                      onChange={(e) =>
+                        setAuthSecretsForm({
+                          ...authSecretsForm,
+                          resendApiKey: e.target.value,
+                        })
+                      }
+                      placeholder="Resend API Key (re_...)"
+                      className="w-full h-10 rounded-xl bg-surface px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                    />
+                    <input
+                      type="text"
+                      value={authSecretsForm.smtpFrom}
+                      onChange={(e) =>
+                        setAuthSecretsForm({
+                          ...authSecretsForm,
+                          smtpFrom: e.target.value,
+                        })
+                      }
+                      placeholder="From Email (e.g. Courseyl <noreply@yourdomain.com>)"
+                      className="w-full h-10 rounded-xl bg-surface px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                    />
+                    <input
+                      type="text"
+                      value={authSecretsForm.smtpHost}
+                      onChange={(e) =>
+                        setAuthSecretsForm({
+                          ...authSecretsForm,
+                          smtpHost: e.target.value,
+                        })
+                      }
+                      placeholder="SMTP Host (e.g. smtp.gmail.com)"
+                      className="w-full h-10 rounded-xl bg-surface px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                    />
+                    <input
+                      type="number"
+                      value={authSecretsForm.smtpPort}
+                      onChange={(e) =>
+                        setAuthSecretsForm({
+                          ...authSecretsForm,
+                          smtpPort: Number(e.target.value) || 587,
+                        })
+                      }
+                      placeholder="SMTP Port (587 or 465)"
+                      className="w-full h-10 rounded-xl bg-surface px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                    />
+                    <input
+                      type="text"
+                      value={authSecretsForm.smtpUser}
+                      onChange={(e) =>
+                        setAuthSecretsForm({
+                          ...authSecretsForm,
+                          smtpUser: e.target.value,
+                        })
+                      }
+                      placeholder="SMTP Username"
+                      className="w-full h-10 rounded-xl bg-surface px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                    />
+                    <input
+                      type="password"
+                      value={authSecretsForm.smtpPass}
+                      onChange={(e) =>
+                        setAuthSecretsForm({
+                          ...authSecretsForm,
+                          smtpPass: e.target.value,
+                        })
+                      }
+                      placeholder="SMTP Password / App Password"
+                      className="w-full h-10 rounded-xl bg-surface px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="rounded-[28px] bg-surface p-6 sm:p-8 shadow-[0_0_0_1px_var(--line)] grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-5 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] space-y-1.5">
                   <div className="text-xs font-mono font-bold uppercase text-moss">● Stealth Decoy</div>
                   <div className="font-semibold text-sm text-ink">`/admin` Route Blocked (404)</div>
@@ -1838,10 +2128,10 @@ export default function StudioHubAdminPage() {
                   </p>
                 </div>
                 <div className="p-5 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] space-y-1.5">
-                  <div className="text-xs font-mono font-bold uppercase text-moss">● Production DB</div>
-                  <div className="font-semibold text-sm text-ink">Supabase Pooler Active</div>
+                  <div className="text-xs font-mono font-bold uppercase text-moss">● Zero Spoof Auth</div>
+                  <div className="font-semibold text-sm text-ink">Cryptographic Verification Only</div>
                   <p className="text-xs text-ink-soft">
-                    All course, billing, and layout changes persist cleanly without downtime.
+                    Unverified emails, throwaway domains, and forged OAuth tokens are strictly rejected.
                   </p>
                 </div>
               </div>

@@ -1,112 +1,76 @@
 import { NextResponse } from "next/server";
+import { getRequestOrigin, sanitizeNextPath } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { signToken, getAuthCookieOptions, hashPassword } from "@/lib/auth";
+import { validateRealEmailAddress } from "@/lib/email-validation";
+import { issueAndSendEmailVerification } from "@/lib/mailer";
 import { getPublicSettings } from "@/lib/settings";
 
+/**
+ * POST /api/auth/email
+ * Production-grade passwordless email initiation:
+ * Validates domain/MX records and dispatches a genuine verification link + OTP code.
+ * NEVER creates an authenticated session before email ownership is confirmed.
+ */
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { email } = body;
+    const validation = await validateRealEmailAddress(body?.email);
 
-    if (!email || typeof email !== "string" || !email.includes("@")) {
+    if (!validation.valid) {
       return NextResponse.json(
-        { error: "Please enter a valid email address." },
+        { error: validation.error || "Please enter a valid email address." },
         { status: 400 }
       );
     }
 
-    const cleanEmail = email.trim().toLowerCase();
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(cleanEmail)) {
-      return NextResponse.json(
-        { error: "Please enter a valid email address format." },
-        { status: 400 }
-      );
-    }
+    const cleanEmail = validation.cleanEmail;
+    const next = sanitizeNextPath(body?.next);
+    const origin = getRequestOrigin(req);
 
-    // 1. Check if user already exists
-    let user = await prisma.user.findUnique({
+    // Check signup toggle only if user doesn't already exist
+    const existing = await prisma.user.findUnique({
       where: { email: cleanEmail },
-      include: { profile: true, subscription: true },
+      select: { id: true },
     });
 
-    let isNew = false;
-
-    if (!user) {
+    if (!existing) {
       const settings = await getPublicSettings().catch(() => null);
       if (settings && settings.plans.allowNewSignups === false) {
         return NextResponse.json(
-          { error: "New registrations are temporarily paused by administrator." },
+          {
+            error:
+              "New registrations are temporarily paused by administrator.",
+          },
           { status: 403 }
         );
       }
-
-      isNew = true;
-      const defaultName = cleanEmail.split("@")[0].replace(/[._-]/g, " ");
-      const formattedName =
-        defaultName.charAt(0).toUpperCase() + defaultName.slice(1);
-      const randomSecret = Math.random().toString(36).slice(2) + Date.now();
-      const passwordHash = await hashPassword(randomSecret);
-
-      user = await prisma.user.create({
-        data: {
-          email: cleanEmail,
-          passwordHash,
-          role: "USER",
-          profile: {
-            create: {
-              displayName: formattedName,
-              avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
-                formattedName
-              )}&backgroundColor=b8c460`,
-              dailyStudyMinutes: 30,
-              currentStreakDays: 1,
-              lastStudyDate: new Date(),
-            },
-          },
-          subscription: {
-            create: {
-              tier: "FREE",
-              status: "ACTIVE",
-              monthlyGenerationsUsed: 0,
-              monthlyHoursUsedSeconds: 0,
-              currentPeriodStart: new Date(),
-              currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-            },
-          },
-        },
-        include: { profile: true, subscription: true },
-      });
     }
 
-    // 2. Sign JWT Session Token
-    const token = signToken({
-      userId: user.id,
-      email: user.email,
-      role: user.role,
+    const delivery = await issueAndSendEmailVerification({
+      email: cleanEmail,
+      purpose: "LOGIN_OTP",
+      origin,
+      next,
     });
 
-    // 3. Set secure HTTP-only cookie
-    const cookieOpts = getAuthCookieOptions();
-    const response = NextResponse.json({
+    if (!delivery.ok) {
+      return NextResponse.json(
+        { error: delivery.error || delivery.message },
+        { status: delivery.statusCode || 502 }
+      );
+    }
+
+    return NextResponse.json({
       success: true,
-      isNew,
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        profile: user.profile,
-        subscription: user.subscription,
-      },
+      requiresVerification: true,
+      deliveryMode: delivery.mode,
+      email: cleanEmail,
+      message: delivery.message,
     });
-
-    response.cookies.set(cookieOpts.name, token, cookieOpts);
-
-    return response;
   } catch (err: unknown) {
-    console.error("Email login error:", err);
-    const msg = err instanceof Error ? err.message : "Internal server error";
+    console.error("Email verification initiation error:", err);
+    const msg =
+      err instanceof Error ? err.message : "Failed to send verification email.";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
-

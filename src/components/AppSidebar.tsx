@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { CourseItLogo } from "./CourseItLogo";
 import { useSiteSettings } from "./SiteSettingsProvider";
 import { getCleanThumbnailUrl } from "@/lib/thumbnail";
+import { supabase } from "@/lib/supabaseClient";
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -143,6 +144,7 @@ export function AppSidebar() {
 
   const handleLogout = async () => {
     try {
+      await supabase.auth.signOut().catch(() => {});
       await fetch("/api/auth/logout", { method: "POST" });
       window.location.href = "/login";
     } catch {}
