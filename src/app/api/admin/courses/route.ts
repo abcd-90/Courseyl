@@ -281,21 +281,19 @@ export async function POST(req: Request) {
           term: topicLabel.split(" ")[0] + " Workflow",
           definition: `Structured approach introduced in ${cleanTitle} to keep implementation modular and reliable.`,
         };
-        const synthesizedQuizzes = synthesizeLessonQuizQuestions(
-          {
-            title: lessonTitle,
-            description: lessonDescription,
-            summary: lessonSummary,
-            keyTakeaways: takeawaysList,
-            importantDefinitions: [`${definitionEntry.term}: ${definitionEntry.definition}`],
-            chapterTitle: `Module ${chIdx + 1}: ${topicLabel}`,
-            courseTitle: cleanTitle,
-            startSeconds,
-            endSeconds,
-            lessonIndex: globalIdx,
-          },
-          4
-        );
+        const synthesizedQuizzes = synthesizeLessonQuizQuestions({
+          title: lessonTitle,
+          description: lessonDescription,
+          summary: lessonSummary,
+          keyTakeaways: takeawaysList,
+          importantDefinitions: [`${definitionEntry.term}: ${definitionEntry.definition}`],
+          chapterTitle: `Module ${chIdx + 1}: ${topicLabel}`,
+          courseTitle: cleanTitle,
+          startSeconds,
+          endSeconds,
+          durationSeconds,
+          lessonIndex: globalIdx,
+        });
 
         return {
           orderIndex: lIdx + 1,

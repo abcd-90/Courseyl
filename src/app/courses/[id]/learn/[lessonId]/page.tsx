@@ -1012,7 +1012,13 @@ export default function LessonLearnPage({
                 >
                   <div className="text-moss dark:text-[#b8c460] mb-2 text-base">📖</div>
                   <h4 className="text-xs font-bold text-ink group-hover:text-moss transition-colors">Quiz</h4>
-                  <p className="text-[0.7rem] text-ink-soft mt-0.5">{quizQuestions.length || 4} questions</p>
+                  <p className="text-[0.7rem] text-ink-soft mt-0.5">
+                    {quizQuestions.length > 0
+                      ? `${quizQuestions.length} question${quizQuestions.length === 1 ? "" : "s"}`
+                      : loading
+                        ? "Loading..."
+                        : "Generate quiz"}
+                  </p>
                 </button>
 
                 {/* Tool 2: My notes */}
@@ -1122,7 +1128,9 @@ export default function LessonLearnPage({
             <div className="pt-3 border-t border-line dark:border-white/10 flex items-center justify-between">
               {quizSubmitted ? (
                 <div className="text-xs font-semibold text-[#b8c460]">
-                  Quiz evaluated! Great progress.
+                  Quiz evaluated!{" "}
+                  {quizQuestions.filter((q) => quizAnswers[q.id] === q.correctOptionIndex).length}/
+                  {quizQuestions.length} correct.
                 </div>
               ) : (
                 <span className="text-xs text-ink-soft">

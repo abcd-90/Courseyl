@@ -141,6 +141,7 @@ export async function GET(
             courseTitle: lesson.chapter.course.title,
             startSeconds: lesson.startSeconds,
             endSeconds: lesson.endSeconds,
+            durationSeconds: lesson.durationSeconds,
             lessonIndex: lesson.orderIndex,
           });
 

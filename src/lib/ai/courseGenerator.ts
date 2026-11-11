@@ -10,7 +10,7 @@ import {
   VideoMetadata,
 } from "../youtube";
 import { getAIProvider, NemotronAIProvider, OpenAIProvider } from "./aiProvider";
-import { synthesizeLessonQuizQuestions } from "./quizGenerator";
+import { computeRecommendedQuizCount, synthesizeLessonQuizQuestions } from "./quizGenerator";
 import { getFullSettings } from "../settings";
 
 export interface GenerateCourseParams {
@@ -34,24 +34,24 @@ function resolveLessonQuizzes(
   chapterTitle?: string,
   lessonIndex = 0
 ): RawQuizQuestion[] {
-  if (Array.isArray(l.quizQuestions) && l.quizQuestions.length >= 4) {
+  const ctx = {
+    title: l.title,
+    description: l.description,
+    summary: l.summary,
+    keyTakeaways: l.keyTakeaways || [],
+    importantDefinitions: l.importantDefinitions || [],
+    chapterTitle,
+    courseTitle,
+    startSeconds: l.startSeconds,
+    endSeconds: l.endSeconds,
+    durationSeconds: Math.max(60, l.endSeconds - l.startSeconds),
+    lessonIndex,
+  };
+  const expectedCount = computeRecommendedQuizCount(ctx);
+  if (Array.isArray(l.quizQuestions) && l.quizQuestions.length >= expectedCount) {
     return l.quizQuestions;
   }
-  return synthesizeLessonQuizQuestions(
-    {
-      title: l.title,
-      description: l.description,
-      summary: l.summary,
-      keyTakeaways: l.keyTakeaways || [],
-      importantDefinitions: l.importantDefinitions || [],
-      chapterTitle,
-      courseTitle,
-      startSeconds: l.startSeconds,
-      endSeconds: l.endSeconds,
-      lessonIndex,
-    },
-    4
-  );
+  return synthesizeLessonQuizQuestions(ctx, expectedCount);
 }
 
 function buildQuizCreatePayload(
@@ -1086,21 +1086,19 @@ function buildDetailedLessonContent(params: {
     );
   }
 
-  const quizQuestions: RawQuizQuestion[] = synthesizeLessonQuizQuestions(
-    {
-      title: cleanTopic,
-      description: descriptionParts.join(" "),
-      summary: summaryParts.join(" "),
-      keyTakeaways: Array.from(takeawaysSet).slice(0, 4),
-      importantDefinitions: definitions.slice(0, 3),
-      courseTitle,
-      startSeconds,
-      endSeconds,
-      lessonIndex,
-      transcriptExcerpt: transcriptSnippet,
-    },
-    4
-  );
+  const quizQuestions: RawQuizQuestion[] = synthesizeLessonQuizQuestions({
+    title,
+    description: descriptionParts.join(" "),
+    summary: summaryParts.join(" "),
+    keyTakeaways: Array.from(takeawaysSet).slice(0, 4),
+    importantDefinitions: definitions.slice(0, 3),
+    courseTitle,
+    startSeconds,
+    endSeconds,
+    durationSeconds: Math.max(60, endSeconds - startSeconds),
+    lessonIndex,
+    transcriptExcerpt: transcriptSnippet,
+  });
 
   return {
     title,
