@@ -426,6 +426,12 @@ export default function StudioHubAdminPage() {
   const handleToggleQuickPlanFlag = async (
     key: "allowNewSignups" | "maintenanceMode"
   ) => {
+    if (key === "allowNewSignups" && plansForm.allowNewSignups) {
+      const ok = window.confirm(
+        "Pause new user signups across Courseyl? Existing verified accounts can still sign in, but new account registrations will be paused until re-enabled."
+      );
+      if (!ok) return;
+    }
     const nextPlans = { ...plansForm, [key]: !plansForm[key] };
     setPlansForm(nextPlans);
     await saveCategory(
@@ -935,14 +941,15 @@ export default function StudioHubAdminPage() {
                       </div>
                       <button
                         type="button"
+                        disabled={savingCategory === "site_plans"}
                         onClick={() => handleToggleQuickPlanFlag("allowNewSignups")}
-                        className={`px-4 py-1.5 rounded-full text-xs font-bold cursor-pointer transition-colors ${
+                        className={`px-4 py-1.5 rounded-full text-xs font-bold cursor-pointer transition-colors disabled:opacity-50 ${
                           plansForm.allowNewSignups
                             ? "bg-moss text-on-moss"
                             : "bg-red-500/15 text-red-600 dark:text-red-400"
                         }`}
                       >
-                        {plansForm.allowNewSignups ? "OPEN" : "PAUSED"}
+                        {plansForm.allowNewSignups ? "Signups: OPEN" : "Signups: PAUSED"}
                       </button>
                     </div>
 

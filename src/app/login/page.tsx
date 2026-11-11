@@ -446,22 +446,20 @@ export default function LoginPage() {
                       >
                         Sign in
                       </button>
-                      {allowSignups && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEmailAuthMode("password-signup");
-                            setError("");
-                          }}
-                          className={`px-3.5 py-1 rounded-full transition-all cursor-pointer ${
-                            emailAuthMode === "password-signup"
-                              ? "bg-[#4b5e1e] text-[#f6f8ec] dark:bg-[#b8c460] dark:text-[#0f1611] shadow-xs"
-                              : "text-[#4c4c3d] dark:text-white/65 hover:text-[#0f1611] dark:hover:text-white"
-                          }`}
-                        >
-                          Create account
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEmailAuthMode("password-signup");
+                          setError("");
+                        }}
+                        className={`px-3.5 py-1 rounded-full transition-all cursor-pointer ${
+                          emailAuthMode === "password-signup"
+                            ? "bg-[#4b5e1e] text-[#f6f8ec] dark:bg-[#b8c460] dark:text-[#0f1611] shadow-xs"
+                            : "text-[#4c4c3d] dark:text-white/65 hover:text-[#0f1611] dark:hover:text-white"
+                        }`}
+                      >
+                        Create account
+                      </button>
                     </div>
                   </div>
 
@@ -489,6 +487,12 @@ export default function LoginPage() {
                         : "Enter your verified email and password."}
                     </p>
                   </div>
+
+                  {emailAuthMode === "password-signup" && !allowSignups && (
+                    <div className="w-full p-3 rounded-2xl bg-amber-500/12 dark:bg-amber-400/15 border border-amber-700/25 dark:border-amber-300/30 text-xs text-amber-950 dark:text-amber-200 text-left leading-relaxed backdrop-blur-sm">
+                      New account registrations are temporarily paused by an administrator.
+                    </div>
+                  )}
 
                   {error && (
                     <div className="w-full p-3 rounded-2xl bg-red-500/12 dark:bg-red-500/15 border border-red-600/25 dark:border-red-400/30 text-xs text-red-900 dark:text-red-200 text-left leading-relaxed backdrop-blur-sm">
@@ -536,7 +540,7 @@ export default function LoginPage() {
                     />
                     <button
                       type="submit"
-                      disabled={loading}
+                      disabled={loading || (emailAuthMode === "password-signup" && !allowSignups)}
                       className="w-full h-11 mt-1 rounded-full bg-[#4b5e1e]/92 hover:bg-[#3c4c16] text-[#f6f8ec] dark:bg-[#b8c460] dark:hover:bg-[#a6b350] dark:text-[#0f1611] font-semibold text-xs sm:text-sm transition-all cursor-pointer disabled:opacity-50 shadow-sm"
                     >
                       {loading
