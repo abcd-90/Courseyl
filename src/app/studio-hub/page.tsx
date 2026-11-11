@@ -169,6 +169,9 @@ export default function StudioHubAdminPage() {
   const [courses, setCourses] = useState<AdminCourseItem[]>([]);
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [userSearch, setUserSearch] = useState("");
+  const [confirmDeleteUserId, setConfirmDeleteUserId] = useState<string | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [refreshingUsers, setRefreshingUsers] = useState(false);
   const [authProvidersStatus, setAuthProvidersStatus] = useState<any>(null);
   const [siteOrigin, setSiteOrigin] = useState("https://courseyl.vercel.app");
   const [testEmailTarget, setTestEmailTarget] = useState("");
@@ -461,6 +464,53 @@ export default function StudioHubAdminPage() {
       }
     } catch {
       showToast("error", "Error updating user.");
+    }
+  };
+
+  const refreshUsersList = async () => {
+    setRefreshingUsers(true);
+    try {
+      const [uRes, mRes] = await Promise.all([
+        fetch("/api/admin/users", { cache: "no-store" }),
+        fetch("/api/admin/metrics", { cache: "no-store" }),
+      ]);
+      if (uRes.ok) {
+        const uData = await uRes.json();
+        setUsers(uData.users || []);
+      }
+      if (mRes.ok) {
+        const mData = await mRes.json();
+        setMetrics(mData.metrics || null);
+        setRecentUsers(mData.recentUsers || []);
+      }
+    } finally {
+      setRefreshingUsers(false);
+    }
+  };
+
+  const handleDeleteUser = async (targetUser: AdminUserRow) => {
+    setDeletingUserId(targetUser.id);
+    try {
+      const res = await fetch(
+        `/api/admin/users?userId=${encodeURIComponent(targetUser.id)}`,
+        { method: "DELETE" }
+      );
+      const d = await res.json();
+      if (!res.ok) {
+        showToast("error", d.error || "Failed to delete user account.");
+        return;
+      }
+      setUsers((prev) => prev.filter((item) => item.id !== targetUser.id));
+      setConfirmDeleteUserId(null);
+      showToast(
+        "success",
+        d.message || `${targetUser.email} deleted permanently from database.`
+      );
+      await refreshUsersList();
+    } catch {
+      showToast("error", "Error deleting user account.");
+    } finally {
+      setDeletingUserId(null);
     }
   };
 
@@ -1852,16 +1902,26 @@ export default function StudioHubAdminPage() {
                     Platform Learners ({users.length})
                   </h2>
                   <p className="text-xs text-ink-soft">
-                    Promote administrators or manually grant Free / Pro / Max plan tiers instantly.
+                    Promote administrators, grant Free / Pro / Max tiers, or delete test accounts permanently from the database.
                   </p>
                 </div>
-                <input
-                  type="search"
-                  value={userSearch}
-                  onChange={(e) => setUserSearch(e.target.value)}
-                  placeholder="Search email or display name..."
-                  className="w-full sm:w-72 h-10 rounded-full bg-paper px-4 text-xs sm:text-sm text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
-                />
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <input
+                    type="search"
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    placeholder="Search email or display name..."
+                    className="flex-1 sm:w-72 h-10 rounded-full bg-paper px-4 text-xs sm:text-sm text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={refreshUsersList}
+                    disabled={refreshingUsers}
+                    className="h-10 px-4 rounded-full bg-paper text-ink hover:bg-moss hover:text-on-moss text-xs font-semibold shadow-[inset_0_0_0_1px_var(--line)] transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+                  >
+                    {refreshingUsers ? "..." : "↻ Refresh"}
+                  </button>
+                </div>
               </div>
 
               <div className="overflow-x-auto">
@@ -1872,59 +1932,106 @@ export default function StudioHubAdminPage() {
                       <th className="py-3 px-4">Verification</th>
                       <th className="py-3 px-4">Activity</th>
                       <th className="py-3 px-4">Role</th>
-                      <th className="py-3 pl-4">Plan Tier</th>
+                      <th className="py-3 px-4">Plan Tier</th>
+                      <th className="py-3 pl-4 text-right">Delete</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">
-                    {filteredUsers.map((u) => (
-                      <tr key={u.id} className="hover:bg-paper/60 transition-colors">
-                        <td className="py-3.5 pr-4">
-                          <div className="font-semibold text-ink">{u.displayName}</div>
-                          <div className="text-xs text-ink-soft">{u.email}</div>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleUpdateUser(u.id, {
-                                emailVerified: !(u.emailVerified ?? false),
-                              })
-                            }
-                            className={`px-2.5 py-1 rounded-full text-[0.68rem] font-mono font-bold uppercase cursor-pointer transition-colors ${
-                              u.emailVerified
-                                ? "bg-ok-bg text-ok-fg"
-                                : "bg-warn-bg text-warn-fg"
-                            }`}
-                          >
-                            {u.emailVerified ? `✓ ${u.authProvider || "email"}` : "Pending"}
-                          </button>
-                        </td>
-                        <td className="py-3.5 px-4 text-xs text-ink-soft font-mono">
-                          {u.coursesCreated} built · {u.coursesEnrolled} enrolled · {u.notesCount} notes
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <select
-                            value={u.role}
-                            onChange={(e) => handleUpdateUser(u.id, { role: e.target.value })}
-                            className="h-8 rounded-lg bg-paper px-2.5 text-xs font-semibold text-ink shadow-[inset_0_0_0_1px_var(--line)]"
-                          >
-                            <option value="USER">USER</option>
-                            <option value="ADMIN">ADMIN</option>
-                          </select>
-                        </td>
-                        <td className="py-3.5 pl-4">
-                          <select
-                            value={u.tier}
-                            onChange={(e) => handleUpdateUser(u.id, { tier: e.target.value })}
-                            className="h-8 rounded-lg bg-paper px-2.5 text-xs font-semibold text-ink shadow-[inset_0_0_0_1px_var(--line)]"
-                          >
-                            <option value="FREE">FREE</option>
-                            <option value="PRO">PRO</option>
-                            <option value="MAX">MAX</option>
-                          </select>
-                        </td>
-                      </tr>
-                    ))}
+                    {filteredUsers.map((u) => {
+                      const isSelf = u.id === currentUser?.id;
+                      const isConfirming = confirmDeleteUserId === u.id;
+                      const isDeleting = deletingUserId === u.id;
+                      return (
+                        <tr key={u.id} className="hover:bg-paper/60 transition-colors">
+                          <td className="py-3.5 pr-4">
+                            <div className="flex items-center gap-2 font-semibold text-ink">
+                              <span>{u.displayName}</span>
+                              {isSelf && (
+                                <span className="px-2 py-0.5 rounded-full bg-lime-soft text-pill-ink text-[0.62rem] font-mono font-bold uppercase">
+                                  You
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-ink-soft">{u.email}</div>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleUpdateUser(u.id, {
+                                  emailVerified: !(u.emailVerified ?? false),
+                                })
+                              }
+                              className={`px-2.5 py-1 rounded-full text-[0.68rem] font-mono font-bold uppercase cursor-pointer transition-colors ${
+                                u.emailVerified
+                                  ? "bg-ok-bg text-ok-fg"
+                                  : "bg-warn-bg text-warn-fg"
+                              }`}
+                            >
+                              {u.emailVerified ? `✓ ${u.authProvider || "email"}` : "Pending"}
+                            </button>
+                          </td>
+                          <td className="py-3.5 px-4 text-xs text-ink-soft font-mono">
+                            {u.coursesCreated} built · {u.coursesEnrolled} enrolled · {u.notesCount} notes
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <select
+                              value={u.role}
+                              onChange={(e) => handleUpdateUser(u.id, { role: e.target.value })}
+                              className="h-8 rounded-lg bg-paper px-2.5 text-xs font-semibold text-ink shadow-[inset_0_0_0_1px_var(--line)]"
+                            >
+                              <option value="USER">USER</option>
+                              <option value="ADMIN">ADMIN</option>
+                            </select>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <select
+                              value={u.tier}
+                              onChange={(e) => handleUpdateUser(u.id, { tier: e.target.value })}
+                              className="h-8 rounded-lg bg-paper px-2.5 text-xs font-semibold text-ink shadow-[inset_0_0_0_1px_var(--line)]"
+                            >
+                              <option value="FREE">FREE</option>
+                              <option value="PRO">PRO</option>
+                              <option value="MAX">MAX</option>
+                            </select>
+                          </td>
+                          <td className="py-3.5 pl-4 text-right whitespace-nowrap">
+                            {isSelf ? (
+                              <span className="text-[0.68rem] font-mono text-ink-soft opacity-60">
+                                Protected
+                              </span>
+                            ) : isConfirming ? (
+                              <div className="inline-flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  disabled={isDeleting}
+                                  onClick={() => handleDeleteUser(u)}
+                                  className="px-3 py-1 rounded-full bg-red-600 hover:bg-red-700 text-white text-[0.7rem] font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                                >
+                                  {isDeleting ? "Deleting..." : "Confirm"}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isDeleting}
+                                  onClick={() => setConfirmDeleteUserId(null)}
+                                  className="px-2.5 py-1 rounded-full bg-paper text-ink-soft hover:text-ink text-[0.7rem] font-medium shadow-[inset_0_0_0_1px_var(--line)] transition-colors cursor-pointer"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteUserId(u.id)}
+                                className="px-3 py-1 rounded-full border border-red-500/25 text-red-600 dark:text-red-400 hover:bg-red-500/10 text-[0.72rem] font-semibold transition-colors cursor-pointer"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

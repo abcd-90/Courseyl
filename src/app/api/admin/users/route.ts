@@ -141,21 +141,59 @@ export async function DELETE(req: Request) {
     }
 
     const { searchParams } = new URL(req.url);
-    const targetUserId = searchParams.get("userId");
+    let targetUserId = searchParams.get("userId");
+
+    if (!targetUserId) {
+      const body = await req.json().catch(() => null);
+      if (body && typeof body.targetUserId === "string") {
+        targetUserId = body.targetUserId;
+      }
+    }
 
     if (!targetUserId) {
       return NextResponse.json({ error: "userId is required." }, { status: 400 });
     }
 
     if (targetUserId === user.id) {
-      return NextResponse.json({ error: "Cannot delete your own active administrator account." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Cannot delete your own active administrator account." },
+        { status: 400 }
+      );
     }
 
-    await prisma.user.delete({
+    const targetUser = await prisma.user.findUnique({
       where: { id: targetUserId },
+      select: { id: true, email: true, role: true },
     });
 
-    return NextResponse.json({ success: true, message: "User account deleted permanently." });
+    if (!targetUser) {
+      return NextResponse.json({ error: "User account not found." }, { status: 404 });
+    }
+
+    if (targetUser.role === "ADMIN") {
+      const adminCount = await prisma.user.count({ where: { role: "ADMIN" } });
+      if (adminCount <= 1) {
+        return NextResponse.json(
+          { error: "Cannot delete the last remaining administrator account." },
+          { status: 400 }
+        );
+      }
+    }
+
+    await prisma.$transaction([
+      prisma.authVerificationToken.deleteMany({
+        where: { email: targetUser.email.toLowerCase() },
+      }),
+      prisma.user.delete({
+        where: { id: targetUserId },
+      }),
+    ]);
+
+    return NextResponse.json({
+      success: true,
+      deletedEmail: targetUser.email,
+      message: `${targetUser.email} deleted permanently from database.`,
+    });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     return NextResponse.json({ error: msg }, { status: 500 });
