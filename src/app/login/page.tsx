@@ -41,11 +41,11 @@ export default function LoginPage() {
   const [successMsg, setSuccessMsg] = useState("");
   const [providers, setProviders] = useState<AuthProvidersMap | null>(null);
 
-  // Email flow state: "choose" (OAuth + Email initiation) vs "verify" (Email confirmation screen)
+  // Email flow state: "choose" (Google / Email mode) vs "verify" (Email confirmation screen)
   const [step, setStep] = useState<"choose" | "verify">("choose");
   const [emailSectionOpen, setEmailSectionOpen] = useState(false);
   const [emailAuthMode, setEmailAuthMode] = useState<
-    "password-login" | "password-signup" | "otp"
+    "password-login" | "password-signup"
   >("password-login");
   const [verifyPurpose, setVerifyPurpose] = useState<"VERIFY_EMAIL" | "LOGIN_OTP">(
     "VERIFY_EMAIL"
@@ -288,7 +288,7 @@ export default function LoginPage() {
   const allowSignups = settings?.plans?.allowNewSignups !== false;
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col justify-between bg-[#fcfcfa] dark:bg-[#0e1311] text-[#0f1611] dark:text-[#f1f3ea] overflow-hidden transition-colors duration-300">
+    <div className="relative min-h-screen w-full flex flex-col justify-between bg-[#fcfcfa] dark:bg-[#0e1311] text-[#0f1611] dark:text-[#f1f3ea] overflow-x-hidden overflow-y-auto transition-colors duration-300">
       {/* 1. FLOATING NAVBAR WITH LIGHT / DARK TOGGLE */}
       <MarketingNavbar />
 
@@ -298,258 +298,274 @@ export default function LoginPage() {
       {/* 3. FLOATING FROSTED GLASS SQUARES MATCHING SCREENSHOTS */}
       <CourseItFloatingSquares />
 
-      {/* 4. CENTER GLASSMORPHISM AUTH CARD MATCHING LIGHT & DARK REFERENCE SCREENSHOTS */}
-      <main className="relative z-20 flex-1 flex items-center justify-center px-4 pt-24 pb-10 w-full">
-        <div className="relative w-full max-w-[440px] rounded-[30px] border border-white/75 dark:border-white/12 bg-white/58 dark:bg-[#141f27]/72 backdrop-blur-2xl p-7 sm:p-9 shadow-[0_24px_60px_-15px_rgba(22,49,92,0.18),inset_0_1px_0_rgba(255,255,255,0.85)] dark:shadow-[0_28px_72px_-12px_rgba(0,0,0,0.78),inset_0_1px_0_rgba(255,255,255,0.08)] text-center flex flex-col items-center transition-all duration-300">
-          {/* Subtle glass specular sheen matching screenshot */}
+      {/* 4. CENTER FROSTED GLASSMORPHISM AUTH CARD MATCHING LIGHT & DARK REFERENCE SCREENSHOTS */}
+      <main className="relative z-20 flex-1 flex items-center justify-center px-4 pt-24 sm:pt-28 pb-10 w-full">
+        <div className="relative w-full max-w-[424px] rounded-[28px] border border-white/65 dark:border-white/14 bg-white/25 dark:bg-[#0e1722]/45 backdrop-blur-xl p-7 sm:p-8 shadow-[0_24px_60px_-15px_rgba(22,49,92,0.16),inset_0_1px_1px_rgba(255,255,255,0.78)] dark:shadow-[0_28px_72px_-12px_rgba(0,0,0,0.78),inset_0_1px_0_rgba(255,255,255,0.08)] text-center flex flex-col items-center transition-all duration-300">
+          {/* Subtle crystal specular highlight letting the sky & mountains shine through */}
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 rounded-[30px] bg-gradient-to-br from-white/45 via-transparent to-indigo-100/35 dark:from-white/[0.06] dark:via-transparent dark:to-[#16315c]/20"
+            className="pointer-events-none absolute inset-0 rounded-[28px] bg-gradient-to-b from-white/22 via-transparent to-white/5 dark:from-white/[0.04] dark:via-transparent dark:to-[#16315c]/15"
           />
 
           <div className="relative z-10 w-full flex flex-col items-center">
             {step === "choose" ? (
-              <>
-                {/* Heading */}
-                <h1 className="text-[1.75rem] sm:text-[2.05rem] font-display font-medium tracking-tight text-[#0f1611] dark:text-[#f5f7f2] leading-tight">
-                  Pick up where you{" "}
-                  <em className="italic font-serif font-normal text-[#4b5e1e] dark:text-[#b8c460]">
-                    left off.
-                  </em>
-                </h1>
+              !emailSectionOpen ? (
+                <>
+                  {/* Heading matching Reference Screenshot */}
+                  <h1 className="text-[1.75rem] sm:text-[2rem] font-display font-medium tracking-tight text-[#0f1611] dark:text-[#f5f7f2] leading-tight">
+                    Pick up where you{" "}
+                    <em className="italic font-serif font-normal text-[#4b5e1e] dark:text-[#b8c460]">
+                      left off.
+                    </em>
+                  </h1>
 
-                {/* Subtitle */}
-                <p className="text-[0.82rem] sm:text-[0.85rem] text-[#4c4c3d] dark:text-white/65 mt-2 mb-6">
-                  Your streak, your plan and your notes are waiting.
-                </p>
+                  {/* Subtitle matching Reference Screenshot */}
+                  <p className="text-[0.82rem] sm:text-[0.85rem] text-[#4c4c3d] dark:text-white/65 mt-2 mb-6">
+                    Your streak, your plan and your notes are waiting.
+                  </p>
 
-                {/* Alert Messages */}
-                {error && (
-                  <div className="w-full p-3 mb-4 rounded-2xl bg-red-500/12 dark:bg-red-500/15 border border-red-600/25 dark:border-red-400/30 text-xs text-red-900 dark:text-red-200 text-left leading-relaxed backdrop-blur-sm">
-                    {error}
-                  </div>
-                )}
+                  {/* Alert Messages */}
+                  {error && (
+                    <div className="w-full p-3 mb-4 rounded-2xl bg-red-500/12 dark:bg-red-500/15 border border-red-600/25 dark:border-red-400/30 text-xs text-red-900 dark:text-red-200 text-left leading-relaxed backdrop-blur-sm">
+                      {error}
+                    </div>
+                  )}
 
-                {successMsg && (
-                  <div className="w-full p-3 mb-4 rounded-2xl bg-[#eef2da]/90 dark:bg-[#b8c460]/15 border border-[#4b5e1e]/25 dark:border-[#b8c460]/30 text-xs text-[#3c4c16] dark:text-[#d5df88] font-medium text-center backdrop-blur-sm">
-                    {successMsg}
-                  </div>
-                )}
+                  {successMsg && (
+                    <div className="w-full p-3 mb-4 rounded-2xl bg-[#eef2da]/80 dark:bg-[#b8c460]/15 border border-[#4b5e1e]/25 dark:border-[#b8c460]/30 text-xs text-[#3c4c16] dark:text-[#d5df88] font-medium text-center backdrop-blur-sm">
+                      {successMsg}
+                    </div>
+                  )}
 
-                {/* Clean 2-Option Auth Stack: Google + Verified Email */}
-                <div className="w-full space-y-2.5">
-                  {/* Google OAuth */}
-                  <button
-                    type="button"
-                    onClick={handleGoogleOAuth}
-                    disabled={loading}
-                    className="w-full h-12 px-5 rounded-full border border-[#0f1611]/12 dark:border-white/15 bg-white/45 hover:bg-white/75 dark:bg-white/[0.04] dark:hover:bg-white/[0.10] hover:border-[#0f1611]/25 dark:hover:border-white/30 text-[#0f1611] dark:text-white text-[0.84rem] sm:text-[0.88rem] font-medium flex items-center justify-center gap-2.5 transition-all cursor-pointer backdrop-blur-md active:scale-[0.99] disabled:opacity-50"
-                  >
-                    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
-                      <path
-                        fill="#4285F4"
-                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                      />
-                      <path
-                        fill="#34A853"
-                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                      />
-                      <path
-                        fill="#FBBC05"
-                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                      />
-                      <path
-                        fill="#EA4335"
-                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                      />
-                    </svg>
-                    <span>Continue with Google</span>
-                  </button>
-
-                  {/* Continue with Email Pill Toggle */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmailSectionOpen((prev) => !prev);
-                      setError("");
-                    }}
-                    disabled={loading}
-                    className={`w-full h-12 px-5 rounded-full border text-[0.84rem] sm:text-[0.88rem] font-medium flex items-center justify-center gap-2.5 transition-all cursor-pointer backdrop-blur-md active:scale-[0.99] disabled:opacity-50 ${
-                      emailSectionOpen
-                        ? "border-[#4b5e1e]/35 dark:border-[#b8c460]/40 bg-white/75 dark:bg-white/[0.10] text-[#0f1611] dark:text-white"
-                        : "border-[#0f1611]/12 dark:border-white/15 bg-white/45 hover:bg-white/75 dark:bg-white/[0.04] dark:hover:bg-white/[0.10] hover:border-[#0f1611]/25 dark:hover:border-white/30 text-[#0f1611] dark:text-white"
-                    }`}
-                  >
-                    <svg
-                      className="w-4 h-4 shrink-0 text-[#4b5e1e] dark:text-[#b8c460]"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={1.9}
-                      aria-hidden="true"
+                  {/* Sheer Frosted Glass Pills matching Reference Glassmorphism */}
+                  <div className="w-full space-y-2.5">
+                    {/* Google OAuth */}
+                    <button
+                      type="button"
+                      onClick={handleGoogleOAuth}
+                      disabled={loading}
+                      className="w-full h-12 px-5 rounded-full border border-[#0f1611]/14 dark:border-white/14 bg-white/15 hover:bg-white/35 dark:bg-white/[0.03] dark:hover:bg-white/[0.09] hover:border-[#0f1611]/25 dark:hover:border-white/28 text-[#0f1611] dark:text-white text-[0.84rem] sm:text-[0.88rem] font-medium flex items-center justify-center gap-2.5 transition-all cursor-pointer backdrop-blur-md active:scale-[0.99] disabled:opacity-50"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                      />
-                    </svg>
-                    <span>Continue with Email</span>
-                  </button>
-                </div>
+                      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                        <path
+                          fill="#4285F4"
+                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                        />
+                        <path
+                          fill="#34A853"
+                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                        />
+                        <path
+                          fill="#FBBC05"
+                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                        />
+                        <path
+                          fill="#EA4335"
+                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                        />
+                      </svg>
+                      <span>Continue with Google</span>
+                    </button>
 
-                {/* Expandable Authentic Email Section */}
-                {emailSectionOpen && (
-                  <div className="w-full mt-4 pt-3.5 border-t border-[#0f1611]/10 dark:border-white/10 space-y-3 animate-in fade-in duration-200">
-                      {/* Clean 2-Tab Selector: Returning Sign In vs New Account Setup */}
-                      <div className="inline-flex p-1 rounded-full bg-white/40 dark:bg-white/[0.05] border border-[#0f1611]/10 dark:border-white/10 text-[0.72rem] font-medium">
+                    {/* Continue with Email */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmailSectionOpen(true);
+                        setError("");
+                        setSuccessMsg("");
+                      }}
+                      disabled={loading}
+                      className="w-full h-12 px-5 rounded-full border border-[#0f1611]/14 dark:border-white/14 bg-white/15 hover:bg-white/35 dark:bg-white/[0.03] dark:hover:bg-white/[0.09] hover:border-[#0f1611]/25 dark:hover:border-white/28 text-[#0f1611] dark:text-white text-[0.84rem] sm:text-[0.88rem] font-medium flex items-center justify-center gap-2.5 transition-all cursor-pointer backdrop-blur-md active:scale-[0.99] disabled:opacity-50"
+                    >
+                      <svg
+                        className="w-4 h-4 shrink-0 text-[#0f1611]/80 dark:text-white/85"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={1.9}
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                        />
+                      </svg>
+                      <span>Continue with Email</span>
+                    </button>
+                  </div>
+
+                  {/* Legal Disclaimer matching Screenshot */}
+                  <p className="text-[0.72rem] text-[#4c4c3d] dark:text-white/55 text-center mt-6 leading-relaxed">
+                    By continuing you agree to our{" "}
+                    <Link
+                      href="/terms"
+                      className="underline underline-offset-2 hover:text-[#0f1611] dark:hover:text-white transition-colors"
+                    >
+                      Terms and Conditions
+                    </Link>{" "}
+                    and{" "}
+                    <Link
+                      href="/privacy"
+                      className="underline underline-offset-2 hover:text-[#0f1611] dark:hover:text-white transition-colors"
+                    >
+                      Privacy policy
+                    </Link>
+                    .
+                  </p>
+                </>
+              ) : (
+                /* Compact Frosted Glass Email Sign-In / Create Account View */
+                <div className="w-full space-y-4 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmailSectionOpen(false);
+                        setError("");
+                        setSuccessMsg("");
+                      }}
+                      className="text-xs font-medium text-[#4c4c3d] dark:text-white/65 hover:text-[#0f1611] dark:hover:text-white transition-colors cursor-pointer"
+                    >
+                      ← Back
+                    </button>
+
+                    <div className="inline-flex p-1 rounded-full bg-white/20 dark:bg-white/[0.05] border border-[#0f1611]/10 dark:border-white/12 text-[0.72rem] font-medium backdrop-blur-md">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEmailAuthMode("password-login");
+                          setError("");
+                        }}
+                        className={`px-3.5 py-1 rounded-full transition-all cursor-pointer ${
+                          emailAuthMode === "password-login"
+                            ? "bg-[#4b5e1e] text-[#f6f8ec] dark:bg-[#b8c460] dark:text-[#0f1611] shadow-xs"
+                            : "text-[#4c4c3d] dark:text-white/65 hover:text-[#0f1611] dark:hover:text-white"
+                        }`}
+                      >
+                        Sign in
+                      </button>
+                      {allowSignups && (
                         <button
                           type="button"
                           onClick={() => {
-                            setEmailAuthMode("password-login");
+                            setEmailAuthMode("password-signup");
                             setError("");
                           }}
                           className={`px-3.5 py-1 rounded-full transition-all cursor-pointer ${
-                            emailAuthMode === "password-login"
+                            emailAuthMode === "password-signup"
                               ? "bg-[#4b5e1e] text-[#f6f8ec] dark:bg-[#b8c460] dark:text-[#0f1611] shadow-xs"
                               : "text-[#4c4c3d] dark:text-white/65 hover:text-[#0f1611] dark:hover:text-white"
                           }`}
                         >
-                          Sign in
+                          Create account
                         </button>
-                        {allowSignups && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEmailAuthMode("password-signup");
-                              setError("");
-                            }}
-                            className={`px-3.5 py-1 rounded-full transition-all cursor-pointer ${
-                              emailAuthMode === "password-signup"
-                                ? "bg-[#4b5e1e] text-[#f6f8ec] dark:bg-[#b8c460] dark:text-[#0f1611] shadow-xs"
-                                : "text-[#4c4c3d] dark:text-white/65 hover:text-[#0f1611] dark:hover:text-white"
-                            }`}
-                          >
-                            Create account
-                          </button>
-                        )}
-                      </div>
-
-                      {emailAuthMode === "otp" ? (
-                        <form onSubmit={(e) => handleSendEmailOtp(e)} className="space-y-2">
-                          <div className="relative flex items-center">
-                            <input
-                              type="email"
-                              required
-                              value={emailInput}
-                              onChange={(e) => setEmailInput(e.target.value)}
-                              placeholder="you@domain.com"
-                              className="w-full h-11 pl-4 pr-28 rounded-full border border-[#0f1611]/15 dark:border-white/15 bg-white/60 dark:bg-white/[0.06] text-[#0f1611] dark:text-white placeholder-[#4c4c3d]/60 dark:placeholder-white/40 text-xs sm:text-sm outline-none focus:border-[#4b5e1e] dark:focus:border-[#b8c460] transition-all"
-                            />
-                            <button
-                              type="submit"
-                              disabled={loading || !emailInput.trim()}
-                              className="absolute right-1.5 h-8 px-3.5 rounded-full bg-[#4b5e1e] hover:bg-[#3c4c16] text-[#f6f8ec] dark:bg-[#b8c460] dark:hover:bg-[#a6b350] dark:text-[#0f1611] font-semibold text-xs transition-colors disabled:opacity-40 cursor-pointer flex items-center gap-1"
-                            >
-                              {loading ? "..." : "Send link →"}
-                            </button>
-                          </div>
-                          <div className="flex items-center justify-between text-[0.68rem] px-1">
-                            <span className="text-[#4c4c3d]/80 dark:text-white/50">
-                              Instant sign-in link sent to your inbox.
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEmailAuthMode("password-login");
-                                setError("");
-                              }}
-                              className="font-medium text-[#4b5e1e] dark:text-[#b8c460] hover:underline cursor-pointer"
-                            >
-                              Use password
-                            </button>
-                          </div>
-                        </form>
-                      ) : (
-                        <form onSubmit={handlePasswordSubmit} className="space-y-2 text-left">
-                          {emailAuthMode === "password-signup" && (
-                            <input
-                              type="text"
-                              required
-                              value={fullName}
-                              onChange={(e) => setFullName(e.target.value)}
-                              placeholder="Full name"
-                              className="w-full h-11 px-4 rounded-full border border-[#0f1611]/15 dark:border-white/15 bg-white/60 dark:bg-white/[0.06] text-[#0f1611] dark:text-white placeholder-[#4c4c3d]/60 dark:placeholder-white/40 text-xs sm:text-sm outline-none focus:border-[#4b5e1e] dark:focus:border-[#b8c460]"
-                            />
-                          )}
-                          <input
-                            type="email"
-                            required
-                            value={emailInput}
-                            onChange={(e) => setEmailInput(e.target.value)}
-                            placeholder="Email address"
-                            className="w-full h-11 px-4 rounded-full border border-[#0f1611]/15 dark:border-white/15 bg-white/60 dark:bg-white/[0.06] text-[#0f1611] dark:text-white placeholder-[#4c4c3d]/60 dark:placeholder-white/40 text-xs sm:text-sm outline-none focus:border-[#4b5e1e] dark:focus:border-[#b8c460]"
-                          />
-                          <input
-                            type="password"
-                            required
-                            minLength={emailAuthMode === "password-signup" ? 8 : 1}
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder={
-                              emailAuthMode === "password-signup"
-                                ? "Set password (min 8 characters)"
-                                : "Password"
-                            }
-                            className="w-full h-11 px-4 rounded-full border border-[#0f1611]/15 dark:border-white/15 bg-white/60 dark:bg-white/[0.06] text-[#0f1611] dark:text-white placeholder-[#4c4c3d]/60 dark:placeholder-white/40 text-xs sm:text-sm outline-none focus:border-[#4b5e1e] dark:focus:border-[#b8c460]"
-                          />
-                          <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full h-11 rounded-full bg-[#4b5e1e] hover:bg-[#3c4c16] text-[#f6f8ec] dark:bg-[#b8c460] dark:hover:bg-[#a6b350] dark:text-[#0f1611] font-semibold text-xs sm:text-sm transition-colors cursor-pointer disabled:opacity-50"
-                          >
-                            {loading
-                              ? "Please wait..."
-                              : emailAuthMode === "password-signup"
-                              ? "Create Account & Verify Email →"
-                              : "Sign In →"}
-                          </button>
-                          <div className="text-center pt-0.5">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEmailAuthMode("otp");
-                                setError("");
-                              }}
-                              className="text-[0.68rem] text-[#4c4c3d]/80 dark:text-white/50 hover:text-[#4b5e1e] dark:hover:text-[#b8c460] transition-colors cursor-pointer"
-                            >
-                              Or sign in with a one-time email link
-                            </button>
-                          </div>
-                        </form>
                       )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <h1 className="text-2xl font-display font-medium tracking-tight text-[#0f1611] dark:text-[#f5f7f2] leading-tight">
+                      {emailAuthMode === "password-signup" ? (
+                        <>
+                          Create your{" "}
+                          <em className="italic font-serif font-normal text-[#4b5e1e] dark:text-[#b8c460]">
+                            account.
+                          </em>
+                        </>
+                      ) : (
+                        <>
+                          Sign in with{" "}
+                          <em className="italic font-serif font-normal text-[#4b5e1e] dark:text-[#b8c460]">
+                            email.
+                          </em>
+                        </>
+                      )}
+                    </h1>
+                    <p className="text-xs text-[#4c4c3d] dark:text-white/65">
+                      {emailAuthMode === "password-signup"
+                        ? "Confirm once in your inbox, then sign in anytime."
+                        : "Enter your verified email and password."}
+                    </p>
+                  </div>
+
+                  {error && (
+                    <div className="w-full p-3 rounded-2xl bg-red-500/12 dark:bg-red-500/15 border border-red-600/25 dark:border-red-400/30 text-xs text-red-900 dark:text-red-200 text-left leading-relaxed backdrop-blur-sm">
+                      {error}
                     </div>
                   )}
 
-                {/* Legal Disclaimer matching Screenshot */}
-                <p className="text-[0.72rem] text-[#4c4c3d] dark:text-white/55 text-center mt-6 leading-relaxed">
-                  By continuing you agree to our{" "}
-                  <Link
-                    href="/terms"
-                    className="underline underline-offset-2 hover:text-[#0f1611] dark:hover:text-white transition-colors"
-                  >
-                    Terms and Conditions
-                  </Link>{" "}
-                  and{" "}
-                  <Link
-                    href="/privacy"
-                    className="underline underline-offset-2 hover:text-[#0f1611] dark:hover:text-white transition-colors"
-                  >
-                    Privacy policy
-                  </Link>
-                  .
-                </p>
-              </>
+                  {successMsg && (
+                    <div className="w-full p-3 rounded-2xl bg-[#eef2da]/80 dark:bg-[#b8c460]/15 border border-[#4b5e1e]/25 dark:border-[#b8c460]/30 text-xs text-[#3c4c16] dark:text-[#d5df88] font-medium text-center backdrop-blur-sm">
+                      {successMsg}
+                    </div>
+                  )}
+
+                  <form onSubmit={handlePasswordSubmit} className="space-y-2.5 text-left">
+                    {emailAuthMode === "password-signup" && (
+                      <input
+                        type="text"
+                        required
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="Full name"
+                        className="w-full h-11 px-4 rounded-full border border-[#0f1611]/14 dark:border-white/14 bg-white/20 dark:bg-white/[0.04] backdrop-blur-md text-[#0f1611] dark:text-white placeholder-[#4c4c3d]/65 dark:placeholder-white/40 text-xs sm:text-sm outline-none focus:bg-white/40 dark:focus:bg-white/[0.08] focus:border-[#4b5e1e] dark:focus:border-[#b8c460] transition-all"
+                      />
+                    )}
+                    <input
+                      type="email"
+                      required
+                      value={emailInput}
+                      onChange={(e) => setEmailInput(e.target.value)}
+                      placeholder="Email address"
+                      className="w-full h-11 px-4 rounded-full border border-[#0f1611]/14 dark:border-white/14 bg-white/20 dark:bg-white/[0.04] backdrop-blur-md text-[#0f1611] dark:text-white placeholder-[#4c4c3d]/65 dark:placeholder-white/40 text-xs sm:text-sm outline-none focus:bg-white/40 dark:focus:bg-white/[0.08] focus:border-[#4b5e1e] dark:focus:border-[#b8c460] transition-all"
+                    />
+                    <input
+                      type="password"
+                      required
+                      minLength={emailAuthMode === "password-signup" ? 8 : 1}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder={
+                        emailAuthMode === "password-signup"
+                          ? "Set password (min 8 characters)"
+                          : "Password"
+                      }
+                      className="w-full h-11 px-4 rounded-full border border-[#0f1611]/14 dark:border-white/14 bg-white/20 dark:bg-white/[0.04] backdrop-blur-md text-[#0f1611] dark:text-white placeholder-[#4c4c3d]/65 dark:placeholder-white/40 text-xs sm:text-sm outline-none focus:bg-white/40 dark:focus:bg-white/[0.08] focus:border-[#4b5e1e] dark:focus:border-[#b8c460] transition-all"
+                    />
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full h-11 mt-1 rounded-full bg-[#4b5e1e]/92 hover:bg-[#3c4c16] text-[#f6f8ec] dark:bg-[#b8c460] dark:hover:bg-[#a6b350] dark:text-[#0f1611] font-semibold text-xs sm:text-sm transition-all cursor-pointer disabled:opacity-50 shadow-sm"
+                    >
+                      {loading
+                        ? "Please wait..."
+                        : emailAuthMode === "password-signup"
+                        ? "Create Account & Verify →"
+                        : "Sign In →"}
+                    </button>
+                  </form>
+
+                  <p className="text-[0.7rem] text-[#4c4c3d] dark:text-white/55 text-center pt-1 leading-relaxed">
+                    By continuing you agree to our{" "}
+                    <Link
+                      href="/terms"
+                      className="underline underline-offset-2 hover:text-[#0f1611] dark:hover:text-white transition-colors"
+                    >
+                      Terms
+                    </Link>{" "}
+                    &amp;{" "}
+                    <Link
+                      href="/privacy"
+                      className="underline underline-offset-2 hover:text-[#0f1611] dark:hover:text-white transition-colors"
+                    >
+                      Privacy policy
+                    </Link>
+                    .
+                  </p>
+                </div>
+              )
             ) : (
               /* ================= STEP 2: EMAIL VERIFICATION SCREEN ================= */
               <div className="w-full space-y-5 py-2 flex flex-col items-center text-center">
@@ -636,7 +652,7 @@ export default function LoginPage() {
                 </div>
 
                 {/* Live Sync Status Pill */}
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/65 dark:bg-white/[0.08] border border-[#0f1611]/10 dark:border-white/15 text-xs font-medium text-[#3c4c16] dark:text-[#d5df88]">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/25 dark:bg-white/[0.06] border border-[#0f1611]/12 dark:border-white/14 backdrop-blur-md text-xs font-medium text-[#3c4c16] dark:text-[#d5df88]">
                   <span
                     className={`w-2 h-2 rounded-full bg-[#4b5e1e] dark:bg-[#b8c460] ${
                       verifySynced ? "" : "animate-pulse"
