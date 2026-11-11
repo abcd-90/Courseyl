@@ -52,6 +52,100 @@ function renderVerificationHtml(params: {
   </div>`;
 }
 
+async function deliverViaConfiguredMailer(params: {
+  cfg: Awaited<ReturnType<typeof getEffectiveAuthConfig>>;
+  brandName: string;
+  to: string;
+  subject: string;
+  html: string;
+}): Promise<SendVerificationResult | null> {
+  const { cfg, brandName, to, subject, html } = params;
+  const hasResend = Boolean(cfg.resendApiKey);
+  const hasSmtp = Boolean(cfg.smtpHost && cfg.smtpUser && cfg.smtpPass);
+
+  if (hasResend) {
+    const fromAddr = cfg.smtpFrom || `${brandName} <onboarding@resend.dev>`;
+    const resendRes = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${cfg.resendApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: fromAddr,
+        to: [to],
+        subject,
+        html,
+      }),
+    });
+
+    if (!resendRes.ok) {
+      const errJson = await resendRes.json().catch(() => ({}));
+      return {
+        ok: false,
+        mode: "resend",
+        statusCode: resendRes.status || 502,
+        message: "Failed to deliver verification email via Resend.",
+        error:
+          errJson?.message ||
+          "Resend rejected this email request. Check your RESEND_API_KEY and verified sender domain.",
+      };
+    }
+
+    return {
+      ok: true,
+      mode: "resend",
+      message: `Confirmation link & 6-digit code sent to ${to}.`,
+    };
+  }
+
+  if (hasSmtp) {
+    try {
+      const normalizedPass = cfg.smtpHost.toLowerCase().includes("gmail.com")
+        ? cfg.smtpPass.replace(/\s+/g, "")
+        : cfg.smtpPass;
+      const port = cfg.smtpPort || 587;
+      const transporter = nodemailer.createTransport({
+        host: cfg.smtpHost,
+        port,
+        secure: port === 465,
+        auth: {
+          user: cfg.smtpUser,
+          pass: normalizedPass,
+        },
+      });
+
+      await transporter.sendMail({
+        from: cfg.smtpFrom || `${brandName} <${cfg.smtpUser}>`,
+        to,
+        subject,
+        html,
+      });
+
+      return {
+        ok: true,
+        mode: "smtp",
+        message: `Confirmation link & 6-digit code sent to ${to}.`,
+      };
+    } catch (smtpErr: unknown) {
+      console.error("SMTP sendMail failed:", smtpErr);
+      const errMsg =
+        smtpErr instanceof Error
+          ? smtpErr.message
+          : "SMTP authentication or delivery error";
+      return {
+        ok: false,
+        mode: "smtp",
+        statusCode: 502,
+        message: "Failed to send confirmation email via SMTP.",
+        error: `Email delivery error: ${errMsg}`,
+      };
+    }
+  }
+
+  return null;
+}
+
 /**
  * Generates and sends a genuine email verification code + magic link.
  * Priority: Resend API -> Direct SMTP (Nodemailer) -> Supabase Auth OTP/Magic Link.
@@ -113,80 +207,15 @@ export async function issueAndSendEmailVerification(params: {
       purpose: params.purpose,
     });
 
-    if (hasResend) {
-      const fromAddr =
-        cfg.smtpFrom || `${brandName} <onboarding@resend.dev>`;
-      const resendRes = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${cfg.resendApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: fromAddr,
-          to: [cleanEmail],
-          subject,
-          html,
-        }),
-      });
-
-      if (!resendRes.ok) {
-        const errJson = await resendRes.json().catch(() => ({}));
-        return {
-          ok: false,
-          mode: "resend",
-          statusCode: resendRes.status || 502,
-          message: "Failed to deliver verification email via Resend.",
-          error:
-            errJson?.message ||
-            "Resend rejected this email request. Check your RESEND_API_KEY and verified sender domain.",
-        };
-      }
-
-      return {
-        ok: true,
-        mode: "resend",
-        message: `Confirmation link & 6-digit code sent to ${cleanEmail}.`,
-      };
-    }
-
-    // Direct SMTP (e.g. Gmail App Password, Brevo, Zoho, SES, custom SMTP)
-    try {
-      const transporter = nodemailer.createTransport({
-        host: cfg.smtpHost,
-        port: cfg.smtpPort || 587,
-        secure: (cfg.smtpPort || 587) === 465,
-        auth: {
-          user: cfg.smtpUser,
-          pass: cfg.smtpPass,
-        },
-      });
-
-      await transporter.sendMail({
-        from: cfg.smtpFrom || `${brandName} <${cfg.smtpUser}>`,
-        to: cleanEmail,
-        subject,
-        html,
-      });
-
-      return {
-        ok: true,
-        mode: "smtp",
-        message: `Confirmation link & 6-digit code sent to ${cleanEmail}.`,
-      };
-    } catch (smtpErr: unknown) {
-      console.error("SMTP sendMail failed:", smtpErr);
-      const errMsg =
-        smtpErr instanceof Error
-          ? smtpErr.message
-          : "SMTP authentication or delivery error";
-      return {
-        ok: false,
-        mode: "smtp",
-        statusCode: 502,
-        message: "Failed to send confirmation email via SMTP.",
-        error: `Email delivery error: ${errMsg}`,
-      };
+    const delivered = await deliverViaConfiguredMailer({
+      cfg,
+      brandName,
+      to: cleanEmail,
+      subject,
+      html,
+    });
+    if (delivered) {
+      return delivered;
     }
   }
 
@@ -237,5 +266,67 @@ export async function issueAndSendEmailVerification(params: {
     mode: "supabase",
     message: `Confirmation email sent to ${cleanEmail}. Click the confirmation link in your inbox or enter your 6-digit code below.`,
   };
+}
+
+/**
+ * Admin-only diagnostic helper to verify Resend API or Custom SMTP delivery directly
+ * without touching Supabase's default shared mailer.
+ */
+export async function sendAdminMailerTestEmail(params: {
+  recipientEmail: string;
+  origin: string;
+}): Promise<SendVerificationResult> {
+  const to = params.recipientEmail.trim().toLowerCase();
+  const [cfg, publicSettings] = await Promise.all([
+    getEffectiveAuthConfig(),
+    getPublicSettings().catch(() => null),
+  ]);
+  const brandName = publicSettings?.branding?.brandName || "Courseyl";
+
+  const hasCustom = Boolean(
+    cfg.resendApiKey || (cfg.smtpHost && cfg.smtpUser && cfg.smtpPass)
+  );
+  if (!hasCustom) {
+    return {
+      ok: false,
+      mode: "supabase",
+      statusCode: 400,
+      message: "Custom mailer not configured yet.",
+      error:
+        "Save either a Resend API Key or Gmail/Custom SMTP credentials first, then click Send Test Email.",
+    };
+  }
+
+  const html = renderVerificationHtml({
+    brandName,
+    code: "123456",
+    confirmUrl: `${params.origin}/login`,
+    purpose: "VERIFY_EMAIL",
+  });
+
+  const result = await deliverViaConfiguredMailer({
+    cfg,
+    brandName,
+    to,
+    subject: `${brandName} Custom Mailer Test (Success)`,
+    html,
+  });
+
+  if (!result) {
+    return {
+      ok: false,
+      mode: "smtp",
+      statusCode: 400,
+      message: "Custom mailer not configured.",
+      error: "No Resend or SMTP credentials active.",
+    };
+  }
+
+  return result.ok
+    ? {
+        ...result,
+        message: `Test email delivered successfully via ${result.mode.toUpperCase()} to ${to}!`,
+      }
+    : result;
 }
 

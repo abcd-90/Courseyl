@@ -174,6 +174,10 @@ export default function StudioHubAdminPage() {
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [userSearch, setUserSearch] = useState("");
   const [authProvidersStatus, setAuthProvidersStatus] = useState<any>(null);
+  const [siteOrigin, setSiteOrigin] = useState("https://courseyl.vercel.app");
+  const [testEmailTarget, setTestEmailTarget] = useState("");
+  const [testingMailer, setTestingMailer] = useState(false);
+  const [copiedCallback, setCopiedCallback] = useState<string | null>(null);
   const [authSecretsForm, setAuthSecretsForm] = useState<AuthSecretsForm>({
     githubClientId: "",
     githubClientSecret: "",
@@ -254,6 +258,9 @@ export default function StudioHubAdminPage() {
 
   useEffect(() => {
     setIsDark(document.documentElement.classList.contains("dark"));
+    if (typeof window !== "undefined") {
+      setSiteOrigin(window.location.origin);
+    }
     fetch("/api/auth/me", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -262,6 +269,7 @@ export default function StudioHubAdminPage() {
           return;
         }
         setCurrentUser(data.user);
+        setTestEmailTarget((prev) => prev || data.user.email || "");
         if (data.user.role === "ADMIN") {
           setAuthStatus("admin");
           loadAllAdminData();
@@ -308,6 +316,61 @@ export default function StudioHubAdminPage() {
       showToast("error", "Network error unlocking Admin Vault.");
     } finally {
       setClaiming(false);
+    }
+  };
+
+  const applyGmailSmtpPreset = () => {
+    const adminEmail = currentUser?.email || authSecretsForm.smtpUser || "";
+    setAuthSecretsForm((prev) => ({
+      ...prev,
+      smtpHost: "smtp.gmail.com",
+      smtpPort: 465,
+      smtpUser: prev.smtpUser || adminEmail,
+      smtpFrom:
+        prev.smtpFrom ||
+        (adminEmail ? `${brandingForm.brandName || "Courseyl"} <${adminEmail}>` : ""),
+    }));
+    showToast(
+      "success",
+      "Gmail SMTP preset applied! Now enter your 16-digit Google App Password and click Save & Send Test."
+    );
+  };
+
+  const copyCallbackUrl = async (key: string, path: string) => {
+    const fullUrl = `${siteOrigin}${path}`;
+    try {
+      await navigator.clipboard.writeText(fullUrl);
+      setCopiedCallback(key);
+      setTimeout(() => setCopiedCallback(null), 2000);
+    } catch {
+      showToast("error", `Copy URL manually: ${fullUrl}`);
+    }
+  };
+
+  const handleSendTestEmail = async () => {
+    setTestingMailer(true);
+    try {
+      const res = await fetch("/api/admin/settings/test-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: testEmailTarget || currentUser?.email,
+          secrets: authSecretsForm,
+        }),
+      });
+      const data = await res.json();
+      if (data?.authProviders) {
+        setAuthProvidersStatus(data.authProviders);
+      }
+      if (!res.ok) {
+        showToast("error", data?.error || "Test email failed.");
+        return;
+      }
+      showToast("success", data.message || "Test confirmation email sent!");
+    } catch {
+      showToast("error", "Network error while sending test email.");
+    } finally {
+      setTestingMailer(false);
     }
   };
 
@@ -1914,7 +1977,7 @@ export default function StudioHubAdminPage() {
 
                 {/* Live Provider Readiness Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-                  <div className="p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] space-y-1">
+                  <div className="p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] space-y-1.5">
                     <div className="text-[0.68rem] font-mono font-bold uppercase text-ink-soft">
                       Google OAuth
                     </div>
@@ -1922,10 +1985,17 @@ export default function StudioHubAdminPage() {
                       {authProvidersStatus?.google?.enabled ? "● Active (Direct)" : "○ Needs Keys"}
                     </div>
                     <div className="text-[0.68rem] text-ink-soft font-mono break-all">
-                      /api/auth/google/callback
+                      {siteOrigin}/api/auth/google/callback
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => copyCallbackUrl("google", "/api/auth/google/callback")}
+                      className="text-[0.68rem] font-semibold text-moss hover:underline cursor-pointer"
+                    >
+                      {copiedCallback === "google" ? "✓ Copied Google Callback URL" : "Copy Google Callback URL"}
+                    </button>
                   </div>
-                  <div className="p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] space-y-1">
+                  <div className="p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] space-y-1.5">
                     <div className="text-[0.68rem] font-mono font-bold uppercase text-ink-soft">
                       GitHub OAuth
                     </div>
@@ -1935,10 +2005,17 @@ export default function StudioHubAdminPage() {
                         : "○ Needs Client ID/Secret"}
                     </div>
                     <div className="text-[0.68rem] text-ink-soft font-mono break-all">
-                      /api/auth/github/callback
+                      {siteOrigin}/api/auth/github/callback
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => copyCallbackUrl("github", "/api/auth/github/callback")}
+                      className="text-[0.68rem] font-semibold text-moss hover:underline cursor-pointer"
+                    >
+                      {copiedCallback === "github" ? "✓ Copied GitHub Callback URL" : "Copy GitHub Callback URL"}
+                    </button>
                   </div>
-                  <div className="p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] space-y-1">
+                  <div className="p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] space-y-1.5">
                     <div className="text-[0.68rem] font-mono font-bold uppercase text-ink-soft">
                       X (Twitter) OAuth
                     </div>
@@ -1948,18 +2025,27 @@ export default function StudioHubAdminPage() {
                         : "○ Needs Client ID/Secret"}
                     </div>
                     <div className="text-[0.68rem] text-ink-soft font-mono break-all">
-                      /api/auth/x/callback
+                      {siteOrigin}/api/auth/x/callback
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => copyCallbackUrl("x", "/api/auth/x/callback")}
+                      className="text-[0.68rem] font-semibold text-moss hover:underline cursor-pointer"
+                    >
+                      {copiedCallback === "x" ? "✓ Copied X Callback URL" : "Copy X Callback URL"}
+                    </button>
                   </div>
-                  <div className="p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] space-y-1">
+                  <div className="p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] space-y-1.5">
                     <div className="text-[0.68rem] font-mono font-bold uppercase text-ink-soft">
                       Email Confirmation
                     </div>
                     <div className="text-sm font-bold text-ink">
-                      ● Enforced ({authProvidersStatus?.email?.mode || "supabase"})
+                      {authProvidersStatus?.email?.mode === "custom"
+                        ? "● Custom Mailer Active"
+                        : "⚠ Supabase Default (Add SMTP)"}
                     </div>
                     <div className="text-[0.68rem] text-ink-soft">
-                      MX check + 6-digit OTP / link
+                      Typo/dummy/MX check + 6-digit OTP
                     </div>
                   </div>
                 </div>
@@ -2028,12 +2114,21 @@ export default function StudioHubAdminPage() {
                 </div>
 
                 {/* Custom Email Mailer (Resend / SMTP) */}
-                <div className="space-y-3 p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)]">
-                  <div className="text-xs font-mono font-bold uppercase text-moss">
-                    Custom Confirmation Mailer (Optional — Resend API or Gmail/Custom SMTP)
+                <div className="space-y-4 p-4 sm:p-5 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)]">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-xs font-mono font-bold uppercase text-moss">
+                      Custom Confirmation Mailer (Gmail SMTP or Resend API)
+                    </div>
+                    <button
+                      type="button"
+                      onClick={applyGmailSmtpPreset}
+                      className="px-3.5 py-1.5 rounded-full bg-surface text-ink hover:bg-moss hover:text-on-moss text-xs font-semibold shadow-[inset_0_0_0_1px_var(--line)] transition-colors cursor-pointer"
+                    >
+                      ⚡ Use Free Gmail SMTP Preset
+                    </button>
                   </div>
-                  <p className="text-xs text-ink-soft">
-                    Without Custom SMTP or Resend, Supabase built-in email confirmation is used (free projects limit built-in mail). Adding Resend or Gmail App Password SMTP removes all limits cleanly.
+                  <p className="text-xs text-ink-soft leading-relaxed">
+                    Supabase free default mail has strict limits &amp; bounce warnings. Using Gmail SMTP (<code className="font-mono">smtp.gmail.com</code>, port <code className="font-mono">465</code> + Google App Password) or Resend API sends branded 6-digit OTPs directly from your account with zero Supabase limits.
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <input
@@ -2045,7 +2140,7 @@ export default function StudioHubAdminPage() {
                           resendApiKey: e.target.value,
                         })
                       }
-                      placeholder="Resend API Key (re_...)"
+                      placeholder="Resend API Key (re_...) — Optional if using Gmail SMTP"
                       className="w-full h-10 rounded-xl bg-surface px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
                     />
                     <input
@@ -2057,7 +2152,7 @@ export default function StudioHubAdminPage() {
                           smtpFrom: e.target.value,
                         })
                       }
-                      placeholder="From Email (e.g. Courseyl <noreply@yourdomain.com>)"
+                      placeholder="From Email (e.g. Courseyl <you@gmail.com>)"
                       className="w-full h-10 rounded-xl bg-surface px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
                     />
                     <input
@@ -2069,7 +2164,7 @@ export default function StudioHubAdminPage() {
                           smtpHost: e.target.value,
                         })
                       }
-                      placeholder="SMTP Host (e.g. smtp.gmail.com)"
+                      placeholder="SMTP Host (smtp.gmail.com)"
                       className="w-full h-10 rounded-xl bg-surface px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
                     />
                     <input
@@ -2078,10 +2173,10 @@ export default function StudioHubAdminPage() {
                       onChange={(e) =>
                         setAuthSecretsForm({
                           ...authSecretsForm,
-                          smtpPort: Number(e.target.value) || 587,
+                          smtpPort: Number(e.target.value) || 465,
                         })
                       }
-                      placeholder="SMTP Port (587 or 465)"
+                      placeholder="SMTP Port (465 for Gmail SSL, or 587)"
                       className="w-full h-10 rounded-xl bg-surface px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
                     />
                     <input
@@ -2093,7 +2188,7 @@ export default function StudioHubAdminPage() {
                           smtpUser: e.target.value,
                         })
                       }
-                      placeholder="SMTP Username"
+                      placeholder="SMTP Username (your@gmail.com)"
                       className="w-full h-10 rounded-xl bg-surface px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
                     />
                     <input
@@ -2105,9 +2200,30 @@ export default function StudioHubAdminPage() {
                           smtpPass: e.target.value,
                         })
                       }
-                      placeholder="SMTP Password / App Password"
+                      placeholder="16-char Google App Password / SMTP Password"
                       className="w-full h-10 rounded-xl bg-surface px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
                     />
+                  </div>
+
+                  {/* Save & Test Email Verification Bar */}
+                  <div className="flex flex-col sm:flex-row gap-2.5 pt-2 border-t border-line/70">
+                    <input
+                      type="email"
+                      value={testEmailTarget}
+                      onChange={(e) => setTestEmailTarget(e.target.value)}
+                      placeholder="Recipient email to test (e.g. your@gmail.com)"
+                      className="flex-1 h-10 rounded-xl bg-surface px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                    />
+                    <button
+                      type="button"
+                      disabled={testingMailer}
+                      onClick={handleSendTestEmail}
+                      className="px-5 h-10 rounded-full bg-surface text-ink hover:bg-moss hover:text-on-moss font-semibold text-xs shadow-[inset_0_0_0_1px_var(--line)] transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+                    >
+                      {testingMailer
+                        ? "Sending Test..."
+                        : "Save & Send Test Email →"}
+                    </button>
                   </div>
                 </div>
               </div>

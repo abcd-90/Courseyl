@@ -30,6 +30,58 @@ const DISPOSABLE_EMAIL_DOMAINS = new Set([
   "yopmail.net",
 ]);
 
+const TYPO_DOMAIN_SUGGESTIONS: Record<string, string> = {
+  "gmial.com": "gmail.com",
+  "gmal.com": "gmail.com",
+  "gmai.com": "gmail.com",
+  "gmail.co": "gmail.com",
+  "gmail.con": "gmail.com",
+  "gnail.com": "gmail.com",
+  "yaho.com": "yahoo.com",
+  "yahooo.com": "yahoo.com",
+  "yhoo.com": "yahoo.com",
+  "yahoo.co": "yahoo.com",
+  "hotmai.com": "hotmail.com",
+  "hotmal.com": "hotmail.com",
+  "hotamil.com": "hotmail.com",
+  "outlok.com": "outlook.com",
+  "outllok.com": "outlook.com",
+  "iclod.com": "icloud.com",
+  "icloud.co": "icloud.com",
+  "protonmai.com": "protonmail.com",
+};
+
+const DUMMY_FREE_LOCAL_PARTS = new Set([
+  "test",
+  "testing",
+  "fake",
+  "dummy",
+  "sample",
+  "demo",
+  "example",
+  "asdf",
+  "asdfgh",
+  "qwer",
+  "qwerty",
+  "abc",
+  "xyz",
+  "123",
+  "1234",
+  "12345",
+  "123456",
+  "noreply",
+  "no-reply",
+]);
+
+const FREE_WEBMAIL_DOMAINS = new Set([
+  "gmail.com",
+  "googlemail.com",
+  "yahoo.com",
+  "hotmail.com",
+  "outlook.com",
+  "icloud.com",
+]);
+
 export interface EmailValidationResult {
   valid: boolean;
   cleanEmail: string;
@@ -63,6 +115,7 @@ export async function validateRealEmailAddress(
   }
 
   const parts = cleanEmail.split("@");
+  const localPart = parts[0] || "";
   const domain = parts[1];
   const tld = domain.split(".").pop() || "";
 
@@ -74,6 +127,15 @@ export async function validateRealEmailAddress(
     };
   }
 
+  const typoSuggestion = TYPO_DOMAIN_SUGGESTIONS[domain];
+  if (typoSuggestion) {
+    return {
+      valid: false,
+      cleanEmail,
+      error: `Did you mean ${localPart}@${typoSuggestion}? Please check the spelling of your email domain.`,
+    };
+  }
+
   if (DISPOSABLE_EMAIL_DOMAINS.has(domain)) {
     return {
       valid: false,
@@ -81,6 +143,29 @@ export async function validateRealEmailAddress(
       error:
         "Temporary or disposable email addresses are not allowed. Please use a real email inbox.",
     };
+  }
+
+  if (FREE_WEBMAIL_DOMAINS.has(domain)) {
+    const baseLocal = localPart.split("+")[0] || "";
+    if (DUMMY_FREE_LOCAL_PARTS.has(baseLocal)) {
+      return {
+        valid: false,
+        cleanEmail,
+        error:
+          "Test or placeholder addresses are blocked to prevent bounced mail. Please use your real inbox.",
+      };
+    }
+    if (domain === "gmail.com" || domain === "googlemail.com") {
+      const normalizedGmail = baseLocal.replace(/\./g, "");
+      if (normalizedGmail.length < 6) {
+        return {
+          valid: false,
+          cleanEmail,
+          error:
+            "Gmail usernames require at least 6 characters. Please enter a valid Gmail address.",
+        };
+      }
+    }
   }
 
   try {
