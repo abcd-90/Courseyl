@@ -123,7 +123,7 @@ export default function PricingPage() {
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       <MarketingNavbar />
 
-      <main className="flex-1 py-14 px-6 max-w-6xl mx-auto w-full">
+      <main className="flex-1 pt-28 sm:pt-32 pb-16 px-6 max-w-6xl mx-auto w-full">
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto">
           <div className="inline-flex items-center gap-2 rounded-full bg-lime-soft px-3.5 py-[7px] text-[0.78rem] font-medium text-pill-ink mb-3">
