@@ -252,7 +252,7 @@ export const DEFAULT_SETTINGS: FullSiteSettings = {
       twitterUrl: "https://twitter.com/courseitxyz",
       linkedinUrl: "https://www.linkedin.com/company/courseit/",
       instagramUrl: "https://www.instagram.com/courseitxyz",
-      contactEmail: "hello@triggerfy.xyz",
+      contactEmail: "thecourseyl@gmail.com",
     },
   },
 };

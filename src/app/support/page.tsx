@@ -21,9 +21,9 @@ export default function SupportPage() {
       .catch(() => {});
   }, []);
 
-  const brandName = settings?.branding?.brandName || "CourseIt";
+  const brandName = settings?.branding?.brandName || "Courseyl";
   const userEmail = currentUser?.email || "your account email";
-  const supportEmail = "hello@triggerfy.xyz";
+  const supportEmail = settings?.structure?.socialLinks?.contactEmail || "thecourseyl@gmail.com";
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-[#fafcf7] dark:bg-[#0c120e] text-ink">
@@ -164,3 +164,4 @@ export default function SupportPage() {
     </div>
   );
 }
+

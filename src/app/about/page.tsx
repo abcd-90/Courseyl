@@ -41,8 +41,8 @@ export default function AboutPage() {
           <h2 className="text-2xl font-display font-semibold text-[#0f1611] pt-6">Get in touch</h2>
           <p>
             Questions, ideas or a course that didn&apos;t build right? Write to{" "}
-            <a href="mailto:hello@triggerfy.xyz" className="text-[#4b5e1e] underline underline-offset-4 font-medium">
-              hello@triggerfy.xyz
+            <a href="mailto:thecourseyl@gmail.com" className="text-[#4b5e1e] underline underline-offset-4 font-medium">
+              thecourseyl@gmail.com
             </a>
             , or{" "}
             <Link href="/dashboard" className="text-[#4b5e1e] underline underline-offset-4 font-medium">

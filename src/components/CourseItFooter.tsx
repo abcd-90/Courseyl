@@ -23,7 +23,7 @@ export function CourseItFooter() {
     twitterUrl: "https://twitter.com/courseitxyz",
     linkedinUrl: "https://www.linkedin.com/company/courseit/",
     instagramUrl: "https://www.instagram.com/courseitxyz",
-    contactEmail: "hello@triggerfy.xyz",
+    contactEmail: "thecourseyl@gmail.com",
   };
   const productLinks = structure?.navLinks?.filter((n) => n.visible !== false) || [];
 
@@ -176,7 +176,7 @@ export function CourseItFooter() {
                   </Link>
                 </li>
                 <li>
-                  <a className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline" href={`mailto:${socialLinks.contactEmail || "hello@triggerfy.xyz"}`}>
+                  <a className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline" href={`mailto:${socialLinks.contactEmail || "thecourseyl@gmail.com"}`}>
                     Contact us
                   </a>
                 </li>

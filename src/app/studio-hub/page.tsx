@@ -316,14 +316,14 @@ export default function StudioHubAdminPage() {
       ...prev,
       smtpHost: "smtp.gmail.com",
       smtpPort: 465,
-      smtpUser: prev.smtpUser || adminEmail,
+      smtpUser: prev.smtpUser || "thecourseyl@gmail.com",
       smtpFrom:
         prev.smtpFrom ||
-        (adminEmail ? `${brandingForm.brandName || "Courseyl"} <${adminEmail}>` : ""),
+        `${brandingForm.brandName || "Courseyl"} <thecourseyl@gmail.com>`,
     }));
     showToast(
       "success",
-      "Gmail SMTP preset applied! Now enter your 16-digit Google App Password and click Save & Send Test."
+      "Gmail SMTP preset applied for thecourseyl@gmail.com! Now enter your 16-digit Google App Password and click Save & Send Test."
     );
   };
 

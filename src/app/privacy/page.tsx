@@ -23,8 +23,8 @@ export default function PrivacyPage() {
           <p>
             Courseyl (&ldquo;we&rdquo;, &ldquo;us&rdquo;) turns YouTube videos and playlists into structured courses
             with lessons, quizzes and a study plan. You can reach us at{" "}
-            <a href="mailto:hello@triggerfy.xyz" className="text-moss underline">
-              hello@triggerfy.xyz
+            <a href="mailto:thecourseyl@gmail.com" className="text-moss underline">
+              thecourseyl@gmail.com
             </a>
             .
           </p>
