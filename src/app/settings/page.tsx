@@ -10,10 +10,16 @@ export default function SettingsPage() {
   const [user, setUser] = useState<any>(null);
   const [name, setName] = useState("");
   const [dailyTime, setDailyTime] = useState(60);
+  const [customMinutes, setCustomMinutes] = useState("45");
+  const [useCustomTime, setUseCustomTime] = useState(false);
+  const [emailReminders, setEmailReminders] = useState(true);
+  const [weeklyDigest, setWeeklyDigest] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const PRESET_MINUTES = [30, 60, 90, 120];
 
   useEffect(() => {
     fetch("/api/auth/me", { cache: "no-store" })
@@ -27,7 +33,14 @@ export default function SettingsPage() {
             data.user.name ||
             "";
           setName(initialName);
-          setDailyTime(data.user.profile?.dailyStudyMinutes || 60);
+          const mins = data.user.profile?.dailyStudyMinutes || 60;
+          setDailyTime(mins);
+          if (!PRESET_MINUTES.includes(mins)) {
+            setUseCustomTime(true);
+            setCustomMinutes(String(mins));
+          }
+          setEmailReminders(data.user.profile?.emailReminders ?? true);
+          setWeeklyDigest(data.user.profile?.weeklyDigest ?? false);
         } else {
           router.push("/login");
         }
@@ -44,17 +57,26 @@ export default function SettingsPage() {
       return;
     }
 
+    const effectiveMinutes = useCustomTime ? Number(customMinutes) : Number(dailyTime);
+    if (!Number.isFinite(effectiveMinutes) || effectiveMinutes < 5 || effectiveMinutes > 480) {
+      setIsError(true);
+      setMessage("Daily study time must be between 5 and 480 minutes.");
+      return;
+    }
+
     setSaving(true);
     setMessage("");
     setIsError(false);
 
     try {
-      const res = await fetch("/api/auth/me", {
+      const res = await fetch("/api/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           displayName: name.trim(),
-          dailyStudyMinutes: Number(dailyTime),
+          dailyStudyMinutes: Math.round(effectiveMinutes),
+          emailReminders,
+          weeklyDigest,
         }),
       });
 
@@ -62,6 +84,7 @@ export default function SettingsPage() {
       if (res.ok && data.user) {
         setUser(data.user);
         setName(data.user.profile?.displayName || name.trim());
+        setDailyTime(data.user.profile?.dailyStudyMinutes || Math.round(effectiveMinutes));
         setIsError(false);
         setMessage("Settings updated successfully!");
 
@@ -162,19 +185,96 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-ink-soft uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-semibold text-ink-soft uppercase tracking-wider mb-2">
                 Daily Study Target (Minutes)
               </label>
-              <select
-                value={dailyTime}
-                onChange={(e) => setDailyTime(Number(e.target.value))}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-line dark:border-white/15 text-sm outline-none bg-white dark:bg-[#0c120e] text-ink focus:border-[#4b5e1e] dark:focus:border-[#b8c460] cursor-pointer"
-              >
-                <option value={30}>30 Minutes / day</option>
-                <option value={60}>60 Minutes / day (Standard)</option>
-                <option value={90}>90 Minutes / day</option>
-                <option value={120}>120 Minutes / day</option>
-              </select>
+              <div className="flex flex-wrap gap-2">
+                {PRESET_MINUTES.map((mins) => {
+                  const active = !useCustomTime && dailyTime === mins;
+                  return (
+                    <button
+                      key={mins}
+                      type="button"
+                      onClick={() => {
+                        setUseCustomTime(false);
+                        setDailyTime(mins);
+                      }}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${
+                        active
+                          ? "bg-[#4b5e1e] dark:bg-[#b8c460] text-white dark:text-[#0f1611] border-[#4b5e1e] dark:border-[#b8c460]"
+                          : "bg-white dark:bg-[#0c120e] border-line dark:border-white/15 text-ink hover:bg-black/5 dark:hover:bg-white/5"
+                      }`}
+                    >
+                      {mins} min{mins === 60 ? " (Standard)" : ""}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => setUseCustomTime(true)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${
+                    useCustomTime
+                      ? "bg-[#4b5e1e] dark:bg-[#b8c460] text-white dark:text-[#0f1611] border-[#4b5e1e] dark:border-[#b8c460]"
+                      : "bg-white dark:bg-[#0c120e] border-line dark:border-white/15 text-ink hover:bg-black/5 dark:hover:bg-white/5"
+                  }`}
+                >
+                  Custom
+                </button>
+              </div>
+
+              {useCustomTime && (
+                <div className="mt-3 flex items-center gap-3">
+                  <input
+                    type="number"
+                    min={5}
+                    max={480}
+                    step={5}
+                    value={customMinutes}
+                    onChange={(e) => setCustomMinutes(e.target.value)}
+                    placeholder="e.g. 45"
+                    className="w-36 px-3.5 py-2 rounded-xl border border-line dark:border-white/15 bg-white dark:bg-[#0c120e] text-ink text-sm outline-none focus:border-[#4b5e1e] dark:focus:border-[#b8c460]"
+                  />
+                  <span className="text-xs text-ink-soft">
+                    Enter any pace between 5 and 480 minutes / day.
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-line/70 dark:border-white/10 space-y-3">
+              <label className="block text-xs font-semibold text-ink-soft uppercase tracking-wider">
+                Email Preferences
+              </label>
+
+              <label className="flex items-center justify-between gap-4 p-3 rounded-2xl border border-line dark:border-white/10 bg-white/60 dark:bg-[#0c120e]/60 cursor-pointer">
+                <div>
+                  <p className="text-sm font-medium text-ink">Daily study reminders</p>
+                  <p className="text-xs text-ink-soft">
+                    Helpful nudges when lessons are queued in Today&apos;s agenda.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={emailReminders}
+                  onChange={(e) => setEmailReminders(e.target.checked)}
+                  className="w-4 h-4 accent-[#4b5e1e] cursor-pointer"
+                />
+              </label>
+
+              <label className="flex items-center justify-between gap-4 p-3 rounded-2xl border border-line dark:border-white/10 bg-white/60 dark:bg-[#0c120e]/60 cursor-pointer">
+                <div>
+                  <p className="text-sm font-medium text-ink">Weekly progress digest</p>
+                  <p className="text-xs text-ink-soft">
+                    Summary of lessons finished, study time, and quiz accuracy.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={weeklyDigest}
+                  onChange={(e) => setWeeklyDigest(e.target.checked)}
+                  className="w-4 h-4 accent-[#4b5e1e] cursor-pointer"
+                />
+              </label>
             </div>
 
             {message && (

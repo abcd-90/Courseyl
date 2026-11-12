@@ -1,9 +1,138 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { clampDailyStudyMinutes } from "@/lib/pacing";
+import { createNotification } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+const STOPWORDS = new Set([
+  "the", "and", "for", "with", "from", "into", "that", "this", "what", "when",
+  "which", "where", "how", "why", "who", "are", "was", "were", "will", "can",
+  "does", "did", "has", "have", "had", "not", "but", "you", "your", "our",
+  "intro", "introduction", "overview", "basics", "fundamentals", "part", "lesson",
+  "module", "chapter", "tutorial", "guide", "course", "complete", "full", "deep",
+  "dive", "using", "build", "building", "making", "create", "understanding", "learn",
+  "core", "setup", "getting", "started", "practical", "example", "examples",
+]);
+
+const TOPIC_SYNONYMS: Record<string, string[]> = {
+  auth: ["authentication", "authorization", "login", "oauth", "jwt", "session"],
+  authentication: ["auth", "login", "oauth", "jwt", "session", "token"],
+  db: ["database", "databases", "sql", "postgres", "postgresql", "prisma", "orm"],
+  database: ["db", "sql", "postgres", "postgresql", "prisma", "orm", "schema", "query"],
+  api: ["apis", "rest", "restful", "endpoint", "endpoints", "http", "fetch", "route"],
+  async: ["asynchronous", "promise", "promises", "await", "concurrency", "callback"],
+  asynchronous: ["async", "promise", "promises", "await", "event", "loop"],
+  oop: ["object", "objects", "class", "classes", "inheritance", "polymorphism"],
+  function: ["functions", "func", "method", "methods", "closure", "closures", "lambda"],
+  functions: ["function", "method", "methods", "closure", "lambda", "parameter"],
+  variable: ["variables", "var", "let", "const", "scope", "datatype", "types"],
+  variables: ["variable", "scope", "datatype", "types"],
+  state: ["states", "usestate", "reducer", "context", "store", "reactivity"],
+  hook: ["hooks", "useeffect", "usestate", "usememo", "usecallback"],
+  hooks: ["hook", "useeffect", "usestate", "usememo", "usecallback"],
+  routing: ["route", "routes", "router", "navigation", "params"],
+  deploy: ["deployment", "hosting", "docker", "ci", "cd", "production", "vercel"],
+  deployment: ["deploy", "docker", "container", "hosting", "production"],
+  test: ["testing", "tests", "unit", "integration", "mock", "assert", "jest"],
+  testing: ["test", "tests", "unit", "integration", "mock", "assert", "vitest"],
+  rag: ["retrieval", "vector", "embeddings", "embedding", "chunking", "knowledge"],
+  agent: ["agents", "agentic", "tool", "tools", "workflow", "orchestration"],
+  llm: ["llms", "language", "model", "models", "prompt", "prompts", "openai", "gpt"],
+  prompt: ["prompts", "prompting", "system", "fewshot", "context"],
+};
+
+function tokenizeNormalized(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s+#.-]/g, " ")
+    .split(/\s+/)
+    .map((w) => w.replace(/^[._-]+|[._-]+$/g, ""))
+    .filter((w) => w.length >= 2 && !STOPWORDS.has(w));
+}
+
+function expandTokens(tokens: string[]): Set<string> {
+  const expanded = new Set<string>(tokens);
+  for (const t of tokens) {
+    if (t.endsWith("s") && t.length > 3) expanded.add(t.slice(0, -1));
+    if (t.endsWith("ing") && t.length > 5) expanded.add(t.slice(0, -3));
+    const syns = TOPIC_SYNONYMS[t];
+    if (syns) {
+      for (const s of syns) expanded.add(s);
+    }
+  }
+  return expanded;
+}
+
+function scoreSemanticLessonMatch(params: {
+  topicName: string;
+  questionTexts: string[];
+  courseTitleTokens: Set<string>;
+  chapterTitle: string;
+  lesson: {
+    title: string;
+    description: string | null;
+    summary: string | null;
+    keyTakeaways: string | null;
+    importantDefinitions: string | null;
+  };
+}): boolean {
+  const { topicName, questionTexts, courseTitleTokens, chapterTitle, lesson } = params;
+  const cleanTopic = topicName.toLowerCase().replace(/^\d+\.\s*/, "").trim();
+  const cleanLessonTitle = lesson.title.toLowerCase().replace(/^\d+\.\s*/, "").trim();
+
+  if (
+    cleanTopic.length >= 4 &&
+    (cleanLessonTitle.includes(cleanTopic) || cleanTopic.includes(cleanLessonTitle))
+  ) {
+    return true;
+  }
+
+  const topicRawTokens = tokenizeNormalized(cleanTopic);
+  const specificTopicTokens = topicRawTokens.filter((t) => !courseTitleTokens.has(t));
+  const coreTopicTokens = specificTopicTokens.length > 0 ? specificTopicTokens : topicRawTokens;
+  const questionTokens = tokenizeNormalized(questionTexts.join(" ")).filter(
+    (t) => !courseTitleTokens.has(t)
+  );
+
+  const topicExpanded = expandTokens([...coreTopicTokens, ...questionTokens.slice(0, 8)]);
+  const lessonTitleExpanded = expandTokens(tokenizeNormalized(cleanLessonTitle));
+  const lessonBodyText = [
+    lesson.description || "",
+    lesson.summary || "",
+    lesson.keyTakeaways || "",
+    lesson.importantDefinitions || "",
+    chapterTitle,
+  ].join(" ");
+  const lessonFullExpanded = expandTokens([
+    ...lessonTitleExpanded,
+    ...tokenizeNormalized(lessonBodyText),
+  ]);
+
+  if (coreTopicTokens.length === 0) return false;
+
+  let titleHits = 0;
+  for (const tk of expandTokens(coreTopicTokens)) {
+    if (lessonTitleExpanded.has(tk)) titleHits++;
+  }
+
+  if (titleHits >= 1 && coreTopicTokens.length <= 2) {
+    return true;
+  }
+  if (titleHits >= 2) {
+    return true;
+  }
+
+  let bodyHits = 0;
+  for (const tk of topicExpanded) {
+    if (lessonFullExpanded.has(tk)) bodyHits++;
+  }
+
+  const ratio = bodyHits / Math.max(1, expandTokens(coreTopicTokens).size);
+  return bodyHits >= 2 && ratio >= 0.5 && titleHits >= 1;
+}
 
 export async function GET(
   req: Request,
@@ -11,6 +140,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    const user = await getCurrentUser().catch(() => null);
     const placementIncludes = {
       placementQuestions: {
         orderBy: { orderIndex: "asc" as const },
@@ -31,10 +161,7 @@ export async function GET(
     if (!course) {
       course = await prisma.course.findFirst({
         where: {
-          OR: [
-            { slug: { startsWith: id } },
-            { slug: { contains: id } },
-          ],
+          OR: [{ slug: { startsWith: id } }, { slug: { contains: id } }],
         },
         include: placementIncludes,
       });
@@ -55,6 +182,7 @@ export async function GET(
       courseId: course.id,
       courseSlug: course.slug,
       courseTitle: course.title,
+      dailyStudyMinutes: clampDailyStudyMinutes(user?.profile?.dailyStudyMinutes, 60),
       course: {
         id: course.id,
         slug: course.slug,
@@ -75,25 +203,47 @@ export async function POST(
   try {
     const user = await getCurrentUser().catch(() => null);
     const { id } = await params;
-    const { answers } = await req.json(); // { [questionId: string]: number }
+    const body = await req.json();
+    const answers = body?.answers || {};
 
-    const course = await prisma.course.findFirst({
+    let course = await prisma.course.findFirst({
       where: { OR: [{ id }, { slug: id }] },
       include: {
         placementQuestions: true,
         chapters: {
+          orderBy: { orderIndex: "asc" },
           include: {
-            lessons: true,
+            lessons: {
+              orderBy: { orderIndex: "asc" },
+            },
           },
         },
       },
     });
 
     if (!course) {
+      course = await prisma.course.findFirst({
+        where: {
+          OR: [{ slug: { startsWith: id } }, { slug: { contains: id } }],
+        },
+        include: {
+          placementQuestions: true,
+          chapters: {
+            orderBy: { orderIndex: "asc" },
+            include: {
+              lessons: {
+                orderBy: { orderIndex: "asc" },
+              },
+            },
+          },
+        },
+      });
+    }
+
+    if (!course) {
       return NextResponse.json({ error: "Course not found" }, { status: 404 });
     }
 
-    // Ensure enrollment if user is logged in
     let enrollment: any = null;
     if (user) {
       try {
@@ -104,7 +254,7 @@ export async function POST(
               courseId: course.id,
             },
           },
-          update: {},
+          update: { lastAccessedAt: new Date() },
           create: {
             userId: user.id,
             courseId: course.id,
@@ -113,20 +263,21 @@ export async function POST(
       } catch {}
     }
 
-    // Evaluate answers
     let correctCount = 0;
     const totalQuestions = course.placementQuestions.length;
-    const masteredTopics = new Set<string>();
-    const topicScores: Record<string, { total: number; correct: number }> = {};
+    const masteredTopicQuestions = new Map<string, string[]>();
+    const topicScores: Record<string, { total: number; correct: number; questions: string[] }> = {};
 
     course.placementQuestions.forEach((q) => {
       const selected = answers?.[q.id];
-      const isCorrect = selected === q.correctOptionIndex;
+      const isExplicitSkip = selected === -1 || selected === undefined || selected === null;
+      const isCorrect = !isExplicitSkip && Number(selected) === q.correctOptionIndex;
 
       if (!topicScores[q.topicName]) {
-        topicScores[q.topicName] = { total: 0, correct: 0 };
+        topicScores[q.topicName] = { total: 0, correct: 0, questions: [] };
       }
       topicScores[q.topicName].total++;
+      topicScores[q.topicName].questions.push(q.questionText);
 
       if (isCorrect) {
         correctCount++;
@@ -134,37 +285,43 @@ export async function POST(
       }
     });
 
-    // Topic mastered if score >= 80% (or 1/1 if single question)
     Object.entries(topicScores).forEach(([topic, score]) => {
-      if (score.correct / score.total >= 0.8) {
-        masteredTopics.add(topic.toLowerCase().trim());
+      if (score.total > 0 && score.correct / score.total >= 0.75) {
+        masteredTopicQuestions.set(topic, score.questions);
       }
     });
 
-    const scorePercentage = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
+    const scorePercentage =
+      totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
 
-    // Identify which lessons should be skipped
-    // A lesson is skipped if its title or description matches a mastered topic
+    const courseTitleTokens = new Set(tokenizeNormalized(course.title));
     const skippedLessonIds: string[] = [];
 
     for (const chapter of course.chapters) {
       for (const lesson of chapter.lessons) {
-        const lessonText = `${lesson.title} ${lesson.description || ""}`.toLowerCase();
         let matchesMasteredTopic = false;
-
-        for (const topic of masteredTopics) {
-          if (lessonText.includes(topic) || topic.includes(lesson.title.toLowerCase().replace(/^\d+\.\s*/, ""))) {
+        for (const [topicName, qTexts] of masteredTopicQuestions.entries()) {
+          if (
+            scoreSemanticLessonMatch({
+              topicName,
+              questionTexts: qTexts,
+              courseTitleTokens,
+              chapterTitle: chapter.title,
+              lesson,
+            })
+          ) {
             matchesMasteredTopic = true;
             break;
           }
         }
 
-        // Only skip if user achieved >= 60% overall score and topic matched
-        if (matchesMasteredTopic && scorePercentage >= 60) {
+        if (matchesMasteredTopic) {
           skippedLessonIds.push(lesson.id);
+        }
 
-          if (enrollment) {
-            try {
+        if (enrollment) {
+          try {
+            if (matchesMasteredTopic) {
               await prisma.lessonProgress.upsert({
                 where: {
                   enrollmentId_lessonId: {
@@ -172,9 +329,7 @@ export async function POST(
                     lessonId: lesson.id,
                   },
                 },
-                update: {
-                  isSkipped: true,
-                },
+                update: { isSkipped: true },
                 create: {
                   enrollmentId: enrollment.id,
                   lessonId: lesson.id,
@@ -182,13 +337,22 @@ export async function POST(
                   isCompleted: false,
                 },
               });
-            } catch {}
-          }
+            } else {
+              await prisma.lessonProgress.updateMany({
+                where: {
+                  enrollmentId: enrollment.id,
+                  lessonId: lesson.id,
+                  isSkipped: true,
+                  isCompleted: false,
+                },
+                data: { isSkipped: false },
+              });
+            }
+          } catch {}
         }
       }
     }
 
-    // Save placement attempt if user is logged in
     if (enrollment) {
       try {
         await prisma.placementAttempt.create({
@@ -200,6 +364,16 @@ export async function POST(
           },
         });
       } catch {}
+    }
+
+    if (user) {
+      await createNotification({
+        userId: user.id,
+        title: `Placement test complete · ${course.title}`,
+        message: `Scored ${correctCount}/${totalQuestions} (${scorePercentage}%). ${skippedLessonIds.length} lesson${skippedLessonIds.length === 1 ? "" : "s"} skipped in your personalized study plan.`,
+        type: "COURSE",
+        linkUrl: `/courses/${course.slug}`,
+      });
     }
 
     const allLessons = course.chapters.flatMap((ch) =>
@@ -221,7 +395,8 @@ export async function POST(
       scorePercentage,
       correctCount,
       totalQuestions,
-      masteredTopics: Array.from(masteredTopics),
+      dailyStudyMinutes: clampDailyStudyMinutes(user?.profile?.dailyStudyMinutes, 60),
+      masteredTopics: Array.from(masteredTopicQuestions.keys()),
       skippedCount: skippedLessonIds.length,
       skippedLessonCount: skippedLessonIds.length,
       skippedLessonIds,
@@ -242,4 +417,3 @@ export async function POST(
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
-

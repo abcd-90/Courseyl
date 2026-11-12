@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
-import { getAIProvider } from "@/lib/ai/aiProvider";
+import { isExternalAIProvider, resolveAIProvider } from "@/lib/ai/aiProvider";
 
 export interface SynthesizedQuizQuestion {
   questionText: string;
@@ -3060,8 +3060,8 @@ export async function generateLessonQuizQuestions(
 ): Promise<SynthesizedQuizQuestion[]> {
   const targetCount = desiredCount ?? computeRecommendedQuizCount(ctx);
   const subtopics = extractLessonSubtopics(ctx);
-  const provider = getAIProvider();
-  const isExternalLLM = provider.name !== "Local Deterministic Synthesizer";
+  const provider = await resolveAIProvider();
+  const isExternalLLM = isExternalAIProvider(provider);
 
   if (isExternalLLM) {
     try {

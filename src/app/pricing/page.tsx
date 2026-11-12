@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { MarketingNavbar } from "@/components/MarketingNavbar";
 import { CourseItFooter } from "@/components/CourseItFooter";
 import { useSiteSettings } from "@/components/SiteSettingsProvider";
@@ -12,6 +12,15 @@ export default function PricingPage() {
   const [checkoutModal, setCheckoutModal] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [checkoutError, setCheckoutError] = useState("");
+  const [checkoutBanner, setCheckoutBanner] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout") === "canceled") {
+      setCheckoutBanner("Checkout was canceled. No changes were made to your plan.");
+    }
+  }, []);
 
   const plans = settings.plans;
   const brandName = settings.branding?.brandName || "Courseyl";
@@ -73,6 +82,8 @@ export default function PricingPage() {
 
   const handleSubscribe = async (tier: string) => {
     setProcessing(true);
+    setCheckoutError("");
+    setSuccessMessage("");
     try {
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
@@ -84,17 +95,25 @@ export default function PricingPage() {
         }),
       });
       const data = await res.json();
-      if (res.ok) {
-        setSuccessMessage(`Successfully upgraded to ${tier} Plan!`);
-        setTimeout(() => {
-          setCheckoutModal(null);
-          setSuccessMessage("");
-        }, 2000);
-      } else {
-        alert(data.error || "Checkout failed. Please login first.");
+      if (res.ok && data.checkoutUrl) {
+        setSuccessMessage("Redirecting to secure Stripe Checkout...");
+        window.location.assign(data.checkoutUrl);
+        return;
       }
+      if (res.status === 401) {
+        window.location.assign(`/login?redirect=/pricing`);
+        return;
+      }
+      if (data.configured === false || data.code === "PAYMENT_GATEWAY_NOT_CONFIGURED") {
+        setCheckoutError(
+          data.error ||
+            "Hosted payment gateway keys are not configured in this environment. No plan charge or subscription change was made."
+        );
+        return;
+      }
+      setCheckoutError(data.error || "Unable to initiate checkout right now. Please try again.");
     } catch {
-      alert("Failed to complete checkout.");
+      setCheckoutError("Network error while contacting the billing gateway.");
     } finally {
       setProcessing(false);
     }
@@ -119,6 +138,11 @@ export default function PricingPage() {
           </p>
 
           {/* Billing Switcher matching CourseIt */}
+          {checkoutBanner ? (
+            <div className="mt-6 mx-auto max-w-xl rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 px-5 py-3 text-sm font-medium text-amber-800 dark:text-amber-300">
+              {checkoutBanner}
+            </div>
+          ) : null}
           {isUnlimitedFree ? (
             <div className="mt-7 mx-auto max-w-xl rounded-2xl bg-lime-soft border border-moss/25 px-5 py-3.5 text-sm font-medium text-pill-ink shadow-xs">
               🎉 <strong>Full Free Access Mode is Active!</strong> All courses, AI generation, and unlimited hours are currently unlocked 100% free for every user.
@@ -376,8 +400,15 @@ export default function PricingPage() {
               Upgrade to {checkoutModal} Plan
             </h3>
             <p className="text-xs sm:text-sm text-ink-soft mt-2">
-              Instant activation via Dodo Payments sandbox. Your video hour quota will be credited immediately.
+              You&apos;ll be redirected to our hosted Stripe Checkout session ({isYearly ? "Yearly" : "Monthly"} billing). Your quota updates automatically once payment is verified via webhook.
             </p>
+
+            {checkoutError ? (
+              <div className="mt-5 p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-200 text-xs sm:text-sm font-medium text-left">
+                <p className="font-semibold mb-1">Checkout unavailable</p>
+                <p>{checkoutError}</p>
+              </div>
+            ) : null}
 
             {successMessage ? (
               <div className="mt-5 p-3 rounded-xl bg-lime-soft text-moss text-sm font-semibold">
@@ -388,14 +419,18 @@ export default function PricingPage() {
                 <button
                   onClick={() => handleSubscribe(checkoutModal)}
                   disabled={processing}
-                  className="w-full py-2.5 rounded-full bg-primary text-primary-foreground hover:bg-moss-dark text-sm font-semibold transition-transform hover:-translate-y-0.5 disabled:opacity-50"
+                  className="w-full py-2.5 rounded-full bg-primary text-primary-foreground hover:bg-moss-dark text-sm font-semibold transition-transform hover:-translate-y-0.5 disabled:opacity-50 cursor-pointer"
                 >
-                  {processing ? "Confirming..." : "Confirm Subscription"}
+                  {processing ? "Creating checkout session..." : "Continue to Checkout"}
                 </button>
                 <button
-                  onClick={() => setCheckoutModal(null)}
+                  onClick={() => {
+                    setCheckoutModal(null);
+                    setCheckoutError("");
+                    setSuccessMessage("");
+                  }}
                   disabled={processing}
-                  className="w-full py-2.5 rounded-full border border-line text-ink-soft text-sm font-medium hover:bg-muted"
+                  className="w-full py-2.5 rounded-full border border-line text-ink-soft text-sm font-medium hover:bg-muted cursor-pointer"
                 >
                   Cancel
                 </button>

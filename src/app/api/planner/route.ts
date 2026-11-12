@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import {
+  clampDailyStudyMinutes,
+  isValidDailyStudyMinutes,
+  MIN_DAILY_STUDY_MINUTES,
+  MAX_DAILY_STUDY_MINUTES,
+} from "@/lib/pacing";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET() {
   try {
@@ -10,7 +19,7 @@ export async function GET() {
     }
 
     const todayStr = new Date().toISOString().split("T")[0];
-    const targetMinutes = user.profile?.dailyStudyMinutes || 60;
+    const targetMinutes = clampDailyStudyMinutes(user.profile?.dailyStudyMinutes, 60);
 
     const todayPlan = await prisma.dailyPlan.upsert({
       where: {
@@ -112,22 +121,29 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { dailyStudyMinutes } = await req.json();
-    const validMinutes = [30, 60, 90, 120];
+    const body = await req.json();
+    const rawMinutes = body?.dailyStudyMinutes;
 
-    if (!validMinutes.includes(dailyStudyMinutes)) {
+    if (!isValidDailyStudyMinutes(rawMinutes)) {
       return NextResponse.json(
-        { error: "Daily study duration must be 30, 60, 90, or 120 minutes." },
+        {
+          error: `Daily study duration must be between ${MIN_DAILY_STUDY_MINUTES} and ${MAX_DAILY_STUDY_MINUTES} minutes.`,
+        },
         { status: 400 }
       );
     }
 
-    if (user.profile) {
-      await prisma.profile.update({
-        where: { id: user.profile.id },
-        data: { dailyStudyMinutes },
-      });
-    }
+    const dailyStudyMinutes = clampDailyStudyMinutes(rawMinutes, 60);
+
+    await prisma.profile.upsert({
+      where: { userId: user.id },
+      update: { dailyStudyMinutes },
+      create: {
+        userId: user.id,
+        displayName: user.profile?.displayName || user.email.split("@")[0],
+        dailyStudyMinutes,
+      },
+    });
 
     const todayStr = new Date().toISOString().split("T")[0];
     await prisma.dailyPlan.upsert({

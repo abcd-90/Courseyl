@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { createNotification } from "@/lib/notifications";
 
 export async function POST(
   req: Request,
@@ -66,6 +67,14 @@ export async function POST(
     await prisma.roadmap.update({
       where: { id: roadmap.id },
       data: { enrollmentCount: { increment: 1 } },
+    });
+
+    await createNotification({
+      userId: user.id,
+      title: `Enrolled in roadmap · ${roadmap.title}`,
+      message: `Added ${roadmap.stages.length} stage${roadmap.stages.length === 1 ? "" : "s"} to your learning path.`,
+      type: "ROADMAP",
+      linkUrl: `/roadmaps/${roadmap.slug}`,
     });
 
     return NextResponse.json({ success: true, enrollment });

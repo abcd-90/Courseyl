@@ -66,6 +66,16 @@ export async function POST(
               .slice(0, 60);
             const uniqueSlug = `${baseSlug}-${Math.random().toString(36).slice(2, 7)}`;
 
+            const creatorSub = await prisma.subscription.findUnique({
+              where: { userId: effectiveUserId },
+              select: { tier: true },
+            });
+            const creatorTier = (creatorSub?.tier || "FREE").toUpperCase();
+            const resolvedVisibility =
+              typeof body?.isPublic === "boolean"
+                ? body.isPublic
+                : roadmap.isPublic && creatorTier !== "PRO" && creatorTier !== "MAX";
+
             const newCourse = await prisma.course.create({
               data: {
                 creatorId: effectiveUserId,
@@ -76,7 +86,7 @@ export async function POST(
                 totalDurationSeconds: meta.durationSeconds || 3600,
                 difficulty: "INTERMEDIATE",
                 status: "READY",
-                isPublic: true,
+                isPublic: resolvedVisibility,
                 enrollmentCount: 1,
               },
             });

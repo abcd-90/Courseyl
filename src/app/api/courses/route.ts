@@ -42,42 +42,109 @@ export async function GET(req: Request) {
               },
             },
           },
+          lessonProgress: {
+            select: { lessonId: true, isCompleted: true, isSkipped: true },
+          },
         },
         orderBy: { lastAccessedAt: "desc" },
       })) as any[];
 
-      const formatted = enrollments
-        .filter((e: any) => e.course && e.course.status !== "FAILED")
-        .map((e: any) => {
-          const c = e.course;
-          let lessonCount = 0;
-          if (Array.isArray(c.chapters)) {
-            c.chapters.forEach((ch: any) => {
-              if (Array.isArray(ch.lessons)) {
-                lessonCount += ch.lessons.length;
-              }
-            });
-          }
+      const enrolledCourseIds = new Set(
+        enrollments.filter((e: any) => e.course).map((e: any) => e.course.id)
+      );
 
-          return {
-            id: c.id,
-            title: c.title,
-            slug: c.slug,
-            description: c.description,
-            difficulty: c.difficulty,
-            thumbnailUrl: getCleanThumbnailUrl(c.thumbnailUrl, c.slug, c.source?.youtubeId),
-            totalDurationSeconds: c.totalDurationSeconds,
-            estimatedStudyMinutes: c.estimatedStudyMinutes,
-            enrollmentCount: c.enrollmentCount,
-            creatorName: c.creator?.profile?.displayName || "CourseIt Creator",
-            creator: c.source?.channelTitle || c.creator?.profile?.displayName || "Instructor",
-            duration: `${Math.floor(c.totalDurationSeconds / 3600)}h ${Math.floor((c.totalDurationSeconds % 3600) / 60)}m`,
-            lessonCount,
-            chapterCount: c.chapters?.length || 0,
-            progressPercentage: e.progressPercentage,
-            createdAt: c.createdAt,
-          };
-        });
+      // Include user-created courses (e.g., private drafts) even if enrollment row is missing
+      const createdCourses = (await prisma.course.findMany({
+        where: {
+          creatorId: user.id,
+          status: { not: "FAILED" },
+          id: { notIn: Array.from(enrolledCourseIds) },
+        },
+        include: {
+          creator: {
+            select: {
+              profile: { select: { displayName: true, avatarUrl: true } },
+            },
+          },
+          source: { select: { channelTitle: true, youtubeId: true } },
+          chapters: {
+            include: {
+              lessons: { select: { id: true, durationSeconds: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      })) as any[];
+
+      const combinedRows = [
+        ...enrollments
+          .filter((e: any) => e.course && e.course.status !== "FAILED")
+          .map((e: any) => ({
+            course: e.course,
+            lessonProgress: Array.isArray(e.lessonProgress) ? e.lessonProgress : [],
+            completedLessonsCount: e.completedLessonsCount || 0,
+            progressPercentage: e.progressPercentage || 0,
+          })),
+        ...createdCourses.map((c: any) => ({
+          course: c,
+          lessonProgress: [],
+          completedLessonsCount: 0,
+          progressPercentage: 0,
+        })),
+      ];
+
+      const formatted = combinedRows.map((e: any) => {
+        const c = e.course;
+        const courseLessonIds = new Set<string>();
+        if (Array.isArray(c.chapters)) {
+          c.chapters.forEach((ch: any) => {
+            if (Array.isArray(ch.lessons)) {
+              ch.lessons.forEach((l: any) => courseLessonIds.add(l.id));
+            }
+          });
+        }
+
+        const lessonCount = courseLessonIds.size;
+        const progressList: any[] = e.lessonProgress;
+        const completedLessonsCount =
+          progressList.length > 0
+            ? progressList.filter(
+                (p) => p.isCompleted && courseLessonIds.has(p.lessonId)
+              ).length
+            : e.completedLessonsCount || 0;
+        const skippedLessonsCount = progressList.filter(
+          (p) => p.isSkipped && courseLessonIds.has(p.lessonId)
+        ).length;
+        const activeLessonsCount = Math.max(1, lessonCount - skippedLessonsCount);
+        const progressPercentage =
+          progressList.length > 0 && lessonCount > 0
+            ? Math.min(100, Math.round((completedLessonsCount / activeLessonsCount) * 100))
+            : Math.round(e.progressPercentage || 0);
+
+        return {
+          id: c.id,
+          title: c.title,
+          slug: c.slug,
+          description: c.description,
+          difficulty: c.difficulty,
+          isPublic: c.isPublic,
+          isCreator: c.creatorId === user.id,
+          thumbnailUrl: getCleanThumbnailUrl(c.thumbnailUrl, c.slug, c.source?.youtubeId),
+          youtubeId: c.source?.youtubeId || null,
+          totalDurationSeconds: c.totalDurationSeconds,
+          estimatedStudyMinutes: c.estimatedStudyMinutes,
+          enrollmentCount: c.enrollmentCount,
+          creatorName: c.creator?.profile?.displayName || "Creator",
+          creator: c.source?.channelTitle || c.creator?.profile?.displayName || "Instructor",
+          duration: `${Math.floor(c.totalDurationSeconds / 3600)}h ${Math.floor((c.totalDurationSeconds % 3600) / 60)}m`,
+          lessonCount,
+          completedLessonsCount,
+          skippedLessonsCount,
+          chapterCount: c.chapters?.length || 0,
+          progressPercentage,
+          createdAt: c.createdAt,
+        };
+      });
 
       return NextResponse.json({
         courses: formatted,

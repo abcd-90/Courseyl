@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -40,6 +43,17 @@ export async function GET() {
       },
     });
 
+    const enrolledCourseIds = user
+      ? new Set(
+          (
+            await prisma.roadmapEnrollment.findMany({
+              where: { userId: user.id },
+              select: { roadmapId: true },
+            })
+          ).map((e) => e.roadmapId)
+        )
+      : new Set<string>();
+
     const formatted = roadmaps.map((r) => {
       let totalCourses = 0;
       let totalDuration = 0;
@@ -57,19 +71,30 @@ export async function GET() {
         description: r.description,
         badge: r.badge,
         enrollmentCount: r.enrollmentCount,
-        creatorName: r.creator?.profile?.displayName || "CourseIt Curator",
+        isEnrolled: enrolledCourseIds.has(r.id),
+        creatorName: r.creator?.profile?.displayName || "Courseyl Curator",
         stageCount: r.stages.length,
         totalCourses,
         totalDurationSeconds: totalDuration,
+        stages: r.stages.map((st) => ({
+          id: st.id,
+          title: st.title,
+          stageIndex: st.stageIndex,
+          courses: st.courses.map((sc) => ({
+            id: sc.course.id,
+            title: sc.course.title,
+            thumbnailUrl: sc.course.thumbnailUrl,
+            totalDurationSeconds: sc.course.totalDurationSeconds,
+          })),
+        })),
         createdAt: r.createdAt,
       };
     });
 
     let userRoadmaps: any[] = [];
-    const effectiveUser = user || (await prisma.user.findFirst());
-    if (effectiveUser) {
+    if (user) {
       const userEnrollments = await prisma.roadmapEnrollment.findMany({
-        where: { userId: effectiveUser.id },
+        where: { userId: user.id },
         include: {
           roadmap: {
             include: {
@@ -115,17 +140,21 @@ export async function GET() {
           badge: ue.roadmap.badge,
           progressPercentage: ue.progressPercentage || 0,
           stageCount: ue.roadmap.stages.length,
+          stages: ue.roadmap.stages.map((st) => ({
+            id: st.id,
+            title: st.title,
+            stageIndex: st.stageIndex,
+          })),
           totalCourses: totalCourses || 1,
           enrollmentCount: ue.roadmap.enrollmentCount ? (ue.roadmap.enrollmentCount - 1) : 0,
           thumbnailUrl: firstThumbnail || "https://i.ytimg.com/vi/LSk5KaEGVK4/maxresdefault.jpg",
-          isPrivate: true,
+          isPrivate: !ue.roadmap.isPublic,
         };
       });
 
-      // Also include any roadmaps created by effectiveUser that don't yet have an enrollment row
       const createdRoadmaps = await prisma.roadmap.findMany({
         where: {
-          creatorId: effectiveUser.id,
+          creatorId: user.id,
           id: { notIn: Array.from(enrolledRoadmapIds) },
         },
         include: {
@@ -167,15 +196,23 @@ export async function GET() {
           badge: r.badge,
           progressPercentage: 0,
           stageCount: r.stages.length,
+          stages: r.stages.map((st) => ({
+            id: st.id,
+            title: st.title,
+            stageIndex: st.stageIndex,
+          })),
           totalCourses: totalCourses || 1,
           enrollmentCount: 0,
           thumbnailUrl: firstThumbnail || "https://i.ytimg.com/vi/J9BI0jGOds8/maxresdefault.jpg",
-          isPrivate: true,
+          isPrivate: !r.isPublic,
         });
       });
     }
 
-    return NextResponse.json({ roadmaps: formatted, userRoadmaps });
+    return NextResponse.json(
+      { roadmaps: formatted, userRoadmaps },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     return NextResponse.json({ error: msg }, { status: 500 });

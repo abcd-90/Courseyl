@@ -78,7 +78,7 @@ export default function RoadmapsPage() {
           </div>
           <div>
             <Link
-              href="/community"
+              href="/community?tab=roadmaps"
               className="inline-flex items-center px-5 py-2.5 rounded-full border border-line dark:border-[#263725] bg-surface dark:bg-[#0c140e] text-xs sm:text-sm font-medium text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors shadow-xs cursor-pointer"
             >
               Browse community roadmaps

@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import {
+  clampDailyStudyMinutes,
+  isValidDailyStudyMinutes,
+  MIN_DAILY_STUDY_MINUTES,
+  MAX_DAILY_STUDY_MINUTES,
+} from "@/lib/pacing";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -40,7 +46,19 @@ export async function PATCH(req: Request) {
     const body = await req.json();
     const rawName = body.displayName ?? body.name ?? body.fullName;
     const newDisplayName = rawName !== undefined ? String(rawName).trim() : undefined;
-    const dailyStudyMinutes = Number(body.dailyStudyMinutes ?? body.dailyStudyTime ?? body.dailyTime);
+    const rawDaily = body.dailyStudyMinutes ?? body.dailyStudyTime ?? body.dailyTime;
+    const hasDaily = rawDaily !== undefined && rawDaily !== null && rawDaily !== "";
+    if (hasDaily && !isValidDailyStudyMinutes(rawDaily)) {
+      return NextResponse.json(
+        {
+          error: `Daily study duration must be between ${MIN_DAILY_STUDY_MINUTES} and ${MAX_DAILY_STUDY_MINUTES} minutes.`,
+        },
+        { status: 400 }
+      );
+    }
+    const dailyStudyMinutes = hasDaily
+      ? clampDailyStudyMinutes(rawDaily, 60)
+      : NaN;
     const bio = body.bio !== undefined ? String(body.bio).trim() : undefined;
 
     const updateData: any = {};
@@ -66,6 +84,12 @@ export async function PATCH(req: Request) {
     if (!isNaN(dailyStudyMinutes) && dailyStudyMinutes > 0) {
       updateData.dailyStudyMinutes = dailyStudyMinutes;
     }
+    if (typeof body.emailReminders === "boolean") {
+      updateData.emailReminders = body.emailReminders;
+    }
+    if (typeof body.weeklyDigest === "boolean") {
+      updateData.weeklyDigest = body.weeklyDigest;
+    }
 
     const updatedProfile = await prisma.profile.upsert({
       where: { userId: user.id },
@@ -74,6 +98,8 @@ export async function PATCH(req: Request) {
         userId: user.id,
         displayName: newDisplayName || user.email.split("@")[0],
         dailyStudyMinutes: !isNaN(dailyStudyMinutes) && dailyStudyMinutes > 0 ? dailyStudyMinutes : 60,
+        emailReminders: typeof body.emailReminders === "boolean" ? body.emailReminders : true,
+        weeklyDigest: typeof body.weeklyDigest === "boolean" ? body.weeklyDigest : false,
         avatarUrl: updateData.avatarUrl,
         bio: bio || null,
       },

@@ -9,12 +9,20 @@ export default function BillingPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
+  const [openingPortal, setOpeningPortal] = useState(false);
   const { settings } = useSiteSettings();
   const isUnlimitedFree = settings?.plans?.unlimitedFreeMode === true || data?.unlimitedFreeMode === true;
   const [message, setMessage] = useState("");
   const [dates, setDates] = useState({ today: "Active Period", end: "End of billing cycle" });
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout") === "success") {
+      setMessage("Payment received! Your subscription status will reflect updates as soon as webhook confirmation completes.");
+    } else if (params.get("portal") === "unavailable") {
+      setMessage("Customer billing portal is not configured yet in this environment.");
+    }
+
     fetch("/api/billing")
       .then((res) => res.json())
       .then((d) => {
@@ -48,6 +56,27 @@ export default function BillingPage() {
       setMessage("Failed to cancel subscription.");
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const handleOpenPortal = async () => {
+    setOpeningPortal(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/billing/portal?format=json");
+      const json = await res.json();
+      if (res.ok && json.portalUrl) {
+        window.location.assign(json.portalUrl);
+        return;
+      }
+      setMessage(
+        json.error ||
+          "Customer billing portal is unavailable right now. Please contact support for billing changes."
+      );
+    } catch {
+      setMessage("Unable to reach the billing portal service.");
+    } finally {
+      setOpeningPortal(false);
     }
   };
 
@@ -201,15 +230,27 @@ export default function BillingPage() {
               Billing cycle period: <strong>{dates.today} – {dates.end}</strong>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               {!isFree ? (
-                <button
-                  onClick={handleCancel}
-                  disabled={cancelling}
-                  className="px-4 py-2 rounded-full border border-red-300 dark:border-red-900 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors disabled:opacity-50 cursor-pointer"
-                >
-                  {cancelling ? "Cancelling..." : "Cancel subscription"}
-                </button>
+                <>
+                  {data?.paymentGatewayConfigured && (
+                    <button
+                      type="button"
+                      onClick={handleOpenPortal}
+                      disabled={openingPortal}
+                      className="px-4 py-2 rounded-full border border-line bg-background text-xs font-semibold text-ink hover:bg-surface transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                      {openingPortal ? "Opening portal..." : "Manage billing"}
+                    </button>
+                  )}
+                  <button
+                    onClick={handleCancel}
+                    disabled={cancelling}
+                    className="px-4 py-2 rounded-full border border-red-300 dark:border-red-900 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    {cancelling ? "Cancelling..." : "Cancel subscription"}
+                  </button>
+                </>
               ) : (
                 <Link
                   href="/pricing"

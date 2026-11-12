@@ -9,7 +9,12 @@ import {
   VideoChapter,
   VideoMetadata,
 } from "../youtube";
-import { getAIProvider, NemotronAIProvider, OpenAIProvider } from "./aiProvider";
+import {
+  resolveAIProvider,
+  isExternalAIProvider,
+  getSecondaryAIProvider,
+  type AIProvider,
+} from "./aiProvider";
 import {
   computeRecommendedQuizCount,
   generateLessonQuizQuestions,
@@ -17,8 +22,16 @@ import {
 } from "./quizGenerator";
 import { randomUUID } from "crypto";
 import { getFullSettings } from "../settings";
+import { createNotification } from "../notifications";
 
 const makeId = () => `c${randomUUID().replace(/-/g, "").slice(0, 24)}`;
+
+export const PIPELINE_STEPS = [
+  { step: 1, key: "transcript", label: "Extracting video transcript & metadata", targetProgress: 25 },
+  { step: 2, key: "curriculum", label: "Planning course curriculum & chapters", targetProgress: 55 },
+  { step: 3, key: "quizzes", label: "Generating lesson quizzes & placement test", targetProgress: 80 },
+  { step: 4, key: "finalize", label: "Finalizing course structure", targetProgress: 100 },
+] as const;
 
 async function createManyInChunks<T>(
   items: T[],
@@ -35,14 +48,143 @@ export interface GenerateCourseParams {
   userId: string;
   manualTranscript?: string;
   difficulty?: "BEGINNER" | "INTERMEDIATE" | "ADVANCED";
+  isPublic?: boolean;
 }
 
 export interface GenerationResult {
   success: boolean;
+  jobId?: string | null;
+  slug?: string;
   courseId: string;
   course?: { id: string; slug: string; title: string };
   isExisting: boolean;
+  status?: string;
   message: string;
+}
+
+interface CheckpointState {
+  url: string;
+  videoId: string;
+  sourceType: "VIDEO" | "PLAYLIST";
+  difficulty: "BEGINNER" | "INTERMEDIATE" | "ADVANCED";
+  meta?: VideoMetadata;
+  transcripts?: TranscriptSegment[] | null;
+  curriculumData?: RawCurriculum;
+}
+
+function trimTranscriptForCheckpoint(
+  segments: TranscriptSegment[] | null,
+  maxChars = 650_000
+): TranscriptSegment[] | null {
+  if (!segments || segments.length === 0) return segments;
+  const approxJsonLen = segments.reduce((sum, s) => sum + s.text.length + 32, 0);
+  if (approxJsonLen <= maxChars) return segments;
+
+  // Sample uniformly across the full video timeline so late timestamps keep transcript coverage
+  const keepRatio = Math.max(0.15, maxChars / approxJsonLen);
+  const stride = Math.max(2, Math.ceil(1 / keepRatio));
+  return segments.filter((_, idx) => idx % stride === 0);
+}
+
+async function fetchQuickYouTubeOEmbed(videoId: string): Promise<{
+  title: string;
+  channelTitle: string;
+  thumbnailUrl: string;
+}> {
+  try {
+    const res = await fetch(
+      `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${encodeURIComponent(
+        videoId
+      )}&format=json`,
+      { signal: AbortSignal.timeout(2500) }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.title) {
+        return {
+          title: cleanPlacementText(String(data.title)) || `YouTube Course (${videoId})`,
+          channelTitle: cleanPlacementText(String(data.author_name || "")) || "Educational Creator",
+          thumbnailUrl:
+            typeof data.thumbnail_url === "string" && data.thumbnail_url
+              ? data.thumbnail_url
+              : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+        };
+      }
+    }
+  } catch {
+    // Instant fallback; Step 1 resolves full metadata cleanly
+  }
+
+  return {
+    title: `Course Build (${videoId})`,
+    channelTitle: "Educational Creator",
+    thumbnailUrl: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+  };
+}
+
+export function formatGenerationJobPayload(job: {
+  id: string;
+  courseId: string;
+  status: string;
+  progressPercentage: number;
+  currentStep: string;
+  errorLog: string | null;
+  checkpointStep: number;
+  difficulty: string;
+  quotaCharged: boolean;
+  startedAt: Date;
+  completedAt: Date | null;
+  course: {
+    id: string;
+    slug: string;
+    title: string;
+    status: string;
+    thumbnailUrl: string | null;
+    totalDurationSeconds: number;
+    difficulty: string;
+  };
+}) {
+  const isCompleted = job.status === "COMPLETED";
+  const isFailed = job.status === "FAILED";
+  const activeStepNumber = isCompleted
+    ? 4
+    : Math.min(4, Math.max(1, job.checkpointStep + 1));
+
+  const steps = PIPELINE_STEPS.map((s) => {
+    let state: "completed" | "active" | "pending" | "failed" = "pending";
+    if (isCompleted || s.step <= job.checkpointStep) {
+      state = "completed";
+    } else if (s.step === activeStepNumber) {
+      state = isFailed ? "failed" : "active";
+    }
+    return {
+      step: s.step,
+      key: s.key,
+      label: s.label,
+      state,
+    };
+  });
+
+  return {
+    id: job.id,
+    courseId: job.courseId,
+    slug: job.course.slug,
+    courseTitle: job.course.title,
+    courseStatus: job.course.status,
+    thumbnailUrl: job.course.thumbnailUrl,
+    totalDurationSeconds: job.course.totalDurationSeconds,
+    difficulty: job.difficulty || job.course.difficulty,
+    status: job.status,
+    progressPercentage: job.progressPercentage,
+    currentStep: job.currentStep,
+    checkpointStep: job.checkpointStep,
+    quotaCharged: job.quotaCharged,
+    canRetry: isFailed,
+    errorLog: job.errorLog,
+    startedAt: job.startedAt,
+    completedAt: job.completedAt,
+    steps,
+  };
 }
 
 function buildLessonQuizContext(
@@ -106,63 +248,7 @@ function slugify(text: string): string {
     .slice(0, 80);
 }
 
-export async function generateCourse(params: GenerateCourseParams): Promise<GenerationResult> {
-  const { url, userId, manualTranscript, difficulty = "BEGINNER" } = params;
-
-  // 1. URL validation
-  const parsedUrl = parseYouTubeUrl(url);
-  if (!parsedUrl.valid || !parsedUrl.videoId) {
-    throw new Error("Invalid YouTube video or playlist URL. Please provide a valid YouTube link.");
-  }
-
-  // 2. Duplicate Detection (clean up any stale FAILED half-built attempt before regenerating)
-  const existingSource = await prisma.courseSource.findFirst({
-    where: { youtubeId: parsedUrl.videoId },
-    include: { course: true },
-  });
-
-  if (existingSource && existingSource.course) {
-    if (existingSource.course.status === "FAILED") {
-      await prisma.course.delete({ where: { id: existingSource.course.id } }).catch(() => {});
-    } else {
-      // Check if user is already enrolled
-      const existingEnrollment = await prisma.enrollment.findUnique({
-        where: {
-          userId_courseId: {
-            userId,
-            courseId: existingSource.course.id,
-          },
-        },
-      });
-
-      if (!existingEnrollment) {
-        await prisma.enrollment.create({
-          data: {
-            userId,
-            courseId: existingSource.course.id,
-          },
-        });
-        await prisma.course.update({
-          where: { id: existingSource.course.id },
-          data: { enrollmentCount: { increment: 1 } },
-        });
-      }
-
-      return {
-        success: true,
-        courseId: existingSource.course.id,
-        course: {
-          id: existingSource.course.id,
-          slug: existingSource.course.slug,
-          title: existingSource.course.title,
-        },
-        isExisting: true,
-        message: "Course already exists on CourseIt! Enrolled instantly without consuming generation quota.",
-      };
-    }
-  }
-
-  // 3. User quota verification
+async function verifyUserQuota(userId: string, durationSecondsToCheck?: number) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: { subscription: true },
@@ -204,64 +290,171 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
 
   const currentLimit = tierLimits[tier as keyof typeof tierLimits] || tierLimits.FREE;
 
-  if (!isUnlimitedMode) {
-    if (sub && sub.monthlyGenerationsUsed >= currentLimit.maxCourses) {
-      throw new Error(
-        `Monthly generation quota exceeded for your ${tier} plan (${sub.monthlyGenerationsUsed}/${currentLimit.maxCourses} courses used). Please upgrade to generate more courses.`
-      );
-    }
+  if (!isUnlimitedMode && sub && sub.monthlyGenerationsUsed >= currentLimit.maxCourses) {
+    throw new Error(
+      `Monthly generation quota exceeded for your ${tier} plan (${sub.monthlyGenerationsUsed}/${currentLimit.maxCourses} courses used). Please upgrade to generate more courses.`
+    );
   }
 
-  // 4. Ingest video metadata
-  const meta = await fetchYouTubeMetadata(parsedUrl.videoId);
-
-  if (!isUnlimitedMode && (sub?.monthlyHoursUsedSeconds || 0) + meta.durationSeconds > currentLimit.maxDurationSec) {
+  if (
+    !isUnlimitedMode &&
+    typeof durationSecondsToCheck === "number" &&
+    durationSecondsToCheck > 0 &&
+    (sub?.monthlyHoursUsedSeconds || 0) + durationSecondsToCheck > currentLimit.maxDurationSec
+  ) {
     throw new Error(
-      `Video duration (${formatDuration(meta.durationSeconds)}) exceeds your remaining ${tier} plan quota of ${Math.round(
+      `Video duration (${formatDuration(durationSecondsToCheck)}) exceeds your remaining ${tier} plan quota of ${Math.round(
         currentLimit.maxDurationSec / 3600
       )} hours. Please upgrade to process longer videos.`
     );
   }
 
-  // 5. Ingest transcript (skip massive caption XML streams on 4h+ chaptered videos unless LLM active)
-  const provider = getAIProvider();
-  const hasExternalAI =
-    provider instanceof NemotronAIProvider || provider instanceof OpenAIProvider;
-  let transcripts: TranscriptSegment[] | null = null;
-  if (manualTranscript && manualTranscript.trim()) {
-    transcripts = [
-      {
-        text: manualTranscript.trim(),
-        start: 0,
-        duration: meta.durationSeconds,
-      },
-    ];
-  } else if (
-    hasExternalAI ||
-    !meta.chapters ||
-    meta.chapters.length < 4 ||
-    meta.durationSeconds < 14400
-  ) {
-    transcripts = await fetchYouTubeTranscript(parsedUrl.videoId);
+  return { user, sub };
+}
+
+/**
+ * Fast async initializer for POST /api/courses/generate.
+ * Validates URL, checks duplicates/quota, creates placeholder Course + GenerationJob,
+ * and returns { jobId, slug, courseId } immediately without risking serverless timeout.
+ */
+export async function initializeCourseGenerationJob(
+  params: GenerateCourseParams
+): Promise<GenerationResult> {
+  const { url, userId, manualTranscript, difficulty = "BEGINNER", isPublic } = params;
+
+  const parsedUrl = parseYouTubeUrl(url);
+  if (!parsedUrl.valid || !parsedUrl.videoId) {
+    throw new Error("Invalid YouTube video or playlist URL. Please provide a valid YouTube link.");
   }
 
-  // 6. Create Course record and GenerationJob
-  const baseSlug = slugify(meta.title) || `course-${Date.now()}`;
+  const existingSource = await prisma.courseSource.findFirst({
+    where: { youtubeId: parsedUrl.videoId },
+    include: {
+      course: {
+        include: {
+          generationJobs: {
+            orderBy: { startedAt: "desc" },
+            take: 1,
+          },
+        },
+      },
+    },
+  });
+
+  if (existingSource && existingSource.course) {
+    const existingCourse = existingSource.course;
+    if (existingCourse.status === "FAILED") {
+      await prisma.course.delete({ where: { id: existingCourse.id } }).catch(() => {});
+    } else {
+      const existingEnrollment = await prisma.enrollment.findUnique({
+        where: {
+          userId_courseId: {
+            userId,
+            courseId: existingCourse.id,
+          },
+        },
+      });
+
+      if (!existingEnrollment) {
+        await prisma.enrollment.create({
+          data: {
+            userId,
+            courseId: existingCourse.id,
+          },
+        });
+        await prisma.course.update({
+          where: { id: existingCourse.id },
+          data: { enrollmentCount: { increment: 1 } },
+        });
+      }
+
+      const latestJob = existingCourse.generationJobs?.[0] || null;
+      if (existingCourse.status === "PROCESSING") {
+        let activeJob = latestJob;
+        if (!activeJob) {
+          activeJob = await prisma.generationJob.create({
+            data: {
+              userId,
+              courseId: existingCourse.id,
+              status: "PENDING",
+              progressPercentage: 10,
+              currentStep: PIPELINE_STEPS[0].label,
+              checkpointStep: 0,
+              difficulty,
+              manualTranscript: manualTranscript?.trim() || null,
+              checkpointData: JSON.stringify({
+                url,
+                videoId: parsedUrl.videoId,
+                sourceType: parsedUrl.type,
+                difficulty,
+              } satisfies CheckpointState),
+            },
+          });
+        }
+        return {
+          success: true,
+          jobId: activeJob.id,
+          slug: existingCourse.slug,
+          courseId: existingCourse.id,
+          course: {
+            id: existingCourse.id,
+            slug: existingCourse.slug,
+            title: existingCourse.title,
+          },
+          isExisting: false,
+          status: activeJob.status,
+          message: "Course generation is already in progress.",
+        };
+      }
+
+      return {
+        success: true,
+        jobId: latestJob?.id || null,
+        slug: existingCourse.slug,
+        courseId: existingCourse.id,
+        course: {
+          id: existingCourse.id,
+          slug: existingCourse.slug,
+          title: existingCourse.title,
+        },
+        isExisting: true,
+        status: "COMPLETED",
+        message: "Course already exists on Courseyl! Enrolled instantly without consuming generation quota.",
+      };
+    }
+  }
+
+  const { user, sub } = await verifyUserQuota(userId);
+  const siteSettings = await getFullSettings().catch(() => null);
+  const tier = (sub?.tier || "FREE").toUpperCase();
+  const canCreatePrivate =
+    user.role === "ADMIN" ||
+    tier === "PRO" ||
+    tier === "MAX" ||
+    Boolean(siteSettings?.plans?.unlimitedFreeMode);
+  const defaultIsPublic = tier === "PRO" || tier === "MAX" ? false : true;
+  const resolvedIsPublic =
+    typeof isPublic === "boolean"
+      ? isPublic || !canCreatePrivate
+      : defaultIsPublic;
+
+  const quickOEmbed = await fetchQuickYouTubeOEmbed(parsedUrl.videoId);
+  const baseSlug = slugify(quickOEmbed.title) || `course-${parsedUrl.videoId.toLowerCase()}`;
   const uniqueSlug = `${baseSlug}-${Math.random().toString(36).slice(2, 7)}`;
 
   const course = await prisma.course.create({
     data: {
       creatorId: userId,
-      title: meta.title,
+      title: quickOEmbed.title,
       slug: uniqueSlug,
-      description: meta.description || `Comprehensive interactive course covering ${meta.title}.`,
+      description: `Interactive structured course from "${quickOEmbed.title}".`,
       targetAudience: "Self-paced learners, software developers, and students.",
       difficulty,
-      thumbnailUrl: meta.thumbnailUrl,
-      totalDurationSeconds: meta.durationSeconds,
-      estimatedStudyMinutes: Math.ceil((meta.durationSeconds * 1.5) / 60),
+      thumbnailUrl: quickOEmbed.thumbnailUrl,
+      totalDurationSeconds: 0,
+      estimatedStudyMinutes: 30,
       status: "PROCESSING",
-      isPublic: true,
+      isPublic: resolvedIsPublic,
       enrollmentCount: 1,
     },
   });
@@ -272,21 +465,31 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
       sourceType: parsedUrl.type === "PLAYLIST" ? "YOUTUBE_PLAYLIST" : "YOUTUBE_VIDEO",
       sourceUrl: url,
       youtubeId: parsedUrl.videoId,
-      channelTitle: meta.channelTitle,
+      channelTitle: quickOEmbed.channelTitle,
     },
   });
+
+  const initialCheckpoint: CheckpointState = {
+    url,
+    videoId: parsedUrl.videoId,
+    sourceType: parsedUrl.type,
+    difficulty,
+  };
 
   const job = await prisma.generationJob.create({
     data: {
       userId,
       courseId: course.id,
-      status: "PROCESSING",
-      progressPercentage: 15,
-      currentStep: "Synthesizing curriculum chapters and lessons",
+      status: "PENDING",
+      progressPercentage: 10,
+      currentStep: PIPELINE_STEPS[0].label,
+      checkpointStep: 0,
+      difficulty,
+      manualTranscript: manualTranscript?.trim() || null,
+      checkpointData: JSON.stringify(initialCheckpoint),
     },
   });
 
-  // Automatically enroll the creator
   await prisma.enrollment.create({
     data: {
       userId,
@@ -294,20 +497,352 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
     },
   });
 
-  // 7. Generate curriculum structure via AI or domain synthesizer
-  try {
-    let curriculumData = await generateCurriculumStructure(meta, transcripts, provider, difficulty);
+  return {
+    success: true,
+    jobId: job.id,
+    slug: course.slug,
+    courseId: course.id,
+    course: {
+      id: course.id,
+      slug: course.slug,
+      title: course.title,
+    },
+    isExisting: false,
+    status: job.status,
+    message: "Course generation job queued.",
+  };
+}
 
-    // Ensure we have at least 1 chapter and lessons covering duration
-    if (!curriculumData.chapters || curriculumData.chapters.length === 0) {
-      curriculumData = generateFallbackCurriculum(meta, difficulty, transcripts);
+/**
+ * Executes ONE checkpointed stage of a GenerationJob using an optimistic DB lease.
+ * Safe against concurrent pollers, serverless timeouts, and checkpoint retries.
+ */
+export async function runGenerationJobStep(jobId: string): Promise<{
+  advanced: boolean;
+  busy?: boolean;
+  job: ReturnType<typeof formatGenerationJobPayload> | null;
+}> {
+  const existing = await prisma.generationJob.findUnique({
+    where: { id: jobId },
+    include: {
+      course: {
+        include: {
+          source: true,
+        },
+      },
+    },
+  });
+
+  if (!existing) {
+    return { advanced: false, job: null };
+  }
+
+  if (existing.status === "COMPLETED" || existing.status === "FAILED") {
+    return {
+      advanced: false,
+      job: formatGenerationJobPayload(existing),
+    };
+  }
+
+  const now = new Date();
+  const leaseUntil = new Date(now.getTime() + 55_000);
+  const acquired = await prisma.generationJob.updateMany({
+    where: {
+      id: jobId,
+      status: { in: ["PENDING", "PROCESSING"] },
+      OR: [{ lockedUntil: null }, { lockedUntil: { lt: now } }],
+    },
+    data: {
+      status: "PROCESSING",
+      lockedUntil: leaseUntil,
+    },
+  });
+
+  if (acquired.count === 0) {
+    const lockedLatest = await prisma.generationJob.findUnique({
+      where: { id: jobId },
+      include: { course: true },
+    });
+    return {
+      advanced: false,
+      busy: true,
+      job: lockedLatest ? formatGenerationJobPayload(lockedLatest) : null,
+    };
+  }
+
+  const course = existing.course;
+  const source = course.source;
+  let state: CheckpointState = {
+    url: source?.sourceUrl || "",
+    videoId: source?.youtubeId || "",
+    sourceType: source?.sourceType === "YOUTUBE_PLAYLIST" ? "PLAYLIST" : "VIDEO",
+    difficulty:
+      (existing.difficulty as "BEGINNER" | "INTERMEDIATE" | "ADVANCED") || "BEGINNER",
+  };
+
+  if (existing.checkpointData) {
+    try {
+      const parsed = JSON.parse(existing.checkpointData) as Partial<CheckpointState>;
+      state = { ...state, ...parsed };
+    } catch {
+      // Recover cleanly from source metadata below if needed
+    }
+  }
+
+  const videoId = state.videoId || source?.youtubeId || parseYouTubeUrl(state.url).videoId || "";
+  if (!videoId) {
+    const failedJob = await prisma.generationJob.update({
+      where: { id: jobId },
+      data: {
+        status: "FAILED",
+        lockedUntil: null,
+        errorLog: "Missing YouTube video identifier for generation job.",
+      },
+      include: { course: true },
+    });
+    await prisma.course.update({ where: { id: course.id }, data: { status: "FAILED" } });
+    return { advanced: false, job: formatGenerationJobPayload(failedJob) };
+  }
+
+  try {
+    // -------------------------------------------------------------
+    // STEP 1: Extracting video transcript & metadata
+    // -------------------------------------------------------------
+    if (existing.checkpointStep < 1 || !state.meta) {
+      await prisma.generationJob.update({
+        where: { id: jobId },
+        data: {
+          currentStep: PIPELINE_STEPS[0].label,
+          progressPercentage: Math.max(existing.progressPercentage, 15),
+        },
+      });
+
+      const meta = await fetchYouTubeMetadata(videoId);
+      await verifyUserQuota(existing.userId, meta.durationSeconds);
+
+      await prisma.course.update({
+        where: { id: course.id },
+        data: {
+          title: meta.title,
+          description: meta.description || `Comprehensive interactive course covering ${meta.title}.`,
+          thumbnailUrl: meta.thumbnailUrl,
+          totalDurationSeconds: meta.durationSeconds,
+          estimatedStudyMinutes: Math.ceil((meta.durationSeconds * 1.5) / 60),
+        },
+      });
+
+      if (source) {
+        await prisma.courseSource.update({
+          where: { id: source.id },
+          data: { channelTitle: meta.channelTitle },
+        });
+      }
+
+      const provider = await resolveAIProvider();
+      const hasExternalAI = isExternalAIProvider(provider);
+      let transcripts: TranscriptSegment[] | null = null;
+
+      if (existing.manualTranscript && existing.manualTranscript.trim()) {
+        transcripts = [
+          {
+            text: existing.manualTranscript.trim(),
+            start: 0,
+            duration: meta.durationSeconds,
+          },
+        ];
+      } else if (
+        hasExternalAI ||
+        !meta.chapters ||
+        meta.chapters.length < 4 ||
+        meta.durationSeconds < 14400
+      ) {
+        transcripts = await fetchYouTubeTranscript(videoId).catch(() => null);
+      }
+
+      const nextState: CheckpointState = {
+        ...state,
+        videoId,
+        meta,
+        transcripts: trimTranscriptForCheckpoint(transcripts),
+      };
+
+      const updated = await prisma.generationJob.update({
+        where: { id: jobId },
+        data: {
+          status: "PROCESSING",
+          checkpointStep: 1,
+          progressPercentage: 25,
+          currentStep: PIPELINE_STEPS[1].label,
+          checkpointData: JSON.stringify(nextState),
+          lockedUntil: null,
+          errorLog: null,
+        },
+        include: { course: true },
+      });
+
+      return { advanced: true, job: formatGenerationJobPayload(updated) };
     }
 
-    // 8. Build Chapters, Lessons, Quizzes & Placement Rows in memory (bounded LLM concurrency, zero DB pool contention)
-    const now = new Date();
-    const isExternalProvider = provider.name !== "Local Deterministic Synthesizer";
-    const llmQuizDeadlineMs = Date.now() + 20000;
-    const videoId = parsedUrl.videoId || "";
+    // -------------------------------------------------------------
+    // STEP 2: Planning course curriculum & chapters
+    // -------------------------------------------------------------
+    if (existing.checkpointStep === 1 || !state.curriculumData) {
+      await prisma.generationJob.update({
+        where: { id: jobId },
+        data: {
+          currentStep: PIPELINE_STEPS[1].label,
+          progressPercentage: Math.max(existing.progressPercentage, 35),
+        },
+      });
+
+      const meta = state.meta;
+      const transcripts = state.transcripts ?? null;
+      const provider = await resolveAIProvider();
+
+      let curriculumData = await generateCurriculumStructure(
+        meta,
+        transcripts,
+        provider,
+        state.difficulty
+      );
+
+      if (!curriculumData.chapters || curriculumData.chapters.length === 0) {
+        curriculumData = generateFallbackCurriculum(meta, state.difficulty, transcripts);
+      }
+
+      const nextState: CheckpointState = {
+        ...state,
+        // Transcript excerpts are now embedded onto lessons, so purge duplicate transcript array from checkpoint JSON
+        transcripts: null,
+        curriculumData,
+      };
+
+      const updated = await prisma.generationJob.update({
+        where: { id: jobId },
+        data: {
+          status: "PROCESSING",
+          checkpointStep: 2,
+          progressPercentage: 55,
+          currentStep: PIPELINE_STEPS[2].label,
+          checkpointData: JSON.stringify(nextState),
+          lockedUntil: null,
+          errorLog: null,
+        },
+        include: { course: true },
+      });
+
+      return { advanced: true, job: formatGenerationJobPayload(updated) };
+    }
+
+    // -------------------------------------------------------------
+    // STEP 3: Generating lesson quizzes & placement test
+    // -------------------------------------------------------------
+    if (existing.checkpointStep === 2) {
+      await prisma.generationJob.update({
+        where: { id: jobId },
+        data: {
+          currentStep: PIPELINE_STEPS[2].label,
+          progressPercentage: Math.max(existing.progressPercentage, 65),
+        },
+      });
+
+      const meta = state.meta;
+      const curriculumData = state.curriculumData;
+      const provider = await resolveAIProvider();
+      const isExternalProvider = isExternalAIProvider(provider);
+      const llmQuizDeadlineMs = Date.now() + 20_000;
+
+      const flatLessons: { cIdx: number; lIdx: number; chapterTitle: string; lesson: RawLesson }[] = [];
+      for (let cIdx = 0; cIdx < curriculumData.chapters.length; cIdx++) {
+        const chap = curriculumData.chapters[cIdx];
+        for (let lIdx = 0; lIdx < chap.lessons.length; lIdx++) {
+          flatLessons.push({
+            cIdx,
+            lIdx,
+            chapterTitle: chap.title,
+            lesson: chap.lessons[lIdx],
+          });
+        }
+      }
+
+      const QUIZ_LLM_CONCURRENCY = 4;
+      for (let i = 0; i < flatLessons.length; i += QUIZ_LLM_CONCURRENCY) {
+        const batch = flatLessons.slice(i, i + QUIZ_LLM_CONCURRENCY);
+        const batchQuizzes = await Promise.all(
+          batch.map((item) =>
+            resolveLessonQuizzesAsync(
+              item.lesson,
+              meta.title,
+              item.chapterTitle,
+              item.lIdx,
+              isExternalProvider && Date.now() < llmQuizDeadlineMs
+            )
+          )
+        );
+        for (let j = 0; j < batch.length; j++) {
+          const item = batch[j];
+          curriculumData.chapters[item.cIdx].lessons[item.lIdx] = {
+            ...item.lesson,
+            quizQuestions: batchQuizzes[j],
+            // Trim raw transcriptExcerpt once quiz is generated to keep checkpoint compact
+            transcriptExcerpt: undefined,
+          };
+        }
+      }
+
+      let placementQuestions = curriculumData.placementQuestions || [];
+      if (isExternalProvider) {
+        const llmPlacement = await generatePlacementWithLLM(
+          curriculumData,
+          meta.title,
+          state.difficulty,
+          provider
+        ).catch(() => null);
+        if (llmPlacement && llmPlacement.length >= 3) {
+          placementQuestions = llmPlacement;
+        }
+      }
+      if (placementQuestions.length < 3) {
+        placementQuestions = generateFallbackPlacement(curriculumData);
+      }
+      curriculumData.placementQuestions = placementQuestions;
+
+      const nextState: CheckpointState = {
+        ...state,
+        curriculumData,
+      };
+
+      const updated = await prisma.generationJob.update({
+        where: { id: jobId },
+        data: {
+          status: "PROCESSING",
+          checkpointStep: 3,
+          progressPercentage: 80,
+          currentStep: PIPELINE_STEPS[3].label,
+          checkpointData: JSON.stringify(nextState),
+          lockedUntil: null,
+          errorLog: null,
+        },
+        include: { course: true },
+      });
+
+      return { advanced: true, job: formatGenerationJobPayload(updated) };
+    }
+
+    // -------------------------------------------------------------
+    // STEP 4: Finalizing course structure (idempotent bulk persist)
+    // -------------------------------------------------------------
+    await prisma.generationJob.update({
+      where: { id: jobId },
+      data: {
+        currentStep: PIPELINE_STEPS[3].label,
+        progressPercentage: Math.max(existing.progressPercentage, 88),
+      },
+    });
+
+    const meta = state.meta;
+    const curriculumData = state.curriculumData;
+    const nowTime = new Date();
 
     const chapterRows: {
       id: string;
@@ -348,14 +883,6 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
       optionText: string;
     }[] = [];
 
-    // Collect flat lesson specs first so any optional LLM quiz calls run cleanly before DB writes
-    const lessonWorkQueue: {
-      chapterId: string;
-      orderIndex: number;
-      chapterTitle: string;
-      lessonData: RawLesson;
-    }[] = [];
-
     for (let cIdx = 0; cIdx < curriculumData.chapters.length; cIdx++) {
       const c = curriculumData.chapters[cIdx];
       const chapterId = makeId();
@@ -368,41 +895,15 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
       });
 
       for (let lIdx = 0; lIdx < c.lessons.length; lIdx++) {
-        lessonWorkQueue.push({
-          chapterId,
-          orderIndex: lIdx,
-          chapterTitle: c.title,
-          lessonData: c.lessons[lIdx],
-        });
-      }
-    }
-
-    const QUIZ_LLM_CONCURRENCY = 4;
-    for (let i = 0; i < lessonWorkQueue.length; i += QUIZ_LLM_CONCURRENCY) {
-      const batch = lessonWorkQueue.slice(i, i + QUIZ_LLM_CONCURRENCY);
-      const batchQuizzes = await Promise.all(
-        batch.map((item) =>
-          resolveLessonQuizzesAsync(
-            item.lessonData,
-            meta.title,
-            item.chapterTitle,
-            item.orderIndex,
-            isExternalProvider && Date.now() < llmQuizDeadlineMs
-          )
-        )
-      );
-
-      for (let j = 0; j < batch.length; j++) {
-        const item = batch[j];
-        const l = item.lessonData;
+        const l = c.lessons[lIdx];
         const lessonId = makeId();
         const startSec = l.startSeconds ?? 0;
         const endSec = l.endSeconds ?? Math.min(600, meta.durationSeconds);
 
         lessonRows.push({
           id: lessonId,
-          chapterId: item.chapterId,
-          orderIndex: item.orderIndex,
+          chapterId,
+          orderIndex: lIdx,
           title: l.title,
           description: l.description || l.summary || `Comprehensive lesson on ${l.title}.`,
           youtubeVideoId: videoId,
@@ -413,10 +914,13 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
           keyTakeaways: JSON.stringify(l.keyTakeaways || []),
           importantDefinitions: JSON.stringify(l.importantDefinitions || []),
           status: "READY",
-          updatedAt: now,
+          updatedAt: nowTime,
         });
 
-        const quizzes = batchQuizzes[j];
+        const quizzes =
+          Array.isArray(l.quizQuestions) && l.quizQuestions.length > 0
+            ? l.quizQuestions
+            : resolveLessonQuizzes(l, meta.title, c.title, lIdx);
         for (let qIdx = 0; qIdx < quizzes.length; qIdx++) {
           const q = quizzes[qIdx];
           const questionId = makeId();
@@ -442,7 +946,6 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
       }
     }
 
-    // 9. Build Placement Diagnostic Rows
     const placementQuestions =
       curriculumData.placementQuestions && curriculumData.placementQuestions.length >= 3
         ? curriculumData.placementQuestions
@@ -486,41 +989,29 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
       }
     }
 
-    // 10. Persist full course atomically in fast sequential bulk chunks (zero pool starvation)
-    await prisma.generationJob.update({
-      where: { id: job.id },
-      data: {
-        progressPercentage: 70,
-        currentStep: `Saving ${chapterRows.length} days, ${lessonRows.length} lessons, and ${quizQuestionRows.length} interactive quiz questions...`,
-      },
-    });
+    // Idempotent replace in case Step 4 had partially written before a crash/retry
+    await prisma.chapter.deleteMany({ where: { courseId: course.id } });
+    await prisma.placementQuestion.deleteMany({ where: { courseId: course.id } });
 
     await createManyInChunks(chapterRows, (data) => prisma.chapter.createMany({ data }));
     await createManyInChunks(lessonRows, (data) => prisma.lesson.createMany({ data }));
     await createManyInChunks(quizQuestionRows, (data) => prisma.quizQuestion.createMany({ data }));
     await createManyInChunks(quizOptionRows, (data) => prisma.quizOption.createMany({ data }));
-    await createManyInChunks(placementQuestionRows, (data) => prisma.placementQuestion.createMany({ data }));
-    await createManyInChunks(placementOptionRows, (data) => prisma.placementOption.createMany({ data }));
+    await createManyInChunks(placementQuestionRows, (data) =>
+      prisma.placementQuestion.createMany({ data })
+    );
+    await createManyInChunks(placementOptionRows, (data) =>
+      prisma.placementOption.createMany({ data })
+    );
 
-    // 11. Mark Course READY & Finalize Job
     await prisma.course.update({
       where: { id: course.id },
       data: { status: "READY" },
     });
 
-    await prisma.generationJob.update({
-      where: { id: job.id },
-      data: {
-        status: "COMPLETED",
-        progressPercentage: 100,
-        currentStep: "Course generation fully complete!",
-        completedAt: new Date(),
-      },
-    });
-
-    if (user.subscription) {
-      await prisma.subscription.update({
-        where: { id: user.subscription.id },
+    if (!existing.quotaCharged) {
+      await prisma.subscription.updateMany({
+        where: { userId: existing.userId },
         data: {
           monthlyGenerationsUsed: { increment: 1 },
           monthlyHoursUsedSeconds: { increment: meta.durationSeconds },
@@ -528,27 +1019,46 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
       });
     }
 
-    return {
-      success: true,
-      courseId: course.id,
-      course: {
-        id: course.id,
-        slug: course.slug,
-        title: course.title,
+    const completedJob = await prisma.generationJob.update({
+      where: { id: jobId },
+      data: {
+        status: "COMPLETED",
+        checkpointStep: 4,
+        progressPercentage: 100,
+        currentStep: PIPELINE_STEPS[3].label,
+        completedAt: new Date(),
+        quotaCharged: true,
+        lockedUntil: null,
+        errorLog: null,
+        checkpointData: null,
       },
-      isExisting: false,
-      message: "Course successfully generated and ready for learning!",
+      include: { course: true },
+    });
+
+    await createNotification({
+      userId: existing.userId,
+      title: `Your course is ready · ${completedJob.course.title}`,
+      message: `${lessonRows.length} interactive lessons generated across ${chapterRows.length} day plan${chapterRows.length === 1 ? "" : "s"}. Jump back in anytime.`,
+      type: "COURSE",
+      linkUrl: `/courses/${completedJob.course.slug}`,
+    });
+
+    return {
+      advanced: true,
+      job: formatGenerationJobPayload(completedJob),
     };
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err);
-    console.error("Course generation pipeline error:", err);
+    console.error("Course generation step failed:", { jobId, step: existing.checkpointStep + 1, errorMsg });
 
-    await prisma.generationJob.update({
-      where: { id: job.id },
+    const failedJob = await prisma.generationJob.update({
+      where: { id: jobId },
       data: {
         status: "FAILED",
         errorLog: errorMsg,
+        lockedUntil: null,
       },
+      include: { course: true },
     });
 
     await prisma.course.update({
@@ -556,8 +1066,144 @@ export async function generateCourse(params: GenerateCourseParams): Promise<Gene
       data: { status: "FAILED" },
     });
 
-    throw new Error(`Generation failed: ${errorMsg}`);
+    return {
+      advanced: false,
+      job: formatGenerationJobPayload(failedJob),
+    };
   }
+}
+
+/**
+ * Advances a GenerationJob sequentially up to `maxSteps` or `timeBudgetMs`.
+ * Ideal for Next.js `after()` background execution and full-run admin/roadmap calls.
+ */
+export async function advanceCourseGenerationJob(
+  jobId: string,
+  options?: { maxSteps?: number; timeBudgetMs?: number }
+): Promise<ReturnType<typeof formatGenerationJobPayload> | null> {
+  const maxSteps = options?.maxSteps ?? 4;
+  const deadline = Date.now() + (options?.timeBudgetMs ?? 40_000);
+
+  let latestJob: ReturnType<typeof formatGenerationJobPayload> | null = null;
+
+  for (let i = 0; i < maxSteps; i++) {
+    if (Date.now() >= deadline) break;
+
+    const result = await runGenerationJobStep(jobId);
+    latestJob = result.job;
+
+    if (!result.job) break;
+    if (result.job.status === "COMPLETED" || result.job.status === "FAILED") {
+      break;
+    }
+    if (!result.advanced) {
+      break;
+    }
+  }
+
+  return latestJob;
+}
+
+/**
+ * Resumes a FAILED GenerationJob strictly from its last persisted checkpointStep without consuming quota.
+ */
+export async function retryCourseGenerationJob(jobId: string): Promise<{
+  resumedFromStep: number;
+  job: ReturnType<typeof formatGenerationJobPayload>;
+}> {
+  const job = await prisma.generationJob.findUnique({
+    where: { id: jobId },
+    include: { course: true },
+  });
+
+  if (!job) {
+    throw new Error("Generation job not found.");
+  }
+
+  if (job.status === "COMPLETED") {
+    return {
+      resumedFromStep: 4,
+      job: formatGenerationJobPayload(job),
+    };
+  }
+
+  const nextStepIdx = Math.min(3, Math.max(0, job.checkpointStep));
+  const nextStepMeta = PIPELINE_STEPS[nextStepIdx];
+
+  await prisma.course.update({
+    where: { id: job.courseId },
+    data: { status: "PROCESSING" },
+  });
+
+  const resetJob = await prisma.generationJob.update({
+    where: { id: jobId },
+    data: {
+      status: "PENDING",
+      errorLog: null,
+      lockedUntil: null,
+      currentStep: nextStepMeta.label,
+      progressPercentage: Math.max(10, job.progressPercentage),
+    },
+    include: { course: true },
+  });
+
+  return {
+    resumedFromStep: nextStepMeta.step,
+    job: formatGenerationJobPayload(resetJob),
+  };
+}
+
+/**
+ * Synchronous end-to-end wrapper preserved for admin and roadmap callers.
+ */
+export async function generateCourse(params: GenerateCourseParams): Promise<GenerationResult> {
+  const initResult = await initializeCourseGenerationJob(params);
+  if (initResult.isExisting || initResult.status === "COMPLETED" || !initResult.jobId) {
+    return initResult;
+  }
+
+  const finalJob = await advanceCourseGenerationJob(initResult.jobId, {
+    maxSteps: 4,
+    timeBudgetMs: 54_000,
+  });
+
+  if (!finalJob) {
+    throw new Error("Generation failed: job state could not be read.");
+  }
+
+  if (finalJob.status === "FAILED") {
+    throw new Error(`Generation failed: ${finalJob.errorLog || "Unknown error"}`);
+  }
+
+  if (finalJob.status !== "COMPLETED") {
+    // Finish any leftover steps cleanly when invoked synchronously outside HTTP polling
+    const followUp = await advanceCourseGenerationJob(initResult.jobId, {
+      maxSteps: 4,
+      timeBudgetMs: 54_000,
+    });
+    if (followUp?.status === "FAILED") {
+      throw new Error(`Generation failed: ${followUp.errorLog || "Unknown error"}`);
+    }
+    if (followUp?.status !== "COMPLETED") {
+      throw new Error("Generation timed out before finalizing course structure.");
+    }
+  }
+
+  const updatedCourse = await prisma.course.findUnique({
+    where: { id: initResult.courseId },
+    select: { id: true, slug: true, title: true },
+  });
+
+  return {
+    success: true,
+    jobId: initResult.jobId,
+    slug: updatedCourse?.slug || initResult.slug,
+    courseId: initResult.courseId,
+    course: updatedCourse || initResult.course,
+    isExisting: false,
+    status: "COMPLETED",
+    message: "Course successfully generated and ready for learning!",
+  };
 }
 
 // ----------------------------------------------------
@@ -1059,6 +1705,14 @@ function extractCourseDescriptionFocus(description = ""): string {
   return firstPara.length > 220 ? `${firstPara.slice(0, 217).trim()}...` : firstPara;
 }
 
+interface SegmentAIEnrichment {
+  title?: string;
+  description?: string;
+  summary?: string;
+  keyTakeaways?: string[];
+  importantDefinitions?: string[];
+}
+
 function buildDetailedLessonContent(params: {
   title: string;
   startSeconds: number;
@@ -1070,6 +1724,7 @@ function buildDetailedLessonContent(params: {
   courseDescription?: string;
   transcripts: TranscriptSegment[] | null;
   subTopics?: string[];
+  aiEnrichment?: SegmentAIEnrichment;
 }): RawLesson {
   const {
     title,
@@ -1082,6 +1737,7 @@ function buildDetailedLessonContent(params: {
     courseDescription,
     transcripts,
     subTopics = [],
+    aiEnrichment,
   } = params;
 
   const cleanTopic = cleanConceptTopic(title) || title;
@@ -1098,68 +1754,95 @@ function buildDetailedLessonContent(params: {
   const transcriptSnippet = extractTranscriptExcerpt(transcripts, startSeconds, endSeconds);
   const courseLead = extractCourseDescriptionFocus(courseDescription);
 
-  const descriptionParts = [
-    `Explore ${cleanTopic} (${clockStart} – ${clockEnd}, ${durMin} min) with practical architecture walkthroughs tailored to ${courseTitle.split(/[|–—-]/)[0].trim()}.`,
-  ];
-  if (cleanSubTopics.length > 1) {
-    descriptionParts.push(
-      `Topics covered: ${cleanSubTopics.slice(0, 7).join(" · ")}.`
-    );
-  } else if (primaryConcept) {
-    descriptionParts.push(primaryConcept.definition);
-  } else if (nextTitle) {
-    descriptionParts.push(`Connects directly into "${cleanConceptTopic(nextTitle)}" as the system scales.`);
+  const descriptionParts = aiEnrichment?.description?.trim()
+    ? [aiEnrichment.description.trim()]
+    : [
+        `Explore ${cleanTopic} (${clockStart} – ${clockEnd}, ${durMin} min) with practical architecture walkthroughs tailored to ${courseTitle.split(/[|–—-]/)[0].trim()}.`,
+      ];
+  if (!aiEnrichment?.description?.trim()) {
+    if (cleanSubTopics.length > 1) {
+      descriptionParts.push(
+        `Topics covered: ${cleanSubTopics.slice(0, 7).join(" · ")}.`
+      );
+    } else if (primaryConcept) {
+      descriptionParts.push(primaryConcept.definition);
+    } else if (nextTitle) {
+      descriptionParts.push(`Connects directly into "${cleanConceptTopic(nextTitle)}" as the system scales.`);
+    }
   }
 
-  const summaryParts = [
-    `Segment Overview [${clockStart} – ${clockEnd}]: This ${durMin}-minute lesson breaks down ${cleanTopic}.`,
-  ];
-  if (cleanSubTopics.length > 1) {
-    summaryParts.push(
-      `Sections inside this module: ${cleanSubTopics.slice(0, 8).join("; ")}.`
-    );
-  }
-  if (concepts.length > 0) {
-    summaryParts.push(
-      `Key focus areas include ${concepts
-        .slice(0, 3)
-        .map((c) => c.term)
-        .join(", ")}. ${concepts[0].definition}`
-    );
-  } else if (courseLead) {
-    summaryParts.push(`Context within the curriculum: ${courseLead}`);
-  }
-  if (transcriptSnippet) {
-    summaryParts.push(`Spoken highlights from video: "${transcriptSnippet}"`);
-  } else if (prevTitle || nextTitle) {
-    const flow: string[] = [];
-    const formatRef = (t: string) => t.replace(/^\d+[\.\:\-]\s*/, "").trim();
-    if (prevTitle) flow.push(`building upon "${formatRef(prevTitle)}"`);
-    if (nextTitle) flow.push(`preparing for "${formatRef(nextTitle)}"`);
-    summaryParts.push(`Curriculum progression: ${flow.join(" and ")}.`);
+  const summaryParts = aiEnrichment?.summary?.trim()
+    ? [
+        `[${clockStart} – ${clockEnd}] ${aiEnrichment.summary.trim()}`,
+        ...(transcriptSnippet ? [`Spoken highlights from video: "${transcriptSnippet}"`] : []),
+      ]
+    : [
+        `Segment Overview [${clockStart} – ${clockEnd}]: This ${durMin}-minute lesson breaks down ${cleanTopic}.`,
+      ];
+  if (!aiEnrichment?.summary?.trim()) {
+    if (cleanSubTopics.length > 1) {
+      summaryParts.push(
+        `Sections inside this module: ${cleanSubTopics.slice(0, 8).join("; ")}.`
+      );
+    }
+    if (concepts.length > 0) {
+      summaryParts.push(
+        `Key focus areas include ${concepts
+          .slice(0, 3)
+          .map((c) => c.term)
+          .join(", ")}. ${concepts[0].definition}`
+      );
+    } else if (courseLead) {
+      summaryParts.push(`Context within the curriculum: ${courseLead}`);
+    }
+    if (transcriptSnippet) {
+      summaryParts.push(`Spoken highlights from video: "${transcriptSnippet}"`);
+    } else if (prevTitle || nextTitle) {
+      const flow: string[] = [];
+      const formatRef = (t: string) => t.replace(/^\d+[\.\:\-]\s*/, "").trim();
+      if (prevTitle) flow.push(`building upon "${formatRef(prevTitle)}"`);
+      if (nextTitle) flow.push(`preparing for "${formatRef(nextTitle)}"`);
+      summaryParts.push(`Curriculum progression: ${flow.join(" and ")}.`);
+    }
   }
 
   const takeawaysSet = new Set<string>();
-  for (const c of concepts.slice(0, 3)) {
-    takeawaysSet.add(c.takeaway);
+  const aiTakeaways = Array.isArray(aiEnrichment?.keyTakeaways)
+    ? aiEnrichment.keyTakeaways
+        .map((t) => (typeof t === "string" ? t.trim() : ""))
+        .filter((t) => t.length >= 8)
+    : [];
+  for (const t of aiTakeaways.slice(0, 6)) {
+    takeawaysSet.add(t);
   }
-  for (const sub of cleanSubTopics.slice(0, 5)) {
-    const strippedSub = sub.replace(/\s*\(\d{1,2}:\d{2}(?::\d{2})?\)$/, "").trim();
-    if (strippedSub.length >= 6 && takeawaysSet.size < 6) {
-      takeawaysSet.add(`Apply practical workflows and core techniques for ${strippedSub}.`);
+  if (takeawaysSet.size < 2) {
+    for (const c of concepts.slice(0, 3)) {
+      takeawaysSet.add(c.takeaway);
+    }
+    for (const sub of cleanSubTopics.slice(0, 5)) {
+      const strippedSub = sub.replace(/\s*\(\d{1,2}:\d{2}(?::\d{2})?\)$/, "").trim();
+      if (strippedSub.length >= 6 && takeawaysSet.size < 6) {
+        takeawaysSet.add(`Apply practical workflows and core techniques for ${strippedSub}.`);
+      }
+    }
+    takeawaysSet.add(`Understand the core mechanics and practical implementation of ${cleanTopic}.`);
+    if (takeawaysSet.size < 3 && nextTitle) {
+      takeawaysSet.add(`See how ${cleanTopic} integrates cleanly before moving to ${cleanConceptTopic(nextTitle)}.`);
+    }
+    if (takeawaysSet.size < 3) {
+      takeawaysSet.add(`Review patterns, failure modes, and verifiable engineering checkpoints across this ${durMin}-minute module.`);
     }
   }
-  takeawaysSet.add(`Understand the core mechanics and practical implementation of ${cleanTopic}.`);
-  if (takeawaysSet.size < 3 && nextTitle) {
-    takeawaysSet.add(`See how ${cleanTopic} integrates cleanly before moving to ${cleanConceptTopic(nextTitle)}.`);
-  }
-  if (takeawaysSet.size < 3) {
-    takeawaysSet.add(`Review patterns, failure modes, and verifiable engineering checkpoints across this ${durMin}-minute module.`);
-  }
 
-  const definitions: string[] = concepts
-    .slice(0, 3)
-    .map((c) => `${c.term}: ${c.definition}`);
+  const aiDefs = Array.isArray(aiEnrichment?.importantDefinitions)
+    ? aiEnrichment.importantDefinitions
+        .map((d) => (typeof d === "string" ? d.trim() : ""))
+        .filter((d) => d.length >= 8 && d.includes(":"))
+    : [];
+  const definitions: string[] =
+    aiDefs.length > 0
+      ? aiDefs.slice(0, 4)
+      : concepts.slice(0, 3).map((c) => `${c.term}: ${c.definition}`);
   if (cleanSubTopics.length > 1 && definitions.length < 4) {
     for (const sub of cleanSubTopics) {
       const strippedSub = sub.replace(/\s*\(\d{1,2}:\d{2}(?::\d{2})?\)$/, "").trim();
@@ -1238,6 +1921,7 @@ interface TimeSegment {
   startSeconds: number;
   endSeconds: number;
   subTopics?: string[];
+  aiEnrichment?: SegmentAIEnrichment;
 }
 
 function isFillerChapterTitle(rawTitle: string): boolean {
@@ -1560,6 +2244,7 @@ function partitionSegmentsIntoDays(
           courseDescription: meta.description,
           transcripts,
           subTopics: seg.subTopics,
+          aiEnrichment: seg.aiEnrichment,
         });
         globalLessonIdx++;
         return lessonObj;
@@ -1622,64 +2307,219 @@ function buildScheduleSlots(totalDuration: number): {
   return { daysCount, slots };
 }
 
+async function callJSONWithProviderFailover<T>(
+  primary: AIProvider,
+  prompt: string,
+  schema: string
+): Promise<T> {
+  try {
+    return await primary.generateJSON<T>(prompt, schema);
+  } catch (primaryErr) {
+    const secondary = getSecondaryAIProvider(primary);
+    if (secondary) {
+      return await secondary.generateJSON<T>(prompt, schema);
+    }
+    throw primaryErr;
+  }
+}
+
+async function generatePlacementWithLLM(
+  curriculum: { chapters: RawChapter[] },
+  courseTitle: string,
+  difficulty: string,
+  provider: AIProvider
+): Promise<RawPlacementQuestion[] | null> {
+  if (!isExternalAIProvider(provider)) return null;
+
+  const allLessons = curriculum.chapters.flatMap((c) => c.lessons);
+  if (allLessons.length === 0) return null;
+
+  const targetCount = Math.min(8, Math.max(4, Math.min(allLessons.length, 6)));
+  const step = allLessons.length / targetCount;
+  const sampled = Array.from({ length: targetCount }, (_, i) => {
+    const idx = Math.min(allLessons.length - 1, Math.floor(i * step));
+    const les = allLessons[idx];
+    return `${idx + 1}. ${les.title}: ${les.description.slice(0, 140)}`;
+  }).join("\n");
+
+  const prompt = `Create ${targetCount} diagnostic placement-test questions for the course "${courseTitle}" (difficulty: ${difficulty}).
+Each question maps to one of these curriculum lessons so learners who already know a topic can skip ahead safely:
+${sampled}
+
+Requirements:
+- Generate exactly ${targetCount} multiple-choice questions, one per key topic sampled above.
+- Each question MUST have topicName matching the core skill, 4 distinct options, a valid correctOptionIndex (0-3), and a concise 1-sentence explanation.`;
+
+  const schema = `{
+  "questions": [
+    {
+      "topicName": "Short topic label",
+      "questionText": "Question prompt",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctOptionIndex": 0,
+      "explanation": "Concise explanation"
+    }
+  ]
+}`;
+
+  const parsed = await Promise.race([
+    callJSONWithProviderFailover<{
+      questions?: {
+        topicName?: string;
+        questionText?: string;
+        options?: string[];
+        correctOptionIndex?: number;
+        explanation?: string;
+      }[];
+    }>(provider, prompt, schema),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 10_000)),
+  ]);
+
+  if (!parsed?.questions || !Array.isArray(parsed.questions)) return null;
+
+  const valid: RawPlacementQuestion[] = parsed.questions
+    .filter(
+      (q) =>
+        typeof q?.topicName === "string" &&
+        q.topicName.trim().length > 1 &&
+        typeof q?.questionText === "string" &&
+        q.questionText.trim().length > 10 &&
+        Array.isArray(q.options) &&
+        q.options.length === 4 &&
+        q.options.every((o) => typeof o === "string" && o.trim().length > 0) &&
+        typeof q.correctOptionIndex === "number" &&
+        q.correctOptionIndex >= 0 &&
+        q.correctOptionIndex <= 3
+    )
+    .slice(0, 8)
+    .map((q) => ({
+      topicName: q.topicName!.trim(),
+      questionText: q.questionText!.trim(),
+      options: q.options!.map((o) => o.trim()),
+      correctOptionIndex: q.correctOptionIndex!,
+      explanation: (q.explanation || `Assesses readiness on ${q.topicName!.trim()}.`).trim(),
+    }));
+
+  return valid.length >= 3 ? valid : null;
+}
+
 export async function generateCurriculumStructure(
   meta: Pick<VideoMetadata, "title" | "durationSeconds" | "description" | "chapters">,
   transcripts: TranscriptSegment[] | null,
-  provider: ReturnType<typeof getAIProvider>,
+  provider: AIProvider,
   difficulty: string
 ): Promise<RawCurriculum> {
-  // 1. When real YouTube chapters/timestamps exist (>= 2), normalize, subdivide long modules, and partition cleanly
-  if (meta.chapters && meta.chapters.length >= 2) {
-    return organizeChaptersIntoDailyPlan(
-      meta.chapters,
-      meta.durationSeconds,
-      meta.title,
-      meta.description,
-      transcripts
-    );
-  }
+  const hasRealChapters = Boolean(meta.chapters && meta.chapters.length >= 2);
 
-  // 2. When no YouTube timestamps exist and external LLM is active, enrich precomputed full-duration timeline slots
-  if (provider instanceof NemotronAIProvider || provider instanceof OpenAIProvider) {
+  // Build authoritative full-duration segments first (never clamping or truncating multi-hour videos)
+  const baseSegments: TimeSegment[] = hasRealChapters
+    ? normalizeAndSubdivideChapters(meta.chapters!, meta.durationSeconds)
+    : buildScheduleSlots(meta.durationSeconds).slots.map((slot, idx) => ({
+        title: `Module ${idx + 1}: Core Concepts & Walkthrough`,
+        startSeconds: slot.startSeconds,
+        endSeconds: slot.endSeconds,
+      }));
+
+  // Tier 1: Enrich curriculum modules via configured external LLM (both chaptered and chapterless videos)
+  if (isExternalAIProvider(provider) && baseSegments.length > 0) {
     try {
-      const { slots } = buildScheduleSlots(meta.durationSeconds);
-      const batchSize = 12;
-      const enrichedSegments: TimeSegment[] = [];
+      const batchSize = 10;
+      const llmDeadlineMs = Date.now() + 24_000;
+      const enrichedSegments: TimeSegment[] = baseSegments.map((s) => ({ ...s }));
+      let batchesSucceeded = 0;
 
-      for (let i = 0; i < slots.length; i += batchSize) {
-        const batch = slots.slice(i, i + batchSize);
+      for (let i = 0; i < baseSegments.length; i += batchSize) {
+        if (Date.now() >= llmDeadlineMs) break;
+
+        const batch = baseSegments.slice(i, i + batchSize);
         const slotHints = batch
           .map((s, idx) => {
-            const excerpt = extractTranscriptExcerpt(transcripts, s.startSeconds, s.endSeconds, 180);
-            return `Slot ${idx + 1}: ${s.startSeconds}s..${s.endSeconds}s (${formatClockTimestamp(s.startSeconds)}-${formatClockTimestamp(s.endSeconds)})${
-              excerpt ? ` | Transcript: "${excerpt}"` : ""
-            }`;
+            const excerpt = extractTranscriptExcerpt(transcripts, s.startSeconds, s.endSeconds, 220);
+            const subHint = s.subTopics?.length
+              ? ` | Subtopics: ${s.subTopics.slice(0, 5).join(", ")}`
+              : "";
+            return `Module ${idx} [${formatClockTimestamp(s.startSeconds)}-${formatClockTimestamp(
+              s.endSeconds
+            )}]: Current="${s.title}"${subHint}${excerpt ? ` | Transcript: "${excerpt}"` : ""}`;
           })
           .join("\n");
 
-        const prompt = `You are structuring an online course from "${meta.title}" (${formatDuration(meta.durationSeconds)} total, difficulty: ${difficulty}).
+        const prompt = `You are designing structured course lessons from "${meta.title}" (${formatDuration(
+          meta.durationSeconds
+        )} total, difficulty: ${difficulty}).
 Course context: ${(meta.description || "").slice(0, 600)}
-Generate distinct, progressive lesson titles strictly matching these exact time slots:
+
+Enrich EVERY module below in exact order (indexes 0..${batch.length - 1}) using the chapter topic and transcript hints without merging or dropping any time window:
 ${slotHints}`;
 
         const schema = `{
   "lessons": [
-    { "title": "Specific concise lesson title" }
+    {
+      "index": 0,
+      "title": "${hasRealChapters ? "Clear refined lesson title preserving original topic" : "Specific concise lesson title"}",
+      "description": "1-2 sentence overview of what learners build or master in this time window",
+      "summary": "2-3 sentence technical study summary grounded in the module content",
+      "keyTakeaways": ["3 concise practical takeaways"],
+      "importantDefinitions": ["Term: Clear technical definition"]
+    }
   ]
 }`;
 
-        const res = await provider.generateJSON<{ lessons?: { title?: string }[] }>(prompt, schema);
-        batch.forEach((slot, idx) => {
-          const aiTitle = res?.lessons?.[idx]?.title?.trim();
-          enrichedSegments.push({
-            title: aiTitle || `Module ${i + idx + 1}: Core Concepts & Walkthrough`,
-            startSeconds: slot.startSeconds,
-            endSeconds: slot.endSeconds,
+        try {
+          const res = await callJSONWithProviderFailover<{
+            lessons?: {
+              index?: number;
+              title?: string;
+              description?: string;
+              summary?: string;
+              keyTakeaways?: string[];
+              importantDefinitions?: string[];
+            }[];
+          }>(provider, prompt, schema);
+
+          const returned = Array.isArray(res?.lessons) ? res.lessons : [];
+          if (returned.length === 0) {
+            throw new Error("LLM returned empty curriculum lessons batch.");
+          }
+
+          batch.forEach((seg, idx) => {
+            const matched =
+              returned.find((item) => item?.index === idx) || returned[idx];
+            if (!matched) return;
+
+            const refinedTitle = matched.title?.trim();
+            enrichedSegments[i + idx] = {
+              ...seg,
+              title:
+                !hasRealChapters && refinedTitle
+                  ? refinedTitle
+                  : refinedTitle && refinedTitle.length >= 6 && refinedTitle.length <= 96
+                    ? refinedTitle
+                    : seg.title,
+              aiEnrichment: {
+                description: matched.description?.trim(),
+                summary: matched.summary?.trim(),
+                keyTakeaways: Array.isArray(matched.keyTakeaways)
+                  ? matched.keyTakeaways.map((k) => String(k).trim()).filter(Boolean)
+                  : undefined,
+                importantDefinitions: Array.isArray(matched.importantDefinitions)
+                  ? matched.importantDefinitions.map((d) => String(d).trim()).filter(Boolean)
+                  : undefined,
+              },
+            };
           });
-        });
+
+          batchesSucceeded++;
+        } catch (batchErr) {
+          if (batchesSucceeded === 0) {
+            throw batchErr;
+          }
+          console.warn("Partial LLM curriculum batch fallback for remaining segments:", batchErr);
+          break;
+        }
       }
 
-      if (enrichedSegments.length === slots.length) {
+      if (batchesSucceeded > 0) {
         return partitionSegmentsIntoDays(
           enrichedSegments,
           meta.durationSeconds,
@@ -1689,10 +2529,21 @@ ${slotHints}`;
       }
     } catch (err) {
       console.warn(
-        "LLM API generation failed, seamlessly falling back to high-fidelity domain synthesizer:",
+        "LLM curriculum enrichment failed, cleanly falling back to deterministic synthesis:",
         err
       );
     }
+  }
+
+  // Tier 2: Resilient deterministic fallback preserving full-video proportional duration
+  if (hasRealChapters) {
+    return organizeChaptersIntoDailyPlan(
+      meta.chapters!,
+      meta.durationSeconds,
+      meta.title,
+      meta.description,
+      transcripts
+    );
   }
 
   return generateFallbackCurriculum(meta, difficulty, transcripts);

@@ -11,6 +11,7 @@ function GenerateContent() {
   const searchParams = useSearchParams();
   const [url, setUrl] = useState("");
   const [difficulty, setDifficulty] = useState<"BEGINNER" | "INTERMEDIATE" | "ADVANCED">("BEGINNER");
+  const [visibility, setVisibility] = useState<"auto" | "public" | "private">("auto");
   const [manualTranscript, setManualTranscript] = useState("");
   const [showManual, setShowManual] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -34,38 +35,25 @@ function GenerateContent() {
 
     setLoading(true);
     setError("");
-    setProgressStage("Validating YouTube URL and checking metadata...");
-    setProgressPercent(15);
+    setProgressStage("Initializing asynchronous course build...");
+    setProgressPercent(25);
 
     try {
-      const stepTimer1 = setTimeout(() => {
-        setProgressStage("Extracting accessible transcript and timestamps...");
-        setProgressPercent(40);
-      }, 1000);
-
-      const stepTimer2 = setTimeout(() => {
-        setProgressStage("Segmenting topics and structuring course chapters...");
-        setProgressPercent(70);
-      }, 2500);
-
-      const stepTimer3 = setTimeout(() => {
-        setProgressStage("Generating interactive quizzes and study notes...");
-        setProgressPercent(90);
-      }, 4000);
-
       const res = await fetch("/api/courses/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           url: url.trim(),
           difficulty,
+          isPublic:
+            visibility === "auto"
+              ? undefined
+              : visibility === "public"
+              ? true
+              : false,
           manualTranscript: manualTranscript.trim() || undefined,
         }),
       });
-
-      clearTimeout(stepTimer1);
-      clearTimeout(stepTimer2);
-      clearTimeout(stepTimer3);
 
       const data = await res.json();
 
@@ -74,15 +62,21 @@ function GenerateContent() {
           router.push(`/login?next=${encodeURIComponent(`/generate?url=${encodeURIComponent(url.trim())}`)}`);
           return;
         }
-        throw new Error(data.error || "Failed to generate course.");
+        throw new Error(data.error || "Failed to start course build.");
+      }
+
+      const targetSlug = data.slug || data.course?.slug || data.courseId;
+      if (data.isExisting || data.status === "COMPLETED") {
+        setProgressPercent(100);
+        setProgressStage("Course found! Opening syllabus...");
+        router.push(`/courses/${targetSlug}`);
+        return;
       }
 
       setProgressPercent(100);
-      setProgressStage("Course generated successfully! Redirecting...");
-      setTimeout(() => {
-        const targetSlug = data.course?.slug || data.courseId;
-        router.push(`/courses/${targetSlug}`);
-      }, 800);
+      setProgressStage("Build pipeline started! Opening live tracker...");
+      const jobQuery = data.jobId ? `?jobId=${encodeURIComponent(data.jobId)}` : "";
+      router.push(`/build/${targetSlug}${jobQuery}`);
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred during course generation.");
       setLoading(false);
@@ -146,6 +140,34 @@ function GenerateContent() {
                   }`}
                 >
                   {lvl}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Visibility Selection */}
+          <div>
+            <label className="block text-xs font-semibold text-[#0f1611] uppercase tracking-wider mb-2">
+              Course Visibility
+            </label>
+            <div className="grid grid-cols-3 gap-3">
+              {([
+                { id: "auto", label: "Plan default" },
+                { id: "public", label: "Public" },
+                { id: "private", label: "Private" },
+              ] as const).map((opt) => (
+                <button
+                  type="button"
+                  key={opt.id}
+                  onClick={() => setVisibility(opt.id)}
+                  disabled={loading}
+                  className={`py-2 px-3 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    visibility === opt.id
+                      ? "bg-[#4b5e1e] text-[#f6f8ec] shadow-sm"
+                      : "bg-[#fcfcfa] border border-[#0f1611]/15 text-[#4c4c3d] hover:text-[#0f1611]"
+                  }`}
+                >
+                  {opt.label}
                 </button>
               ))}
             </div>

@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import {
+  getAIProvider,
+  isExternalAIProvider,
+  normalizeAIProviderName,
+  resolveAIProviderConfig,
+} from "@/lib/ai/aiProvider";
 
 export const dynamic = "force-dynamic";
 
@@ -11,17 +17,7 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden: Administrator role required." }, { status: 403 });
     }
 
-    const [providerSetting, modelSetting] = await Promise.all([
-      prisma.platformSetting.findUnique({ where: { key: "AI_PROVIDER" } }),
-      prisma.platformSetting.findUnique({ where: { key: "AI_MODEL" } }),
-    ]);
-
-    const activeProvider = providerSetting?.value || process.env.AI_PROVIDER || "NVIDIA_NEMOTRON";
-    const activeModel =
-      modelSetting?.value ||
-      (activeProvider.includes("nemotron") || activeProvider === "NVIDIA_NEMOTRON"
-        ? process.env.NVIDIA_MODEL || "nvidia/llama-3.1-nemotron-70b-instruct"
-        : process.env.OPENAI_MODEL || "gpt-4o-mini");
+    const resolvedConfig = await resolveAIProviderConfig();
 
     const recentJobs = await prisma.generationJob.findMany({
       take: 10,
@@ -34,11 +30,13 @@ export async function GET() {
 
     return NextResponse.json({
       config: {
-        activeProvider,
-        activeModel,
-        hasNvidiaKey: !!process.env.NVIDIA_API_KEY,
-        hasOpenAiKey: !!process.env.OPENAI_API_KEY,
-        hasYouTubeKey: !!process.env.YOUTUBE_API_KEY,
+        activeProvider: resolvedConfig.activeProvider,
+        activeModel: resolvedConfig.activeModel,
+        rawProviderSetting: resolvedConfig.rawProviderSetting,
+        precedenceSource: resolvedConfig.source,
+        hasNvidiaKey: resolvedConfig.hasNvidiaKey,
+        hasOpenAiKey: resolvedConfig.hasOpenAiKey,
+        hasYouTubeKey: resolvedConfig.hasYouTubeKey,
       },
       recentJobs: recentJobs.map((j) => ({
         id: j.id,
@@ -68,36 +66,55 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { provider, model, test, prompt } = body;
 
-    // Handle interactive test run
+    // Handle interactive test run using real aligned provider when configured
     if (test) {
-      const apiKey = process.env.NVIDIA_API_KEY || process.env.OPENAI_API_KEY;
-      if (!apiKey && provider !== "HEURISTIC_MOCK" && provider !== "local") {
+      const normalized = normalizeAIProviderName(provider) || "NVIDIA_NEMOTRON";
+      const instance = getAIProvider({
+        provider: normalized,
+        model: typeof model === "string" ? model : undefined,
+      });
+
+      if (!isExternalAIProvider(instance)) {
         return NextResponse.json({
-          output: `[Diagnostic Simulator - Standby Mode]\nProvider: ${provider}\nModel: ${model}\nStatus: API Key is configured via environment. Simulation response: "Neural network weights encode learned parameters by scaling input features, directly governing activations and overall predictive accuracy."`,
+          output: `[Diagnostic Fallback - Tier 2 Synthesizer Active]\nRequested Provider: ${provider || normalized}\nResolved Provider: ${instance.name}\nStatus: External API key not active for this provider or local mode selected.`,
         });
       }
 
-      return NextResponse.json({
-        output: `[Live AI Verification: 200 OK]\nProvider: ${provider}\nTarget Checkpoint: ${model || "Default"}\nResult: Connected successfully to neural inference gateway for prompt: "${(prompt || "").slice(0, 50)}..."`,
-      });
+      try {
+        const testPrompt =
+          typeof prompt === "string" && prompt.trim()
+            ? prompt.trim()
+            : "Explain in 2 concise sentences how checkpointed generation improves reliability.";
+        const reply = await instance.generateCompletion(testPrompt);
+        return NextResponse.json({
+          output: `[Live AI Verification: 200 OK]\nProvider: ${instance.name}\nModel: ${instance.model || model || "Default"}\nResponse:\n${reply}`,
+        });
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        return NextResponse.json({
+          output: `[Live AI Request Failed - Tier 2 Fallback Ready]\nProvider: ${instance.name}\nModel: ${instance.model || model || "Default"}\nError: ${errMsg}`,
+        });
+      }
     }
+
+    const savedProvider = normalizeAIProviderName(provider) || String(provider || "NVIDIA_NEMOTRON");
 
     await Promise.all([
       prisma.platformSetting.upsert({
         where: { key: "AI_PROVIDER" },
-        update: { value: provider },
-        create: { key: "AI_PROVIDER", value: provider },
+        update: { value: savedProvider },
+        create: { key: "AI_PROVIDER", value: savedProvider },
       }),
       prisma.platformSetting.upsert({
         where: { key: "AI_MODEL" },
-        update: { value: model || "" },
-        create: { key: "AI_MODEL", value: model || "" },
+        update: { value: typeof model === "string" ? model.trim() : "" },
+        create: { key: "AI_MODEL", value: typeof model === "string" ? model.trim() : "" },
       }),
     ]);
 
     return NextResponse.json({
       success: true,
-      message: `AI Provider updated to ${provider} (${model || "default model"}).`,
+      message: `AI Provider updated to ${savedProvider} (${model || "default model"}).`,
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Internal server error";

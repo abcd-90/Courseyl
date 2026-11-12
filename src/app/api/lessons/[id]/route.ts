@@ -145,6 +145,45 @@ export async function GET(
             lessonIndex: lesson.orderIndex,
           });
 
+    const initialAnswers: Record<string, number> = {};
+    let watchProgress: { watchedSeconds: number; watched: boolean; lastSecond: number } | null = null;
+
+    if (user) {
+      const questionIds = resolvedQuizQuestions.map((q) => q.id);
+      const [savedAnswers, savedWatch] = await Promise.all([
+        questionIds.length > 0
+          ? prisma.quizAnswer.findMany({
+              where: {
+                userId: user.id,
+                questionId: { in: questionIds },
+              },
+              select: {
+                questionId: true,
+                selectedOptionIndex: true,
+              },
+            })
+          : Promise.resolve([]),
+        prisma.lessonWatchProgress.findUnique({
+          where: {
+            userId_lessonId: {
+              userId: user.id,
+              lessonId: lesson.id,
+            },
+          },
+          select: {
+            watchedSeconds: true,
+            watched: true,
+            lastSecond: true,
+          },
+        }),
+      ]);
+
+      for (const ans of savedAnswers) {
+        initialAnswers[ans.questionId] = ans.selectedOptionIndex;
+      }
+      watchProgress = savedWatch;
+    }
+
     const courseSource = lesson.chapter?.course?.source;
     const resolvedVideoId =
       lesson.youtubeVideoId && lesson.youtubeVideoId !== "urbkF3zPpxw"
@@ -178,6 +217,7 @@ export async function GET(
         allLessons: allCourseLessons,
       },
       notes,
+      initialAnswers,
       quizQuestions: resolvedQuizQuestions.map((q) => ({
         id: q.id,
         questionText: q.questionText,
@@ -190,6 +230,9 @@ export async function GET(
         isCompleted: progress?.isCompleted ?? false,
         isSkipped: progress?.isSkipped ?? false,
         lastPlaybackSeconds: progress?.lastPlaybackSeconds ?? lesson.startSeconds,
+        watched: watchProgress?.watched ?? false,
+        watchedSeconds: watchProgress?.watchedSeconds ?? 0,
+        lastSecond: watchProgress?.lastSecond ?? 0,
       },
     });
   } catch (err: unknown) {

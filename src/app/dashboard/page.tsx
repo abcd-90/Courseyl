@@ -14,6 +14,13 @@ export default function DashboardPage() {
   const brandName = settings?.branding?.brandName || "Courseyl";
   const [url, setUrl] = useState("");
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [progressSummary, setProgressSummary] = useState<{
+    streakDays: number;
+    lessonsThisWeek: number;
+    quizScorePercentage: number | null;
+    quizLessonsAttempted: number;
+    watchedMinutesThisWeek: number;
+  } | null>(null);
   const [myCourses, setMyCourses] = useState<any[]>([]);
   const [popularCourses, setPopularCourses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,22 +37,36 @@ export default function DashboardPage() {
         .catch(() => {});
     };
 
-    fetchUserData();
+    const fetchProgressSummary = () => {
+      fetch("/api/progress/summary", { cache: "no-store" })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data && typeof data.lessonsThisWeek === "number") {
+            setProgressSummary(data);
+          }
+        })
+        .catch(() => {});
+    };
 
-    // 2. Fetch live enrolled courses
-    fetch("/api/courses?enrolled=true", { cache: "no-store" })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.courses && Array.isArray(data.courses) && data.courses.length > 0) {
-          setMyCourses(data.courses);
-        } else {
+    const fetchEnrolledCourses = () => {
+      fetch("/api/courses?enrolled=true", { cache: "no-store" })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.courses && Array.isArray(data.courses) && data.courses.length > 0) {
+            setMyCourses(data.courses);
+          } else {
+            setMyCourses([]);
+          }
+        })
+        .catch(() => {
           setMyCourses([]);
-        }
-      })
-      .catch(() => {
-        setMyCourses([]);
-      })
-      .finally(() => setLoading(false));
+        })
+        .finally(() => setLoading(false));
+    };
+
+    fetchUserData();
+    fetchProgressSummary();
+    fetchEnrolledCourses();
 
     // 3. Fetch real popular community courses
     fetch("/api/courses?limit=6", { cache: "no-store" })
@@ -63,13 +84,20 @@ export default function DashboardPage() {
       } else {
         fetchUserData();
       }
+      fetchProgressSummary();
+    };
+
+    const handleFocusRefresh = () => {
+      fetchUserData();
+      fetchProgressSummary();
+      fetchEnrolledCourses();
     };
 
     window.addEventListener("user-updated", handleUserUpdated);
-    window.addEventListener("focus", fetchUserData);
+    window.addEventListener("focus", handleFocusRefresh);
     return () => {
       window.removeEventListener("user-updated", handleUserUpdated);
-      window.removeEventListener("focus", fetchUserData);
+      window.removeEventListener("focus", handleFocusRefresh);
     };
   }, []);
 
@@ -88,7 +116,18 @@ export default function DashboardPage() {
     currentUser?.name ||
     currentUser?.email?.split("@")[0] ||
     "Learner";
-  const streakDays = currentUser?.profile?.currentStreakDays || 1;
+  const streakDays =
+    progressSummary?.streakDays ??
+    currentUser?.profile?.currentStreakDays ??
+    0;
+
+  const formatWatchedDuration = (minutes: number) => {
+    if (!minutes || minutes <= 0) return "0m";
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  };
 
   const sampleCourses = [
     {
@@ -220,7 +259,9 @@ export default function DashboardPage() {
                 {streakDays} {streakDays === 1 ? "day" : "days"}
               </h3>
               <p className="text-[0.62rem] sm:text-[0.68rem] text-[#0f1611]/80 mt-1 leading-tight">
-                Today counts. Come back tomorrow for {streakDays + 1}.
+                {streakDays > 0
+                  ? `Today counts. Come back tomorrow for ${streakDays + 1}.`
+                  : "Finish today's goal to start your streak."}
               </p>
             </div>
             {/* Notch connector on right edge */}
@@ -234,7 +275,9 @@ export default function DashboardPage() {
               LESSONS THIS WEEK
             </span>
             <div className="my-auto py-1">
-              <h3 className="text-xl sm:text-3xl md:text-4xl font-display font-bold leading-tight">0</h3>
+              <h3 className="text-xl sm:text-3xl md:text-4xl font-display font-bold leading-tight">
+                {progressSummary?.lessonsThisWeek ?? 0}
+              </h3>
             </div>
             <div />
             <div className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-paper z-10" />
@@ -247,7 +290,12 @@ export default function DashboardPage() {
               QUIZ SCORE
             </span>
             <div className="my-auto py-1">
-              <h3 className="text-xl sm:text-3xl md:text-4xl font-display font-bold leading-tight">—</h3>
+              <h3 className="text-xl sm:text-3xl md:text-4xl font-display font-bold leading-tight">
+                {progressSummary?.quizScorePercentage !== null &&
+                progressSummary?.quizScorePercentage !== undefined
+                  ? `${progressSummary.quizScorePercentage}%`
+                  : "—"}
+              </h3>
             </div>
             <div />
             <div className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-paper z-10" />
@@ -260,7 +308,9 @@ export default function DashboardPage() {
               WATCHED THIS WEEK
             </span>
             <div className="my-auto py-1">
-              <h3 className="text-xl sm:text-3xl md:text-4xl font-display font-bold leading-tight">0m</h3>
+              <h3 className="text-xl sm:text-3xl md:text-4xl font-display font-bold leading-tight">
+                {formatWatchedDuration(progressSummary?.watchedMinutesThisWeek ?? 0)}
+              </h3>
             </div>
             <div />
           </div>
@@ -293,16 +343,24 @@ export default function DashboardPage() {
                   <div className="relative aspect-video rounded-xl overflow-hidden bg-black">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={c.thumbnailUrl || "https://i.ytimg.com/vi/ygXn5nV5qFc/maxresdefault.jpg"}
+                      src={getCleanThumbnailUrl(c.thumbnailUrl, c.slug, c.youtubeId)}
                       alt={c.title}
                       onError={(e: any) => {
-                        e.currentTarget.src = "https://i.ytimg.com/vi/ygXn5nV5qFc/hqdefault.jpg";
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = getCleanThumbnailUrl(null, c.slug, c.youtubeId);
                       }}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/85 text-white text-[0.65rem] font-semibold flex items-center gap-1.5 backdrop-blur-xs">
                       <span className="w-1.5 h-1.5 rounded-full bg-[#f97316] animate-pulse" />
-                      <span>{c.progressPercentage && c.progressPercentage > 0 ? "In progress" : "Start now"}</span>
+                      <span>
+                        {c.progressPercentage >= 100
+                          ? "Completed"
+                          : (c.progressPercentage && c.progressPercentage > 0) ||
+                              (c.completedLessonsCount && c.completedLessonsCount > 0)
+                            ? "In progress"
+                            : "Start now"}
+                      </span>
                     </div>
                   </div>
 
@@ -311,7 +369,7 @@ export default function DashboardPage() {
                       {c.title}
                     </h3>
                     <p className="text-[0.68rem] font-bold text-ink-soft tracking-wider uppercase font-mono">
-                      {c.lessonCount ? `0 OF ${c.lessonCount} LESSONS` : "13 LESSONS"} · {c.duration || "90 MIN"}
+                      {c.lessonCount ? `${c.completedLessonsCount ?? 0} OF ${c.lessonCount} LESSONS` : "0 LESSONS"} · {c.duration || "0m"}
                     </p>
                     <div className="pt-1 flex items-center justify-between text-xs text-ink-soft border-t border-line dark:border-white/5">
                       <span className="truncate max-w-[200px]">{c.creator || "Instructor"}</span>

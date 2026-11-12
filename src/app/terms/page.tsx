@@ -30,7 +30,7 @@ export default function TermsPage() {
             monthly or yearly cycle until canceled via Settings.
           </p>
 
-          <h2 className="text-xl font-display font-semibold text-[#0f1611] pt-4">3. Fair Usage</h2>
+          <h2 className="text-xl font-display font-semibold text-ink pt-4">3. Fair Usage</h2>
           <p>
             Our AI pipelines transform transcripts into structured lessons and quizzes. Video quotas depend on your
             plan tier. We reserve the right to throttle abusive automated scraping.

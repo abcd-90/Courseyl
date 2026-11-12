@@ -19,16 +19,19 @@ model User {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  profile            Profile?
-  subscription       Subscription?
-  coursesCreated     Course[]            @relation("CourseCreator")
-  enrollments        Enrollment[]
-  studyNotes         StudyNote[]
-  quizAttempts       QuizAttempt[]
-  dailyPlans         DailyPlan[]
-  roadmapsCreated    Roadmap[]           @relation("RoadmapCreator")
-  roadmapEnrollments RoadmapEnrollment[]
-  generationJobs     GenerationJob[]
+  profile             Profile?
+  subscription        Subscription?
+  coursesCreated      Course[]              @relation("CourseCreator")
+  enrollments         Enrollment[]
+  studyNotes          StudyNote[]
+  quizAttempts        QuizAttempt[]
+  quizAnswers         QuizAnswer[]
+  watchProgress       LessonWatchProgress[]
+  dailyPlans          DailyPlan[]
+  roadmapsCreated     Roadmap[]             @relation("RoadmapCreator")
+  roadmapEnrollments  RoadmapEnrollment[]
+  generationJobs      GenerationJob[]
+  notifications       Notification[]
 
   @@index([authProvider, oauthProviderId])
 }
@@ -39,7 +42,9 @@ model Profile {
   displayName        String
   bio                String?
   avatarUrl          String?
-  dailyStudyMinutes  Int       @default(60) // 30, 60, 90, 120
+  dailyStudyMinutes  Int       @default(60) // 30, 60, 90, 120, or custom (5..480)
+  emailReminders     Boolean   @default(true)
+  weeklyDigest       Boolean   @default(false)
   currentStreakDays  Int       @default(0)
   lastStudyDate      DateTime?
   createdAt          DateTime  @default(now())
@@ -130,10 +135,11 @@ model Lesson {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  chapter        Chapter          @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  chapter        Chapter               @relation(fields: [chapterId], references: [id], onDelete: Cascade)
   quizQuestions  QuizQuestion[]
   studyNotes     StudyNote[]
   lessonProgress LessonProgress[]
+  watchProgress  LessonWatchProgress[]
 }
 
 model QuizQuestion {
@@ -148,6 +154,7 @@ model QuizQuestion {
 
   lesson  Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   options QuizOption[]
+  answers QuizAnswer[]
 }
 
 model QuizOption {
@@ -327,6 +334,12 @@ model GenerationJob {
   progressPercentage Int       @default(0)
   currentStep        String    @default("Initializing")
   errorLog           String?
+  checkpointStep     Int       @default(0) // 0: queued, 1: transcript, 2: curriculum, 3: quizzes, 4: finalized
+  checkpointData     String?
+  difficulty         String    @default("BEGINNER")
+  manualTranscript   String?
+  lockedUntil        DateTime?
+  quotaCharged       Boolean   @default(false)
   startedAt          DateTime  @default(now())
   completedAt        DateTime?
 
@@ -358,4 +371,55 @@ model AuthVerificationToken {
 
   @@index([email, purpose])
   @@index([pollHash])
+}
+
+model QuizAnswer {
+  id                  String   @id @default(cuid())
+  userId              String
+  questionId          String
+  selectedOptionIndex Int
+  isCorrect           Boolean
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId])
+  @@index([userId])
+  @@index([questionId])
+}
+
+model LessonWatchProgress {
+  id             String   @id @default(cuid())
+  userId         String
+  lessonId       String
+  watchedSeconds Int      @default(0)
+  watched        Boolean  @default(false)
+  lastSecond     Int      @default(0)
+  watchedRanges  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@index([lessonId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String   @default("SYSTEM") // SYSTEM | COURSE | QUIZ | ROADMAP
+  isRead    Boolean  @default(false)
+  linkUrl   String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
 }

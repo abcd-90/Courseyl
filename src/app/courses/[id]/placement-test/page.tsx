@@ -4,6 +4,7 @@ import React, { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/AppSidebar";
+import { clampDailyStudyMinutes, estimatePacedDays } from "@/lib/pacing";
 
 const cleanDisplay = (str: string) => {
   if (!str) return "";
@@ -36,6 +37,7 @@ export default function PlacementTestPage({ params }: { params: Promise<{ id: st
   const router = useRouter();
 
   const [testData, setTestData] = useState<any>(null);
+  const [dailyStudyMinutes, setDailyStudyMinutes] = useState<number>(60);
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -54,13 +56,35 @@ export default function PlacementTestPage({ params }: { params: Promise<{ id: st
         if (data.questions) {
           setTestData(data);
         }
+        if (typeof data.dailyStudyMinutes === "number") {
+          setDailyStudyMinutes(clampDailyStudyMinutes(data.dailyStudyMinutes, 60));
+        }
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
     fetchQuestions();
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.user?.profile?.dailyStudyMinutes) {
+          setDailyStudyMinutes(
+            clampDailyStudyMinutes(data.user.profile.dailyStudyMinutes, 60)
+          );
+        }
+      })
+      .catch(() => {});
+
+    const handleUserUpdated = (e: any) => {
+      const mins = e?.detail?.profile?.dailyStudyMinutes;
+      if (mins) {
+        setDailyStudyMinutes(clampDailyStudyMinutes(mins, 60));
+      }
+    };
+    window.addEventListener("user-updated", handleUserUpdated);
+    return () => window.removeEventListener("user-updated", handleUserUpdated);
   }, [courseSlug]);
 
   const questions = testData?.questions || [];
@@ -71,29 +95,46 @@ export default function PlacementTestPage({ params }: { params: Promise<{ id: st
     setAnswers((prev) => ({ ...prev, [currentQ.id]: optIndex }));
   };
 
+  const submitEvaluation = async (answersPayload: Record<string, number>) => {
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/courses/${courseSlug}/placement-test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answers: answersPayload }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (typeof data.dailyStudyMinutes === "number") {
+          setDailyStudyMinutes(clampDailyStudyMinutes(data.dailyStudyMinutes, 60));
+        }
+        setResult(data);
+      } else {
+        alert(data.error || "Failed to submit assessment.");
+      }
+    } catch {
+      alert("Error evaluating placement test.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleNextOrSubmit = async () => {
     if (currentQIndex < questions.length - 1) {
       setCurrentQIndex((prev) => prev + 1);
     } else {
-      // Final question -> submit to evaluate
-      setSubmitting(true);
-      try {
-        const res = await fetch(`/api/courses/${courseSlug}/placement-test`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ answers }),
-        });
-        const data = await res.json();
-        if (res.ok) {
-          setResult(data);
-        } else {
-          alert(data.error || "Failed to submit assessment.");
-        }
-      } catch {
-        alert("Error evaluating placement test.");
-      } finally {
-        setSubmitting(false);
-      }
+      await submitEvaluation(answers);
+    }
+  };
+
+  const handleSkipQuestion = async () => {
+    if (!currentQ || submitting) return;
+    const nextAnswers = { ...answers, [currentQ.id]: -1 };
+    setAnswers(nextAnswers);
+    if (currentQIndex < questions.length - 1) {
+      setCurrentQIndex((prev) => prev + 1);
+    } else {
+      await submitEvaluation(nextAnswers);
     }
   };
 
@@ -135,7 +176,7 @@ export default function PlacementTestPage({ params }: { params: Promise<{ id: st
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isSkipped: newIsSkipped }),
       });
-    } catch {} finally {
+    } catch { } finally {
       setTogglingMap((prev) => ({ ...prev, [lessonId]: false }));
     }
   };
@@ -160,7 +201,9 @@ export default function PlacementTestPage({ params }: { params: Promise<{ id: st
     const activeDurationSeconds = Math.max(0, totalDurationSeconds - skippedDurationSeconds);
     const activeLessons = result.lessons?.filter((l: any) => !l.isSkipped) || [];
     const skippedLessons = result.lessons?.filter((l: any) => l.isSkipped) || [];
-    const estimatedDays = Math.ceil(activeDurationSeconds / (90 * 60)) || 1;
+    const displayDurationSeconds =
+      activePlanView === "my" ? activeDurationSeconds : totalDurationSeconds;
+    const estimatedDays = estimatePacedDays(displayDurationSeconds, dailyStudyMinutes);
     const firstActiveLessonId = result.firstActiveLessonId || activeLessons[0]?.id || result.lessons?.[0]?.id;
 
     return (
@@ -234,25 +277,23 @@ export default function PlacementTestPage({ params }: { params: Promise<{ id: st
               {/* Course Duration & Action Card */}
               <div className="bg-surface dark:bg-[#121815] rounded-3xl border border-line dark:border-white/10 p-6 sm:p-7 shadow-xs space-y-5">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-ink-soft font-medium">90 min a day</span>
+                  <span className="text-xs text-ink-soft font-medium">{dailyStudyMinutes} min a day</span>
                   <div className="flex items-center p-1 rounded-full bg-black/5 dark:bg-white/5 border border-line dark:border-white/10 text-xs">
                     <button
                       onClick={() => setActivePlanView("full")}
-                      className={`px-3 py-1 rounded-full font-semibold transition-colors cursor-pointer ${
-                        activePlanView === "full"
-                          ? "bg-white dark:bg-[#1f2a1d] text-ink shadow-xs"
-                          : "text-ink-soft hover:text-ink"
-                      }`}
+                      className={`px-3 py-1 rounded-full font-semibold transition-colors cursor-pointer ${activePlanView === "full"
+                        ? "bg-white dark:bg-[#1f2a1d] text-ink shadow-xs"
+                        : "text-ink-soft hover:text-ink"
+                        }`}
                     >
                       Full course
                     </button>
                     <button
                       onClick={() => setActivePlanView("my")}
-                      className={`px-3 py-1 rounded-full font-semibold transition-colors cursor-pointer ${
-                        activePlanView === "my"
-                          ? "bg-[#4b5e1e] dark:bg-[#b8c460] text-white dark:text-[#0f1611] shadow-xs"
-                          : "text-ink-soft hover:text-ink"
-                      }`}
+                      className={`px-3 py-1 rounded-full font-semibold transition-colors cursor-pointer ${activePlanView === "my"
+                        ? "bg-[#4b5e1e] dark:bg-[#b8c460] text-white dark:text-[#0f1611] shadow-xs"
+                        : "text-ink-soft hover:text-ink"
+                        }`}
                     >
                       My course
                     </button>
@@ -408,8 +449,8 @@ export default function PlacementTestPage({ params }: { params: Promise<{ id: st
   const currentOptions = Array.isArray(currentQ?.options)
     ? currentQ.options
     : typeof currentQ?.options === "string"
-    ? JSON.parse(currentQ.options)
-    : [];
+      ? JSON.parse(currentQ.options)
+      : [];
 
   const selectedAnswer = answers[currentQ?.id];
   const optionLetters = ["A", "B", "C", "D"];
@@ -465,18 +506,16 @@ export default function PlacementTestPage({ params }: { params: Promise<{ id: st
                   key={optIndex}
                   type="button"
                   onClick={() => handleSelectOption(optIndex)}
-                  className={`w-full p-4 rounded-2xl border text-left text-sm transition-all flex items-center gap-4 cursor-pointer ${
-                    isSelected
-                      ? "border-[#4b5e1e] dark:border-[#b8c460] bg-[#eef3e5] dark:bg-[#1a2516] shadow-xs"
-                      : "border-line dark:border-white/10 bg-surface dark:bg-[#121815] text-ink hover:bg-black/5 dark:hover:bg-white/5"
-                  }`}
+                  className={`w-full p-4 rounded-2xl border text-left text-sm transition-all flex items-center gap-4 cursor-pointer ${isSelected
+                    ? "border-[#4b5e1e] dark:border-[#b8c460] bg-[#eef3e5] dark:bg-[#1a2516] shadow-xs"
+                    : "border-line dark:border-white/10 bg-surface dark:bg-[#121815] text-ink hover:bg-black/5 dark:hover:bg-white/5"
+                    }`}
                 >
                   <span
-                    className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shrink-0 transition-colors ${
-                      isSelected
-                        ? "bg-[#4b5e1e] dark:bg-[#b8c460] text-white dark:text-[#0f1611]"
-                        : "bg-black/5 dark:bg-white/10 text-ink-soft"
-                    }`}
+                    className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shrink-0 transition-colors ${isSelected
+                      ? "bg-[#4b5e1e] dark:bg-[#b8c460] text-white dark:text-[#0f1611]"
+                      : "bg-black/5 dark:bg-white/10 text-ink-soft"
+                      }`}
                   >
                     {letter}
                   </span>
@@ -489,18 +528,16 @@ export default function PlacementTestPage({ params }: { params: Promise<{ id: st
             <button
               type="button"
               onClick={() => handleSelectOption(-1)}
-              className={`w-full p-4 rounded-2xl border text-left text-sm transition-all flex items-center gap-4 cursor-pointer ${
-                selectedAnswer === -1
-                  ? "border-[#4b5e1e] dark:border-[#b8c460] bg-[#eef3e5] dark:bg-[#1a2516] shadow-xs"
-                  : "border-line dark:border-white/10 bg-surface dark:bg-[#121815] text-ink hover:bg-black/5 dark:hover:bg-white/5"
-              }`}
+              className={`w-full p-4 rounded-2xl border text-left text-sm transition-all flex items-center gap-4 cursor-pointer ${selectedAnswer === -1
+                ? "border-[#4b5e1e] dark:border-[#b8c460] bg-[#eef3e5] dark:bg-[#1a2516] shadow-xs"
+                : "border-line dark:border-white/10 bg-surface dark:bg-[#121815] text-ink hover:bg-black/5 dark:hover:bg-white/5"
+                }`}
             >
               <span
-                className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shrink-0 transition-colors ${
-                  selectedAnswer === -1
-                    ? "bg-[#4b5e1e] dark:bg-[#b8c460] text-white dark:text-[#0f1611]"
-                    : "bg-[#e4e9c6] text-[#4b5e1e] dark:bg-[#283117] dark:text-[#b8c460]"
-                }`}
+                className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shrink-0 transition-colors ${selectedAnswer === -1
+                  ? "bg-[#4b5e1e] dark:bg-[#b8c460] text-white dark:text-[#0f1611]"
+                  : "bg-[#e4e9c6] text-[#4b5e1e] dark:bg-[#283117] dark:text-[#b8c460]"
+                  }`}
               >
                 ?
               </span>
@@ -513,7 +550,7 @@ export default function PlacementTestPage({ params }: { params: Promise<{ id: st
             No score to beat, and no going back. &ldquo;Skip this question&rdquo; keeps those lessons in your plan.
           </p>
 
-          <div className="pt-4">
+          <div className="pt-4 flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={handleNextOrSubmit}
@@ -523,8 +560,17 @@ export default function PlacementTestPage({ params }: { params: Promise<{ id: st
               {submitting
                 ? "Evaluating assessment..."
                 : currentQIndex < questions.length - 1
-                ? "Next question"
-                : "Complete assessment →"}
+                  ? "Next question"
+                  : "Complete assessment →"}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSkipQuestion}
+              disabled={submitting}
+              className="px-5 py-3 rounded-full border border-line dark:border-white/10 bg-surface dark:bg-[#121815] text-xs sm:text-sm font-semibold text-ink-soft hover:text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 cursor-pointer"
+            >
+              Skip this question →
             </button>
           </div>
         </div>

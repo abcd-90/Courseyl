@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { clampDailyStudyMinutes } from "@/lib/pacing";
+import { getFullSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -158,7 +160,7 @@ export async function GET(
         creatorName:
           course.creator?.profile?.displayName ||
           (course.creator?.email ? course.creator.email.split("@")[0] : "") ||
-          "Sheikhsami3082",
+          "Creator",
         source: course.source
           ? {
               channelTitle: course.source.channelTitle,
@@ -168,13 +170,17 @@ export async function GET(
         channelTitle:
           course.source?.channelTitle ||
           course.creator?.profile?.displayName ||
-          "CodeWithHarry",
+          "YouTube Creator",
         hasPlacementTest: course.placementQuestions.length > 0,
         chapters: formattedChapters,
       },
       userState: {
         isEnrolled: !!enrollment,
         enrollmentId: enrollment?.id,
+        isCreator: user ? course.creatorId === user.id || user.role === "ADMIN" : false,
+        canManageVisibility: user ? course.creatorId === user.id || user.role === "ADMIN" : false,
+        planTier: user?.subscription?.tier || "FREE",
+        dailyStudyMinutes: clampDailyStudyMinutes(user?.profile?.dailyStudyMinutes, 60),
         progressPercentage,
         completedLessons,
         skippedLessons,
@@ -182,6 +188,77 @@ export async function GET(
         hasCompletedPlacementTest: !!placementAttempt,
         placementScore: placementAttempt?.scorePercentage ?? null,
       },
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const body = await req.json();
+
+    const course = await prisma.course.findFirst({
+      where: {
+        OR: [{ id }, { slug: id }],
+      },
+    });
+
+    if (!course) {
+      return NextResponse.json({ error: "Course not found" }, { status: 404 });
+    }
+
+    if (course.creatorId !== user.id && user.role !== "ADMIN") {
+      return NextResponse.json(
+        { error: "Only the course owner can update visibility settings." },
+        { status: 403 }
+      );
+    }
+
+    const updateData: Record<string, any> = {};
+    if (typeof body?.isPublic === "boolean") {
+      if (body.isPublic === false) {
+        const tier = (user.subscription?.tier || "FREE").toUpperCase();
+        const siteSettings = await getFullSettings().catch(() => null);
+        const allowPrivate =
+          user.role === "ADMIN" ||
+          tier === "PRO" ||
+          tier === "MAX" ||
+          Boolean(siteSettings?.plans?.unlimitedFreeMode);
+        if (!allowPrivate) {
+          return NextResponse.json(
+            { error: "Upgrade to Pro or Max to keep courses private." },
+            { status: 403 }
+          );
+        }
+      }
+      updateData.isPublic = body.isPublic;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: "No valid fields to update." }, { status: 400 });
+    }
+
+    const updated = await prisma.course.update({
+      where: { id: course.id },
+      data: updateData,
+      select: { id: true, slug: true, isPublic: true },
+    });
+
+    return NextResponse.json({
+      success: true,
+      course: updated,
+      isPublic: updated.isPublic,
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Internal server error";

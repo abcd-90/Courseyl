@@ -5,6 +5,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/AppSidebar";
 import { getCleanThumbnailUrl } from "@/lib/thumbnail";
+import { InlineQuizPanel } from "@/components/InlineQuizPanel";
+import {
+  AutoplayCountdownOverlay,
+  AUTOPLAY_COUNTDOWN_SECONDS,
+  PLAYBACK_SPEEDS,
+  getStoredAutoplay,
+  setStoredAutoplay,
+  getStoredPlaybackSpeed,
+  setStoredPlaybackSpeed,
+} from "@/components/YouTubePlayer";
 
 export default function LessonLearnPage({
   params,
@@ -23,13 +33,28 @@ export default function LessonLearnPage({
   const [activeTab, setActiveTab] = useState<"my-notes" | "study-notes">("my-notes");
   const [notes, setNotes] = useState<any[]>([]);
   const [newNoteContent, setNewNoteContent] = useState("");
-  const [showQuizModal, setShowQuizModal] = useState(false);
-  const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({});
-  const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingNoteContent, setEditingNoteContent] = useState("");
+  const [savingNoteId, setSavingNoteId] = useState<string | null>(null);
+  const [noteActionError, setNoteActionError] = useState<string | null>(null);
+  const [initialQuizAnswers, setInitialQuizAnswers] = useState<Record<string, number>>({});
+  const [watched, setWatched] = useState(false);
+  const [watchedSeconds, setWatchedSeconds] = useState(0);
   const [completed, setCompleted] = useState(false);
   const [autoplayNext, setAutoplayNext] = useState(true);
+  const [autoplayCountdown, setAutoplayCountdown] = useState<number | null>(null);
   const [playbackSpeed, setPlaybackSpeed] = useState("1x");
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setAutoplayNext(getStoredAutoplay(true));
+    const savedSpeed = getStoredPlaybackSpeed();
+    setPlaybackSpeed(`${savedSpeed}x`);
+  }, []);
+
+  useEffect(() => {
+    setAutoplayCountdown(null);
+  }, [resolvedParams.lessonId]);
 
   // Player state
   const [isPlaying, setIsPlaying] = useState(false);
@@ -44,6 +69,10 @@ export default function LessonLearnPage({
   const playerRef = useRef<any>(null);
   const playerCardRef = useRef<HTMLDivElement>(null);
   const noteInputRef = useRef<HTMLTextAreaElement>(null);
+  const quizSectionRef = useRef<HTMLDivElement>(null);
+  const pendingWatchSecondsRef = useRef<Set<number>>(new Set());
+  const recordedWatchSecondsRef = useRef<Set<number>>(new Set());
+  const lastRelativeSecondRef = useRef<number>(0);
 
   const courseSlug = lesson?.courseSlug || course?.slug || resolvedParams.id;
   const courseTitle = course?.title || lesson?.courseTitle || "Course Lesson";
@@ -65,9 +94,15 @@ export default function LessonLearnPage({
     setLessonCurrentTime(0);
     setCurrentTime(0);
     setIsPlaying(false);
-    setQuizAnswers({});
-    setQuizSubmitted(false);
-    setShowQuizModal(false);
+    setInitialQuizAnswers({});
+    setWatched(false);
+    setWatchedSeconds(0);
+    setEditingNoteId(null);
+    setEditingNoteContent("");
+    setNoteActionError(null);
+    pendingWatchSecondsRef.current.clear();
+    recordedWatchSecondsRef.current.clear();
+    lastRelativeSecondRef.current = 0;
 
     // Enroll automatically
     fetch(`/api/courses/${resolvedParams.id}/enroll`, { method: "POST" }).catch(() => {});
@@ -86,7 +121,10 @@ export default function LessonLearnPage({
           });
           setNavigation(data.navigation || null);
           setQuizQuestions(data.quizQuestions || []);
+          setInitialQuizAnswers(data.initialAnswers || {});
           setCompleted(data.progress?.isCompleted || false);
+          setWatched(Boolean(data.progress?.watched));
+          setWatchedSeconds(Number(data.progress?.watchedSeconds || 0));
 
           try {
             const stored = localStorage.getItem("courseit_recent_courses");
@@ -137,7 +175,7 @@ export default function LessonLearnPage({
       .catch(() => {});
   }, [resolvedParams.id, resolvedParams.lessonId]);
 
-  // Handle lesson completion & advance
+  // Handle lesson completion & start autoplay countdown
   const handleLessonCompletedAndNext = useCallback(() => {
     if (!completed) {
       setCompleted(true);
@@ -148,9 +186,26 @@ export default function LessonLearnPage({
       }).catch(() => {});
     }
     if (autoplayNext && nextLesson) {
-      router.push(`/courses/${courseSlug}/learn/${nextLesson.id}`);
+      setAutoplayCountdown((prev) => (prev === null ? AUTOPLAY_COUNTDOWN_SECONDS : prev));
     }
-  }, [completed, autoplayNext, nextLesson, resolvedParams.lessonId, router, courseSlug]);
+  }, [completed, autoplayNext, nextLesson, resolvedParams.lessonId]);
+
+  useEffect(() => {
+    if (autoplayCountdown === null) return;
+    if (!nextLesson) {
+      setAutoplayCountdown(null);
+      return;
+    }
+    if (autoplayCountdown <= 0) {
+      setAutoplayCountdown(null);
+      router.push(`/courses/${courseSlug}/learn/${nextLesson.id}`);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setAutoplayCountdown((prev) => (prev !== null ? prev - 1 : null));
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [autoplayCountdown, nextLesson, router, courseSlug]);
 
   // Robust Player Commander (calls YT API or postMessage fallback)
   const sendPlayerCommand = useCallback((func: string, args: any[] = []) => {
@@ -173,6 +228,99 @@ export default function LessonLearnPage({
       } catch {}
     }
   }, []);
+
+  const isPlayingRef = useRef(false);
+
+  const flushWatchTelemetry = useCallback(
+    async (useKeepalive = false) => {
+      const lessonId = resolvedParams.lessonId;
+      if (!lessonId || pendingWatchSecondsRef.current.size === 0) return;
+
+      const pending = Array.from(pendingWatchSecondsRef.current).sort((a, b) => a - b);
+      pendingWatchSecondsRef.current.clear();
+
+      try {
+        const res = await fetch("/api/watch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lessonId,
+            seconds: pending,
+            lastSecond: lastRelativeSecondRef.current,
+          }),
+          keepalive: useKeepalive,
+        });
+
+        if (!useKeepalive && res.ok) {
+          const data = await res.json();
+          if (typeof data.watchedSeconds === "number") {
+            setWatchedSeconds(data.watchedSeconds);
+          }
+          if (typeof data.watched === "boolean") {
+            setWatched(data.watched);
+          }
+        }
+      } catch {
+        if (!useKeepalive) {
+          for (const sec of pending) {
+            pendingWatchSecondsRef.current.add(sec);
+          }
+        }
+      }
+    },
+    [resolvedParams.lessonId]
+  );
+
+  const recordWatchedSecond = useCallback(
+    (relativeSec: number) => {
+      if (!resolvedParams.lessonId || !Number.isFinite(relativeSec)) return;
+      const maxSec = Math.max(1, Math.floor(duration || 60));
+      const clamped = Math.max(0, Math.min(Math.floor(relativeSec), maxSec));
+      lastRelativeSecondRef.current = clamped;
+      if (!recordedWatchSecondsRef.current.has(clamped)) {
+        recordedWatchSecondsRef.current.add(clamped);
+        pendingWatchSecondsRef.current.add(clamped);
+      }
+    },
+    [resolvedParams.lessonId, duration]
+  );
+
+  const flushWatchTelemetryRef = useRef(flushWatchTelemetry);
+  const recordWatchedSecondRef = useRef(recordWatchedSecond);
+  useEffect(() => {
+    flushWatchTelemetryRef.current = flushWatchTelemetry;
+  }, [flushWatchTelemetry]);
+  useEffect(() => {
+    recordWatchedSecondRef.current = recordWatchedSecond;
+  }, [recordWatchedSecond]);
+
+  useEffect(() => {
+    if (!resolvedParams.lessonId) return;
+
+    const flushTimer = setInterval(() => {
+      void flushWatchTelemetry(false);
+    }, 15000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        void flushWatchTelemetry(true);
+      }
+    };
+
+    const handlePageHide = () => {
+      void flushWatchTelemetry(true);
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageHide);
+
+    return () => {
+      clearInterval(flushTimer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageHide);
+      void flushWatchTelemetry(true);
+    };
+  }, [resolvedParams.lessonId, flushWatchTelemetry]);
 
   // 2. YouTube IFrame API Initialization
   useEffect(() => {
@@ -206,11 +354,16 @@ export default function LessonLearnPage({
             },
             onStateChange: (event: any) => {
               if (event.data === 1) {
+                isPlayingRef.current = true;
                 setIsPlaying(true);
               } else if (event.data === 2) {
+                isPlayingRef.current = false;
                 setIsPlaying(false);
+                void flushWatchTelemetryRef.current(false);
               } else if (event.data === 0) {
+                isPlayingRef.current = false;
                 setIsPlaying(false);
+                void flushWatchTelemetryRef.current(false);
                 handleLessonCompletedAndNext();
               }
             },
@@ -231,21 +384,37 @@ export default function LessonLearnPage({
         if (typeof e.data === "string") {
           const parsed = JSON.parse(e.data);
           if (parsed.event === "onStateChange") {
-            if (parsed.info === 1) setIsPlaying(true);
-            else if (parsed.info === 2) setIsPlaying(false);
-            else if (parsed.info === 0) {
+            if (parsed.info === 1) {
+              isPlayingRef.current = true;
+              setIsPlaying(true);
+            } else if (parsed.info === 2) {
+              isPlayingRef.current = false;
               setIsPlaying(false);
+              void flushWatchTelemetryRef.current(false);
+            } else if (parsed.info === 0) {
+              isPlayingRef.current = false;
+              setIsPlaying(false);
+              void flushWatchTelemetryRef.current(false);
               handleLessonCompletedAndNext();
             }
           }
           if (parsed.event === "infoDelivery" && parsed.info) {
+            if (typeof parsed.info.playerState === "number") {
+              const playingNow = parsed.info.playerState === 1;
+              isPlayingRef.current = playingNow;
+              setIsPlaying(playingNow);
+              if (parsed.info.playerState === 2 || parsed.info.playerState === 0) {
+                void flushWatchTelemetryRef.current(false);
+              }
+            }
             if (typeof parsed.info.currentTime === "number") {
               const raw = parsed.info.currentTime;
+              const rel = Math.max(0, raw - startSec);
               setCurrentTime(raw);
-              setLessonCurrentTime(Math.max(0, raw - startSec));
-            }
-            if (typeof parsed.info.playerState === "number") {
-              setIsPlaying(parsed.info.playerState === 1);
+              setLessonCurrentTime(rel);
+              if (isPlayingRef.current || parsed.info.playerState === 1) {
+                recordWatchedSecondRef.current(rel);
+              }
             }
           }
         }
@@ -274,10 +443,13 @@ export default function LessonLearnPage({
               setCurrentTime(raw);
               const elapsed = Math.max(0, raw - startSec);
               setLessonCurrentTime(elapsed);
+              recordWatchedSecondRef.current(elapsed);
 
               if (endSec && raw >= endSec) {
                 sendPlayerCommand("pauseVideo");
+                isPlayingRef.current = false;
                 setIsPlaying(false);
+                void flushWatchTelemetryRef.current(false);
                 handleLessonCompletedAndNext();
               }
             }
@@ -303,9 +475,12 @@ export default function LessonLearnPage({
   const togglePlay = () => {
     if (isPlaying) {
       sendPlayerCommand("pauseVideo");
+      isPlayingRef.current = false;
       setIsPlaying(false);
+      void flushWatchTelemetryRef.current(false);
     } else {
       sendPlayerCommand("playVideo");
+      isPlayingRef.current = true;
       setIsPlaying(true);
     }
   };
@@ -342,11 +517,12 @@ export default function LessonLearnPage({
   };
 
   const handleToggleSpeed = () => {
-    const speeds = [0.75, 1, 1.25, 1.5, 1.75, 2];
+    const speeds: readonly number[] = PLAYBACK_SPEEDS;
     const currentNum = parseFloat(playbackSpeed) || 1;
     const currentIdx = speeds.indexOf(currentNum);
     const nextSpeed = speeds[(currentIdx + 1) % speeds.length];
     setPlaybackSpeed(`${nextSpeed}x`);
+    setStoredPlaybackSpeed(nextSpeed);
     sendPlayerCommand("setPlaybackRate", [nextSpeed]);
   };
 
@@ -393,11 +569,24 @@ export default function LessonLearnPage({
     }
   };
 
-  const seekToTimestamp = (seconds: number) => {
-    const target = startSec + seconds;
+  const seekToTimestamp = (seconds: number, autoPlay = true) => {
+    const clampedRel = Math.max(0, seconds);
+    const target = startSec + clampedRel;
     sendPlayerCommand("seekTo", [target, true]);
+    if (autoPlay) {
+      sendPlayerCommand("playVideo");
+      isPlayingRef.current = true;
+      setIsPlaying(true);
+    }
     setCurrentTime(target);
-    setLessonCurrentTime(Math.max(0, target - startSec));
+    setLessonCurrentTime(clampedRel);
+  };
+
+  const handleReplayQuizMoment = (relativeSeconds: number, absoluteSeconds: number) => {
+    const targetRel =
+      absoluteSeconds >= startSec ? Math.max(0, absoluteSeconds - startSec) : Math.max(0, relativeSeconds);
+    seekToTimestamp(targetRel, true);
+    playerCardRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
 
   const handleMarkComplete = async () => {
@@ -412,36 +601,109 @@ export default function LessonLearnPage({
     } catch {}
   };
 
-  const handleAddNote = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newNoteContent.trim()) return;
+  const submitNewNote = async () => {
+    const trimmed = newNoteContent.trim();
+    if (!trimmed) return;
 
     const noteSec = Math.floor(lessonCurrentTime);
+    setNoteActionError(null);
+    setSavingNoteId("new");
+
     try {
       const res = await fetch(`/api/lessons/${resolvedParams.lessonId}/notes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          content: newNoteContent.trim(),
+          content: trimmed,
           timestampSeconds: noteSec,
         }),
       });
-      const data = await res.json();
-      if (res.ok && data.note) {
-        setNotes([data.note, ...notes]);
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.note) {
+        setNotes((prev) => [data.note, ...prev]);
         setNewNoteContent("");
+      } else {
+        setNoteActionError(data?.error || "Could not save note. Please sign in and try again.");
       }
     } catch {
-      setNotes([
-        {
-          id: "note_" + Date.now(),
-          content: newNoteContent.trim(),
-          timestampSeconds: noteSec,
-          createdAt: new Date().toISOString(),
-        },
-        ...notes,
-      ]);
-      setNewNoteContent("");
+      setNoteActionError("Network error while saving note.");
+    } finally {
+      setSavingNoteId(null);
+    }
+  };
+
+  const handleAddNote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await submitNewNote();
+  };
+
+  const handleStartEditNote = (note: any) => {
+    setEditingNoteId(note.id);
+    setEditingNoteContent(note.content || "");
+    setNoteActionError(null);
+  };
+
+  const handleCancelEditNote = () => {
+    setEditingNoteId(null);
+    setEditingNoteContent("");
+    setNoteActionError(null);
+  };
+
+  const handleSaveEditNote = async (noteId: string) => {
+    const trimmed = editingNoteContent.trim();
+    if (!trimmed) {
+      setNoteActionError("Note content cannot be empty.");
+      return;
+    }
+
+    setSavingNoteId(noteId);
+    setNoteActionError(null);
+
+    try {
+      const res = await fetch(`/api/lessons/${resolvedParams.lessonId}/notes/${noteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: trimmed }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.note) {
+        setNotes((prev) =>
+          prev.map((n) => (n.id === noteId ? { ...n, ...data.note } : n))
+        );
+        setEditingNoteId(null);
+        setEditingNoteContent("");
+      } else {
+        setNoteActionError(data?.error || "Could not update note.");
+      }
+    } catch {
+      setNoteActionError("Network error while updating note.");
+    } finally {
+      setSavingNoteId(null);
+    }
+  };
+
+  const handleDeleteNote = async (noteId: string) => {
+    setSavingNoteId(noteId);
+    setNoteActionError(null);
+
+    try {
+      const res = await fetch(`/api/lessons/${resolvedParams.lessonId}/notes/${noteId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok) {
+        setNotes((prev) => prev.filter((n) => n.id !== noteId));
+        if (editingNoteId === noteId) {
+          setEditingNoteId(null);
+          setEditingNoteContent("");
+        }
+      } else {
+        setNoteActionError(data?.error || "Could not delete note.");
+      }
+    } catch {
+      setNoteActionError("Network error while deleting note.");
+    } finally {
+      setSavingNoteId(null);
     }
   };
 
@@ -554,8 +816,21 @@ export default function LessonLearnPage({
                   allowFullScreen
                 />
 
+                {/* End-screen 7-second Autoplay Countdown Overlay */}
+                {autoplayCountdown !== null && nextLesson && (
+                  <AutoplayCountdownOverlay
+                    secondsLeft={autoplayCountdown}
+                    nextLessonTitle={nextLesson.title}
+                    onPlayNow={() => {
+                      setAutoplayCountdown(null);
+                      router.push(`/courses/${courseSlug}/learn/${nextLesson.id}`);
+                    }}
+                    onCancel={() => setAutoplayCountdown(null)}
+                  />
+                )}
+
                 {/* Center Play Button Overlay when paused */}
-                {!isPlaying && (
+                {!isPlaying && autoplayCountdown === null && (
                   <div
                     onClick={togglePlay}
                     className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[1px] transition-all cursor-pointer z-10"
@@ -716,7 +991,15 @@ export default function LessonLearnPage({
               <span>Autoplay next lesson</span>
               <button
                 type="button"
-                onClick={() => setAutoplayNext(!autoplayNext)}
+                role="switch"
+                aria-checked={autoplayNext}
+                aria-label="Autoplay next lesson"
+                onClick={() => {
+                  const next = !autoplayNext;
+                  setAutoplayNext(next);
+                  setStoredAutoplay(next);
+                  if (!next) setAutoplayCountdown(null);
+                }}
                 className={`w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${
                   autoplayNext ? "bg-[#b8c460]" : "bg-black/20 dark:bg-white/20"
                 }`}
@@ -835,22 +1118,41 @@ export default function LessonLearnPage({
                       ref={noteInputRef}
                       value={newNoteContent}
                       onChange={(e) => setNewNoteContent(e.target.value)}
+                      onKeyDown={(e) => {
+                        if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                          e.preventDefault();
+                          void submitNewNote();
+                        }
+                      }}
                       placeholder="What clicked at this moment? The time is taken when you start typing."
                       rows={3}
                       className="w-full bg-transparent text-sm text-ink dark:text-white placeholder-ink-soft/60 outline-none resize-none"
                     />
 
                     <div className="pt-2 border-t border-line dark:border-white/5 flex items-center justify-between text-xs text-ink-soft">
-                      <span className="text-[0.7rem]">Enter note to pin</span>
+                      <span className="text-[0.7rem]">Press Ctrl/⌘ + Enter to pin</span>
                       <button
                         type="submit"
-                        disabled={!newNoteContent.trim()}
+                        disabled={!newNoteContent.trim() || savingNoteId === "new"}
                         className="px-4 py-1.5 rounded-full bg-[#2a371c] dark:bg-[#1f2b15] text-[#b8c460] hover:bg-[#3b4e28] text-xs font-semibold transition-colors disabled:opacity-40 cursor-pointer"
                       >
-                        Add note
+                        {savingNoteId === "new" ? "Saving..." : "Add note"}
                       </button>
                     </div>
                   </form>
+
+                  {noteActionError && (
+                    <div className="px-3.5 py-2.5 rounded-2xl bg-[#3e1e1b]/15 dark:bg-[#3e1e1b]/60 border border-[#6b2a24]/30 text-xs text-red-700 dark:text-[#f2a79e] flex items-center justify-between gap-2">
+                      <span>{noteActionError}</span>
+                      <button
+                        type="button"
+                        onClick={() => setNoteActionError(null)}
+                        className="text-[0.7rem] underline shrink-0 cursor-pointer"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  )}
 
                   {/* Notes Feed or Empty State */}
                   {notes.length === 0 ? (
@@ -859,51 +1161,218 @@ export default function LessonLearnPage({
                     </p>
                   ) : (
                     <div className="space-y-3 pt-2">
-                      {notes.map((n) => (
-                        <div
-                          key={n.id}
-                          className="p-3.5 rounded-2xl bg-surface dark:bg-[#0d140f] border border-line dark:border-white/10 flex items-start gap-3 text-ink"
-                        >
-                          <button
-                            onClick={() => seekToTimestamp(n.timestampSeconds)}
-                            className="px-2 py-0.5 rounded-md bg-lime-soft dark:bg-[#1c2717] text-moss dark:text-[#b8c460] font-mono text-xs font-semibold shrink-0 cursor-pointer"
+                      {notes.map((n) => {
+                        const isEditing = editingNoteId === n.id;
+                        const isBusy = savingNoteId === n.id;
+                        return (
+                          <div
+                            key={n.id}
+                            className="p-3.5 rounded-2xl bg-surface dark:bg-[#0d140f] border border-line dark:border-white/10 flex items-start gap-3 text-ink group"
                           >
-                            {formatTime(n.timestampSeconds || 0)}
-                          </button>
-                          <p className="text-xs sm:text-sm text-ink leading-relaxed">{n.content}</p>
-                        </div>
-                      ))}
+                            <button
+                              type="button"
+                              onClick={() => seekToTimestamp(n.timestampSeconds || 0)}
+                              className="px-2 py-0.5 rounded-md bg-lime-soft dark:bg-[#1c2717] text-moss dark:text-[#b8c460] font-mono text-xs font-semibold shrink-0 cursor-pointer mt-0.5"
+                            >
+                              {formatTime(n.timestampSeconds || 0)}
+                            </button>
+
+                            {isEditing ? (
+                              <div className="flex-1 space-y-2.5">
+                                <textarea
+                                  value={editingNoteContent}
+                                  onChange={(e) => setEditingNoteContent(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                                      e.preventDefault();
+                                      void handleSaveEditNote(n.id);
+                                    } else if (e.key === "Escape") {
+                                      e.preventDefault();
+                                      handleCancelEditNote();
+                                    }
+                                  }}
+                                  rows={2}
+                                  autoFocus
+                                  className="w-full p-2.5 rounded-xl bg-paper dark:bg-[#131b15] border border-line dark:border-white/15 text-xs sm:text-sm text-ink outline-none focus:border-moss resize-none"
+                                />
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[0.68rem] text-ink-soft">
+                                    Ctrl/⌘ + Enter to save · Esc to cancel
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={handleCancelEditNote}
+                                      disabled={isBusy}
+                                      className="px-3 py-1 rounded-full border border-line dark:border-white/15 text-xs text-ink-soft hover:text-ink transition-colors cursor-pointer disabled:opacity-50"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleSaveEditNote(n.id)}
+                                      disabled={!editingNoteContent.trim() || isBusy}
+                                      className="px-3.5 py-1 rounded-full bg-[#2a371c] dark:bg-[#1f2b15] text-[#b8c460] hover:bg-[#3b4e28] text-xs font-semibold transition-colors cursor-pointer disabled:opacity-40"
+                                    >
+                                      {isBusy ? "Saving..." : "Save"}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <p className="flex-1 text-xs sm:text-sm text-ink leading-relaxed whitespace-pre-wrap">
+                                  {n.content}
+                                </p>
+                                <div className="flex items-center gap-1 shrink-0 opacity-80 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartEditNote(n)}
+                                    disabled={isBusy}
+                                    aria-label="Edit note"
+                                    className="px-2 py-1 rounded-lg text-[0.7rem] font-medium text-ink-soft hover:text-ink hover:bg-paper dark:hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-40"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleDeleteNote(n.id)}
+                                    disabled={isBusy}
+                                    aria-label="Delete note"
+                                    className="px-2 py-1 rounded-lg text-[0.7rem] font-medium text-ink-soft hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-40"
+                                  >
+                                    {isBusy ? "..." : "Delete"}
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
               ) : (
                 /* Study Notes AI Summary Tab */
-                <div className="bg-surface dark:bg-[#0d140f] rounded-3xl border border-line dark:border-white/10 p-6 space-y-5 text-ink">
-                  <div>
-                    <h3 className="text-sm font-bold text-ink mb-2">Lesson Key Takeaways</h3>
-                    <ul className="space-y-2 text-xs sm:text-sm text-ink-soft list-disc list-inside">
-                      <li>Bite-sized structured progression ensures maximum retention of core concepts.</li>
-                      <li>Active recall testing pins key learnings right at the precise video timestamp.</li>
-                      <li>Semantic chapter division keeps daily study goals achievable and trackable.</li>
-                    </ul>
-                  </div>
+                (() => {
+                  const takeaways: string[] = Array.isArray(lesson?.keyTakeaways)
+                    ? lesson.keyTakeaways.map((t: unknown) => String(t).trim()).filter(Boolean)
+                    : [];
 
-                  <div className="pt-4 border-t border-line dark:border-white/10">
-                    <h3 className="text-sm font-bold text-ink mb-2">Key Highlights</h3>
-                    <div className="flex flex-wrap gap-2">
-                      <span className="px-3 py-1 rounded-full bg-lime-soft dark:bg-[#182315] text-moss dark:text-[#b8c460] text-xs font-semibold">
-                        Curated Curriculum
-                      </span>
-                      <span className="px-3 py-1 rounded-full bg-lime-soft dark:bg-[#182315] text-moss dark:text-[#b8c460] text-xs font-semibold">
-                        Timestamped Recall
-                      </span>
-                      <span className="px-3 py-1 rounded-full bg-lime-soft dark:bg-[#182315] text-moss dark:text-[#b8c460] text-xs font-semibold">
-                        Distraction-Free
-                      </span>
+                  const definitions: { term: string; definition: string }[] = Array.isArray(
+                    lesson?.importantDefinitions
+                  )
+                    ? lesson.importantDefinitions
+                        .map((item: unknown) => {
+                          if (typeof item === "object" && item !== null && "term" in item) {
+                            const obj = item as { term?: unknown; definition?: unknown };
+                            const term = String(obj.term || "").trim();
+                            const def = String(obj.definition || "").trim();
+                            return term || def
+                              ? { term: term || "Concept", definition: def }
+                              : null;
+                          }
+                          const raw = String(item || "").trim();
+                          if (!raw) return null;
+                          const colonIdx = raw.indexOf(":");
+                          if (colonIdx > 0 && colonIdx < raw.length - 1) {
+                            return {
+                              term: raw.slice(0, colonIdx).trim(),
+                              definition: raw.slice(colonIdx + 1).trim(),
+                            };
+                          }
+                          return { term: raw, definition: "" };
+                        })
+                        .filter(
+                          (d: { term: string; definition: string } | null): d is { term: string; definition: string } =>
+                            Boolean(d)
+                        )
+                    : [];
+
+                  const summaryText = String(lesson?.summary || lesson?.description || "").trim();
+                  const hasStudyNotes = Boolean(
+                    summaryText || takeaways.length > 0 || definitions.length > 0
+                  );
+
+                  if (!hasStudyNotes) {
+                    return (
+                      <div className="bg-surface dark:bg-[#0d140f] rounded-3xl border border-line dark:border-white/10 p-6 text-ink">
+                        <p className="text-xs sm:text-sm text-ink-soft">
+                          No study notes available for this lesson yet.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="bg-surface dark:bg-[#0d140f] rounded-3xl border border-line dark:border-white/10 p-6 space-y-5 text-ink">
+                      {summaryText && (
+                        <div>
+                          <h3 className="text-sm font-bold text-ink mb-2">Lesson Summary</h3>
+                          <p className="text-xs sm:text-sm text-ink-soft leading-relaxed">
+                            {summaryText}
+                          </p>
+                        </div>
+                      )}
+
+                      {takeaways.length > 0 && (
+                        <div className={summaryText ? "pt-4 border-t border-line dark:border-white/10" : ""}>
+                          <h3 className="text-sm font-bold text-ink mb-2">Lesson Key Takeaways</h3>
+                          <ul className="space-y-2 text-xs sm:text-sm text-ink-soft list-disc list-inside leading-relaxed">
+                            {takeaways.map((item, idx) => (
+                              <li key={idx}>{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {definitions.length > 0 && (
+                        <div
+                          className={
+                            summaryText || takeaways.length > 0
+                              ? "pt-4 border-t border-line dark:border-white/10"
+                              : ""
+                          }
+                        >
+                          <h3 className="text-sm font-bold text-ink mb-3">Key Terms &amp; Definitions</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            {definitions.map((def, idx) => (
+                              <div
+                                key={idx}
+                                className="p-3 rounded-2xl bg-lime-soft/50 dark:bg-[#182315] border border-line dark:border-[#26371a]/60 space-y-1"
+                              >
+                                <span className="block text-xs font-bold text-moss dark:text-[#b8c460]">
+                                  {def.term}
+                                </span>
+                                {def.definition && (
+                                  <p className="text-xs text-ink-soft leading-relaxed">
+                                    {def.definition}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                </div>
+                  );
+                })()
               )}
+            </div>
+
+            {/* Inline Lesson Quiz */}
+            <div ref={quizSectionRef} className="pt-2 scroll-mt-24">
+              <InlineQuizPanel
+                lessonId={resolvedParams.lessonId}
+                lessonTitle={lesson?.title}
+                startSeconds={startSec}
+                durationSeconds={duration}
+                questions={quizQuestions}
+                initialAnswers={initialQuizAnswers}
+                loading={loading}
+                onReplayMoment={handleReplayQuizMoment}
+                onQuizPassed={() => setCompleted(true)}
+              />
             </div>
           </div>
 
@@ -1007,7 +1476,10 @@ export default function LessonLearnPage({
               <div className="grid grid-cols-2 gap-2.5">
                 {/* Tool 1: Quiz */}
                 <button
-                  onClick={() => setShowQuizModal(true)}
+                  type="button"
+                  onClick={() =>
+                    quizSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+                  }
                   className="p-3.5 rounded-2xl bg-surface dark:bg-[#121914] border border-line dark:border-white/10 text-left hover:border-moss/40 transition-all cursor-pointer group"
                 >
                   <div className="text-moss dark:text-[#b8c460] mb-2 text-base">📖</div>
@@ -1017,7 +1489,7 @@ export default function LessonLearnPage({
                       ? `${quizQuestions.length} question${quizQuestions.length === 1 ? "" : "s"}`
                       : loading
                         ? "Loading..."
-                        : "Generate quiz"}
+                        : "Check understanding"}
                   </p>
                 </button>
 
@@ -1035,7 +1507,13 @@ export default function LessonLearnPage({
                 </button>
 
                 {/* Tool 3: Day test (Soon) */}
-                <div className="p-3.5 rounded-2xl bg-surface dark:bg-[#121914] border border-line dark:border-white/10 text-left opacity-60">
+                <button
+                  type="button"
+                  disabled
+                  aria-disabled="true"
+                  title="Day test is coming soon"
+                  className="p-3.5 rounded-2xl bg-surface dark:bg-[#121914] border border-line dark:border-white/10 text-left opacity-60 cursor-not-allowed"
+                >
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-ink-soft text-base">📋</span>
                     <span className="px-1.5 py-0.5 rounded text-[0.6rem] font-bold bg-[#182315] text-[#b8c460] border border-[#2b3a1d]">
@@ -1044,10 +1522,16 @@ export default function LessonLearnPage({
                   </div>
                   <h4 className="text-xs font-bold text-ink">Day test</h4>
                   <p className="text-[0.7rem] text-ink-soft mt-0.5">The whole day</p>
-                </div>
+                </button>
 
                 {/* Tool 4: Flashcards (Soon) */}
-                <div className="p-3.5 rounded-2xl bg-surface dark:bg-[#121914] border border-line dark:border-white/10 text-left opacity-60">
+                <button
+                  type="button"
+                  disabled
+                  aria-disabled="true"
+                  title="Flashcards are coming soon"
+                  className="p-3.5 rounded-2xl bg-surface dark:bg-[#121914] border border-line dark:border-white/10 text-left opacity-60 cursor-not-allowed"
+                >
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-ink-soft text-base">🗂️</span>
                     <span className="px-1.5 py-0.5 rounded text-[0.6rem] font-bold bg-[#182315] text-[#b8c460] border border-[#2b3a1d]">
@@ -1056,110 +1540,12 @@ export default function LessonLearnPage({
                   </div>
                   <h4 className="text-xs font-bold text-ink">Flashcards</h4>
                   <p className="text-[0.7rem] text-ink-soft mt-0.5">Key ideas</p>
-                </div>
+                </button>
               </div>
             </div>
           </div>
         </div>
       </main>
-
-      {/* Interactive Quiz Modal */}
-      {showQuizModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
-          <div className="bg-surface dark:bg-[#0c120e] rounded-3xl border border-line dark:border-white/15 max-w-lg w-full p-6 sm:p-7 shadow-2xl text-ink space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-line dark:border-white/10">
-              <div>
-                <span className="text-xs font-semibold text-moss dark:text-[#b8c460] uppercase tracking-wider font-mono">
-                  Lesson Quiz
-                </span>
-                <h3 className="text-base font-bold text-ink mt-0.5">{lesson?.title}</h3>
-              </div>
-              <button
-                onClick={() => setShowQuizModal(false)}
-                className="w-8 h-8 rounded-full border border-line dark:border-white/10 text-ink-soft hover:text-ink flex items-center justify-center cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            {quizQuestions.length === 0 ? (
-              <p className="text-sm text-ink-soft py-4 text-center">No quiz questions generated for this lesson yet.</p>
-            ) : (
-              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1">
-                {quizQuestions.map((q, qIdx) => (
-                  <div key={q.id} className="space-y-2 p-3.5 rounded-2xl bg-paper dark:bg-[#131b15] border border-line dark:border-white/5">
-                    <p className="text-xs sm:text-sm font-semibold text-ink">
-                      {qIdx + 1}. {q.questionText}
-                    </p>
-                    <div className="space-y-1.5 pt-1">
-                      {q.options?.map((opt: any) => {
-                        const isSelected = quizAnswers[q.id] === opt.optionIndex;
-                        const isCorrect = q.correctOptionIndex === opt.optionIndex;
-                        return (
-                          <button
-                            key={opt.optionIndex}
-                            onClick={() => !quizSubmitted && setQuizAnswers({ ...quizAnswers, [q.id]: opt.optionIndex })}
-                            className={`w-full text-left p-2.5 rounded-xl text-xs transition-all flex items-center justify-between cursor-pointer ${
-                              isSelected
-                                ? quizSubmitted
-                                  ? isCorrect
-                                    ? "bg-[#253818] text-[#c0d86e] border border-[#486b2a]"
-                                    : "bg-[#3e1e1b] text-[#f2a79e] border border-[#6b2a24]"
-                                  : "bg-[#253818] text-[#c0d86e] border border-[#486b2a]"
-                                : "bg-surface dark:bg-[#0c120e] border border-line dark:border-white/5 text-ink-soft hover:text-ink"
-                            }`}
-                          >
-                            <span>{opt.optionText}</span>
-                            {quizSubmitted && isCorrect && <span className="text-xs">✓</span>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {quizSubmitted && q.explanation && (
-                      <p className="text-[0.72rem] text-ink-soft/90 pt-1 border-t border-line dark:border-white/5">
-                        💡 {q.explanation}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="pt-3 border-t border-line dark:border-white/10 flex items-center justify-between">
-              {quizSubmitted ? (
-                <div className="text-xs font-semibold text-[#b8c460]">
-                  Quiz evaluated!{" "}
-                  {quizQuestions.filter((q) => quizAnswers[q.id] === q.correctOptionIndex).length}/
-                  {quizQuestions.length} correct.
-                </div>
-              ) : (
-                <span className="text-xs text-ink-soft">
-                  Answer all questions to complete
-                </span>
-              )}
-
-              <button
-                onClick={() => {
-                  if (!quizSubmitted) {
-                    setQuizSubmitted(true);
-                    setCompleted(true);
-                    fetch(`/api/lessons/${resolvedParams.lessonId}/quiz/submit`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ answers: quizAnswers }),
-                    }).catch(() => {});
-                  } else {
-                    setShowQuizModal(false);
-                  }
-                }}
-                className="px-5 py-2 rounded-full bg-[#b8c460] text-[#0f1611] text-xs font-semibold hover:bg-[#a6b350] transition-colors cursor-pointer shadow-xs"
-              >
-                {quizSubmitted ? "Done" : "Submit answers"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

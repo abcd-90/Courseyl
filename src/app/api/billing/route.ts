@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getFullSettings } from "@/lib/settings";
+import { isBillingConfigured } from "@/lib/billing";
 
 export async function GET() {
   try {
@@ -72,6 +73,7 @@ export async function GET() {
 
     return NextResponse.json({
       unlimitedFreeMode: isUnlimited,
+      paymentGatewayConfigured: isBillingConfigured(),
       subscription: {
         id: sub.id,
         tier: sub.tier,
