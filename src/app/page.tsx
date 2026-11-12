@@ -33,6 +33,7 @@ export default function HomePage() {
         if (data?.courses && Array.isArray(data.courses) && data.courses.length > 0) {
           setLiveCourses(
             data.courses.map((c: any) => ({
+              id: c.id,
               title: c.title,
               author: c.creator || "Instructor",
               duration: c.duration,
@@ -198,7 +199,7 @@ export default function HomePage() {
     "Bite-sized lessons, quizzes that replay what you missed, and a daily plan that fits your pace.";
   const heroPrimaryCta = settings?.structure?.heroPrimaryCtaLabel || "Start with a link";
   const heroSecondaryCta = settings?.structure?.heroSecondaryCtaLabel || "How it works";
-  const displayedHomeCourses = liveCourses.length > 0 ? liveCourses : sampleCourses;
+  const displayedHomeCourses = (liveCourses.length > 0 ? liveCourses : sampleCourses).slice(0, 6);
 
   const sectionElements: Record<HomeSectionId, React.ReactNode> = {
     hero: (
@@ -850,9 +851,9 @@ export default function HomePage() {
             </h2>
           </div>
 
-          <div className="mt-12 grid grid-cols-[repeat(auto-fill,minmax(min(300px,100%),1fr))] gap-5">
+          <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {displayedHomeCourses.map((c, i) => (
-              <div key={c.slug || i} className="flex">
+              <div key={c.id || `${c.slug || "course"}-${i}`} className="flex">
                 <Link
                   href={`/courses/${c.slug}`}
                   className="flex w-full flex-col gap-3 rounded-card bg-surface p-2.5 shadow-[0_0_0_1px_var(--line)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_30px_60px_-30px_rgba(22,49,92,0.45),0_0_0_1px_var(--line)]"
@@ -891,6 +892,15 @@ export default function HomePage() {
                 </Link>
               </div>
             ))}
+          </div>
+
+          <div className="mt-10 flex justify-center">
+            <Link
+              href="/community"
+              className="inline-flex shrink-0 items-center justify-center rounded-full bg-surface text-ink shadow-[inset_0_0_0_1px_var(--line)] hover:bg-muted hover:-translate-y-px transition-all h-12 gap-2 px-7 text-[0.92rem] font-medium cursor-pointer"
+            >
+              All courses
+            </Link>
           </div>
         </div>
       </section>
