@@ -30,6 +30,7 @@ export default function LessonLearnPage({
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const [navigation, setNavigation] = useState<any>(null);
   const [quizQuestions, setQuizQuestions] = useState<any[]>([]);
+  const [showQuiz, setShowQuiz] = useState(false);
   const [activeTab, setActiveTab] = useState<"my-notes" | "study-notes">("my-notes");
   const [notes, setNotes] = useState<any[]>([]);
   const [newNoteContent, setNewNoteContent] = useState("");
@@ -70,6 +71,7 @@ export default function LessonLearnPage({
   const playerCardRef = useRef<HTMLDivElement>(null);
   const noteInputRef = useRef<HTMLTextAreaElement>(null);
   const quizSectionRef = useRef<HTMLDivElement>(null);
+  const shouldScrollToQuizRef = useRef(false);
   const pendingWatchSecondsRef = useRef<Set<number>>(new Set());
   const recordedWatchSecondsRef = useRef<Set<number>>(new Set());
   const lastRelativeSecondRef = useRef<number>(0);
@@ -88,12 +90,21 @@ export default function LessonLearnPage({
   const duration = lesson?.durationSeconds || Math.max(60, (lesson?.endSeconds || 0) - startSec);
   const endSec = lesson?.endSeconds && lesson.endSeconds > startSec ? lesson.endSeconds : startSec + duration;
 
+  useEffect(() => {
+    if (showQuiz && shouldScrollToQuizRef.current) {
+      shouldScrollToQuizRef.current = false;
+      quizSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [showQuiz]);
+
   // 1. Fetch Lesson, Course and Notes
   useEffect(() => {
     setLoading(true);
     setLessonCurrentTime(0);
     setCurrentTime(0);
     setIsPlaying(false);
+    setShowQuiz(false);
+    shouldScrollToQuizRef.current = false;
     setInitialQuizAnswers({});
     setWatched(false);
     setWatchedSeconds(0);
@@ -1360,20 +1371,31 @@ export default function LessonLearnPage({
               )}
             </div>
 
-            {/* Inline Lesson Quiz */}
-            <div ref={quizSectionRef} className="pt-2 scroll-mt-24">
-              <InlineQuizPanel
-                lessonId={resolvedParams.lessonId}
-                lessonTitle={lesson?.title}
-                startSeconds={startSec}
-                durationSeconds={duration}
-                questions={quizQuestions}
-                initialAnswers={initialQuizAnswers}
-                loading={loading}
-                onReplayMoment={handleReplayQuizMoment}
-                onQuizPassed={() => setCompleted(true)}
-              />
-            </div>
+            {/* Inline Lesson Quiz (only shown when explicitly opened via the Quiz button) */}
+            {showQuiz && (
+              <div ref={quizSectionRef} className="pt-2 scroll-mt-24 space-y-2">
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowQuiz(false)}
+                    className="text-xs font-medium text-ink-soft hover:text-ink transition-colors cursor-pointer px-2.5 py-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5"
+                  >
+                    Hide quiz
+                  </button>
+                </div>
+                <InlineQuizPanel
+                  lessonId={resolvedParams.lessonId}
+                  lessonTitle={lesson?.title}
+                  startSeconds={startSec}
+                  durationSeconds={duration}
+                  questions={quizQuestions}
+                  initialAnswers={initialQuizAnswers}
+                  loading={loading}
+                  onReplayMoment={handleReplayQuizMoment}
+                  onQuizPassed={() => setCompleted(true)}
+                />
+              </div>
+            )}
           </div>
 
           {/* Right Column: Course Syllabus & Study Tools (4 cols) */}
@@ -1477,10 +1499,20 @@ export default function LessonLearnPage({
                 {/* Tool 1: Quiz */}
                 <button
                   type="button"
-                  onClick={() =>
-                    quizSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
-                  }
-                  className="p-3.5 rounded-2xl bg-surface dark:bg-[#121914] border border-line dark:border-white/10 text-left hover:border-moss/40 transition-all cursor-pointer group"
+                  aria-expanded={showQuiz}
+                  onClick={() => {
+                    if (showQuiz) {
+                      quizSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    } else {
+                      shouldScrollToQuizRef.current = true;
+                      setShowQuiz(true);
+                    }
+                  }}
+                  className={`p-3.5 rounded-2xl bg-surface dark:bg-[#121914] border text-left hover:border-moss/40 transition-all cursor-pointer group ${
+                    showQuiz
+                      ? "border-moss/60 dark:border-[#b8c460]/50"
+                      : "border-line dark:border-white/10"
+                  }`}
                 >
                   <div className="text-moss dark:text-[#b8c460] mb-2 text-base">📖</div>
                   <h4 className="text-xs font-bold text-ink group-hover:text-moss transition-colors">Quiz</h4>
