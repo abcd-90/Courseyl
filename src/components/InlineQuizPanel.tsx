@@ -24,6 +24,9 @@ interface InlineQuizPanelProps {
   questions: InlineQuizQuestion[];
   initialAnswers?: Record<string, number>;
   loading?: boolean;
+  isModal?: boolean;
+  onClose?: () => void;
+  onAnswersChange?: (answers: Record<string, number>) => void;
   onReplayMoment: (relativeSeconds: number, absoluteSeconds: number) => void;
   onQuizPassed?: () => void;
 }
@@ -74,17 +77,25 @@ export function InlineQuizPanel({
   questions,
   initialAnswers,
   loading,
+  isModal = false,
+  onClose,
+  onAnswersChange,
   onReplayMoment,
   onQuizPassed,
 }: InlineQuizPanelProps) {
-  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [answers, setAnswers] = useState<Record<string, number>>(() =>
+    initialAnswers ? { ...initialAnswers } : {}
+  );
   const [savingQuestionId, setSavingQuestionId] = useState<string | null>(null);
   const [scoreNotice, setScoreNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    setScoreNotice(null);
+  }, [lessonId]);
 
   // Rehydrate persisted per-question answers whenever lesson or initialAnswers change
   useEffect(() => {
     setAnswers(initialAnswers ? { ...initialAnswers } : {});
-    setScoreNotice(null);
   }, [lessonId, initialAnswers]);
 
   const answeredCount = questions.filter((q) => answers[q.id] !== undefined).length;
@@ -115,6 +126,7 @@ export function InlineQuizPanel({
   const handleSelectOption = async (question: InlineQuizQuestion, optionIndex: number) => {
     const nextAnswers = { ...answers, [question.id]: optionIndex };
     setAnswers(nextAnswers);
+    onAnswersChange?.(nextAnswers);
     setSavingQuestionId(question.id);
 
     try {
@@ -141,6 +153,7 @@ export function InlineQuizPanel({
     const nextAnswers = { ...answers };
     delete nextAnswers[questionId];
     setAnswers(nextAnswers);
+    onAnswersChange?.(nextAnswers);
     setScoreNotice(null);
     setSavingQuestionId(questionId);
 
@@ -162,14 +175,24 @@ export function InlineQuizPanel({
     <section
       id="inline-quiz-panel"
       aria-label="Lesson quiz"
-      className="bg-surface dark:bg-[#0c120e] rounded-3xl border border-line dark:border-white/10 p-5 sm:p-6 shadow-sm space-y-5 text-ink"
+      className={
+        isModal
+          ? "bg-surface dark:bg-[#0c120e] rounded-3xl border border-line dark:border-white/10 shadow-2xl text-ink flex flex-col max-h-[88vh] overflow-hidden"
+          : "bg-surface dark:bg-[#0c120e] rounded-3xl border border-line dark:border-white/10 p-5 sm:p-6 shadow-sm space-y-5 text-ink"
+      }
     >
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-line dark:border-white/10">
-        <div>
+      <div
+        className={
+          isModal
+            ? "flex items-start sm:items-center justify-between gap-3 px-5 sm:px-6 pt-5 sm:pt-6 pb-4 border-b border-line dark:border-white/10 shrink-0"
+            : "flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-line dark:border-white/10"
+        }
+      >
+        <div className="min-w-0">
           <span className="text-[0.68rem] font-bold uppercase tracking-widest text-moss dark:text-[#b8c460] font-mono">
             Quick Check · Quiz
           </span>
-          <h3 className="text-base sm:text-lg font-display font-bold text-ink mt-0.5">
+          <h3 className="text-base sm:text-lg font-display font-bold text-ink mt-0.5 leading-snug">
             {lessonTitle ? `Check your understanding: ${lessonTitle}` : "Lesson Quiz"}
           </h3>
         </div>
@@ -180,18 +203,29 @@ export function InlineQuizPanel({
               {correctCount}/{questions.length} correct
             </span>
           )}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close quiz"
+              className="w-8 h-8 rounded-full border border-line dark:border-white/15 flex items-center justify-center text-xs text-ink-soft hover:text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
 
-      {loading && questions.length === 0 ? (
-        <p className="text-xs sm:text-sm text-ink-soft py-4">Loading lesson quiz...</p>
-      ) : questions.length === 0 ? (
-        <p className="text-xs sm:text-sm text-ink-soft py-4">
-          No quiz questions available for this lesson yet.
-        </p>
-      ) : (
-        <div className="space-y-4">
-          {questions.map((q, qIdx) => {
+      <div className={isModal ? "flex-1 overflow-y-auto px-5 sm:px-6 py-5" : ""}>
+        {loading && questions.length === 0 ? (
+          <p className="text-xs sm:text-sm text-ink-soft py-4">Loading lesson quiz...</p>
+        ) : questions.length === 0 ? (
+          <p className="text-xs sm:text-sm text-ink-soft py-4">
+            No quiz questions available for this lesson yet.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {questions.map((q, qIdx) => {
             const selectedIndex = answers[q.id];
             const hasAnswered = selectedIndex !== undefined;
             const isCorrect = hasAnswered && selectedIndex === q.correctOptionIndex;
@@ -295,9 +329,16 @@ export function InlineQuizPanel({
           })}
         </div>
       )}
+      </div>
 
       {questions.length > 0 && (
-        <div className="pt-2 border-t border-line dark:border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-soft">
+        <div
+          className={
+            isModal
+              ? "px-5 sm:px-6 py-4 border-t border-line dark:border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-soft shrink-0 bg-surface dark:bg-[#0c120e]"
+              : "pt-2 border-t border-line dark:border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-soft"
+          }
+        >
           <span>
             {scoreNotice ||
               (allAnswered

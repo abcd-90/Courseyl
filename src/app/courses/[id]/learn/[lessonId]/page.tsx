@@ -70,8 +70,6 @@ export default function LessonLearnPage({
   const playerRef = useRef<any>(null);
   const playerCardRef = useRef<HTMLDivElement>(null);
   const noteInputRef = useRef<HTMLTextAreaElement>(null);
-  const quizSectionRef = useRef<HTMLDivElement>(null);
-  const shouldScrollToQuizRef = useRef(false);
   const pendingWatchSecondsRef = useRef<Set<number>>(new Set());
   const recordedWatchSecondsRef = useRef<Set<number>>(new Set());
   const lastRelativeSecondRef = useRef<number>(0);
@@ -91,10 +89,22 @@ export default function LessonLearnPage({
   const endSec = lesson?.endSeconds && lesson.endSeconds > startSec ? lesson.endSeconds : startSec + duration;
 
   useEffect(() => {
-    if (showQuiz && shouldScrollToQuizRef.current) {
-      shouldScrollToQuizRef.current = false;
-      quizSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+    if (!showQuiz) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowQuiz(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, [showQuiz]);
 
   // 1. Fetch Lesson, Course and Notes
@@ -104,7 +114,6 @@ export default function LessonLearnPage({
     setCurrentTime(0);
     setIsPlaying(false);
     setShowQuiz(false);
-    shouldScrollToQuizRef.current = false;
     setInitialQuizAnswers({});
     setWatched(false);
     setWatchedSeconds(0);
@@ -596,6 +605,7 @@ export default function LessonLearnPage({
   const handleReplayQuizMoment = (relativeSeconds: number, absoluteSeconds: number) => {
     const targetRel =
       absoluteSeconds >= startSec ? Math.max(0, absoluteSeconds - startSec) : Math.max(0, relativeSeconds);
+    setShowQuiz(false);
     seekToTimestamp(targetRel, true);
     playerCardRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
@@ -1370,32 +1380,6 @@ export default function LessonLearnPage({
                 })()
               )}
             </div>
-
-            {/* Inline Lesson Quiz (only shown when explicitly opened via the Quiz button) */}
-            {showQuiz && (
-              <div ref={quizSectionRef} className="pt-2 scroll-mt-24 space-y-2">
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setShowQuiz(false)}
-                    className="text-xs font-medium text-ink-soft hover:text-ink transition-colors cursor-pointer px-2.5 py-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5"
-                  >
-                    Hide quiz
-                  </button>
-                </div>
-                <InlineQuizPanel
-                  lessonId={resolvedParams.lessonId}
-                  lessonTitle={lesson?.title}
-                  startSeconds={startSec}
-                  durationSeconds={duration}
-                  questions={quizQuestions}
-                  initialAnswers={initialQuizAnswers}
-                  loading={loading}
-                  onReplayMoment={handleReplayQuizMoment}
-                  onQuizPassed={() => setCompleted(true)}
-                />
-              </div>
-            )}
           </div>
 
           {/* Right Column: Course Syllabus & Study Tools (4 cols) */}
@@ -1499,15 +1483,9 @@ export default function LessonLearnPage({
                 {/* Tool 1: Quiz */}
                 <button
                   type="button"
+                  aria-haspopup="dialog"
                   aria-expanded={showQuiz}
-                  onClick={() => {
-                    if (showQuiz) {
-                      quizSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                    } else {
-                      shouldScrollToQuizRef.current = true;
-                      setShowQuiz(true);
-                    }
-                  }}
+                  onClick={() => setShowQuiz(true)}
                   className={`p-3.5 rounded-2xl bg-surface dark:bg-[#121914] border text-left hover:border-moss/40 transition-all cursor-pointer group ${
                     showQuiz
                       ? "border-moss/60 dark:border-[#b8c460]/50"
@@ -1578,6 +1556,38 @@ export default function LessonLearnPage({
           </div>
         </div>
       </main>
+
+      {/* Lesson Quiz Modal Dialog */}
+      {showQuiz && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={lesson?.title ? `Quiz: ${lesson.title}` : "Lesson quiz"}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowQuiz(false);
+            }
+          }}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6"
+        >
+          <div className="w-full max-w-2xl">
+            <InlineQuizPanel
+              lessonId={resolvedParams.lessonId}
+              lessonTitle={lesson?.title}
+              startSeconds={startSec}
+              durationSeconds={duration}
+              questions={quizQuestions}
+              initialAnswers={initialQuizAnswers}
+              loading={loading}
+              isModal
+              onClose={() => setShowQuiz(false)}
+              onAnswersChange={setInitialQuizAnswers}
+              onReplayMoment={handleReplayQuizMoment}
+              onQuizPassed={() => setCompleted(true)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
