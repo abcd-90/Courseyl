@@ -20,6 +20,12 @@ import {
   generateLessonQuizQuestions,
   synthesizeLessonQuizQuestions,
 } from "./quizGenerator";
+import {
+  buildPlacementQuestionsFromCurriculum,
+  cleanPlacementText,
+  generatePlacementQuestionsWithAI,
+  hasLowQualityPlacementSet,
+} from "./placementGenerator";
 import { randomUUID } from "crypto";
 import { getFullSettings } from "../settings";
 import { createNotification } from "../notifications";
@@ -790,22 +796,12 @@ export async function runGenerationJobStep(jobId: string): Promise<{
         }
       }
 
-      let placementQuestions = curriculumData.placementQuestions || [];
-      if (isExternalProvider) {
-        const llmPlacement = await generatePlacementWithLLM(
-          curriculumData,
-          meta.title,
-          state.difficulty,
-          provider
-        ).catch(() => null);
-        if (llmPlacement && llmPlacement.length >= 3) {
-          placementQuestions = llmPlacement;
-        }
-      }
-      if (placementQuestions.length < 3) {
-        placementQuestions = generateFallbackPlacement(curriculumData);
-      }
-      curriculumData.placementQuestions = placementQuestions;
+      curriculumData.placementQuestions = await generatePlacementQuestionsWithAI({
+        courseTitle: meta.title,
+        difficulty: state.difficulty,
+        chapters: curriculumData.chapters,
+        provider: isExternalProvider ? provider : undefined,
+      });
 
       const nextState: CheckpointState = {
         ...state,
@@ -947,9 +943,14 @@ export async function runGenerationJobStep(jobId: string): Promise<{
     }
 
     const placementQuestions =
-      curriculumData.placementQuestions && curriculumData.placementQuestions.length >= 3
+      curriculumData.placementQuestions &&
+      !hasLowQualityPlacementSet(curriculumData.placementQuestions)
         ? curriculumData.placementQuestions
-        : generateFallbackPlacement(curriculumData);
+        : buildPlacementQuestionsFromCurriculum({
+            courseTitle: course.title,
+            difficulty: course.difficulty,
+            chapters: curriculumData.chapters,
+          });
 
     const placementQuestionRows: {
       id: string;
@@ -2289,7 +2290,10 @@ function partitionSegmentsIntoDays(
 
   return {
     chapters: rawChapters,
-    placementQuestions: generateFallbackPlacement({ chapters: rawChapters }),
+    placementQuestions: buildPlacementQuestionsFromCurriculum({
+      courseTitle: meta.title,
+      chapters: rawChapters,
+    }),
   };
 }
 
@@ -2343,86 +2347,6 @@ async function callJSONWithProviderFailover<T>(
     }
     throw primaryErr;
   }
-}
-
-async function generatePlacementWithLLM(
-  curriculum: { chapters: RawChapter[] },
-  courseTitle: string,
-  difficulty: string,
-  provider: AIProvider
-): Promise<RawPlacementQuestion[] | null> {
-  if (!isExternalAIProvider(provider)) return null;
-
-  const allLessons = curriculum.chapters.flatMap((c) => c.lessons);
-  if (allLessons.length === 0) return null;
-
-  const targetCount = Math.min(8, Math.max(4, Math.min(allLessons.length, 6)));
-  const step = allLessons.length / targetCount;
-  const sampled = Array.from({ length: targetCount }, (_, i) => {
-    const idx = Math.min(allLessons.length - 1, Math.floor(i * step));
-    const les = allLessons[idx];
-    return `${idx + 1}. ${les.title}: ${les.description.slice(0, 140)}`;
-  }).join("\n");
-
-  const prompt = `Create ${targetCount} diagnostic placement-test questions for the course "${courseTitle}" (difficulty: ${difficulty}).
-Each question maps to one of these curriculum lessons so learners who already know a topic can skip ahead safely:
-${sampled}
-
-Requirements:
-- Generate exactly ${targetCount} multiple-choice questions, one per key topic sampled above.
-- Each question MUST have topicName matching the core skill, 4 distinct options, a valid correctOptionIndex (0-3), and a concise 1-sentence explanation.`;
-
-  const schema = `{
-  "questions": [
-    {
-      "topicName": "Short topic label",
-      "questionText": "Question prompt",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "correctOptionIndex": 0,
-      "explanation": "Concise explanation"
-    }
-  ]
-}`;
-
-  const parsed = await Promise.race([
-    callJSONWithProviderFailover<{
-      questions?: {
-        topicName?: string;
-        questionText?: string;
-        options?: string[];
-        correctOptionIndex?: number;
-        explanation?: string;
-      }[];
-    }>(provider, prompt, schema),
-    new Promise<null>((resolve) => setTimeout(() => resolve(null), 10_000)),
-  ]);
-
-  if (!parsed?.questions || !Array.isArray(parsed.questions)) return null;
-
-  const valid: RawPlacementQuestion[] = parsed.questions
-    .filter(
-      (q) =>
-        typeof q?.topicName === "string" &&
-        q.topicName.trim().length > 1 &&
-        typeof q?.questionText === "string" &&
-        q.questionText.trim().length > 10 &&
-        Array.isArray(q.options) &&
-        q.options.length === 4 &&
-        q.options.every((o) => typeof o === "string" && o.trim().length > 0) &&
-        typeof q.correctOptionIndex === "number" &&
-        q.correctOptionIndex >= 0 &&
-        q.correctOptionIndex <= 3
-    )
-    .slice(0, 8)
-    .map((q) => ({
-      topicName: q.topicName!.trim(),
-      questionText: q.questionText!.trim(),
-      options: q.options!.map((o) => o.trim()),
-      correctOptionIndex: q.correctOptionIndex!,
-      explanation: (q.explanation || `Assesses readiness on ${q.topicName!.trim()}.`).trim(),
-    }));
-
-  return valid.length >= 3 ? valid : null;
 }
 
 export async function generateCurriculumStructure(
@@ -2645,99 +2569,5 @@ function generateFallbackCurriculum(
 
   void difficulty;
   return curriculum;
-}
-
-function cleanPlacementText(str: string): string {
-  if (!str) return "";
-  return str
-    .replace(/\\u0026/g, "&")
-    .replace(/\\u003c/g, "<")
-    .replace(/\\u003e/g, ">")
-    .replace(/\\u0027/g, "'")
-    .replace(/\\u0022/g, '"')
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/^\d+[\.\:\-]\s*/, "")
-    .trim();
-}
-
-function generateFallbackPlacement(curriculum: { chapters: RawChapter[] }): RawPlacementQuestion[] {
-  const allLessons: RawLesson[] = [];
-  curriculum.chapters.forEach((chap) => {
-    chap.lessons.forEach((les) => {
-      allLessons.push(les);
-    });
-  });
-
-  const targetCount = Math.min(8, Math.max(4, Math.min(allLessons.length, 6)));
-  const selectedLessons: RawLesson[] = [];
-  if (allLessons.length <= targetCount) {
-    selectedLessons.push(...allLessons);
-  } else {
-    const step = allLessons.length / targetCount;
-    for (let i = 0; i < targetCount; i++) {
-      const idx = Math.min(allLessons.length - 1, Math.floor(i * step));
-      selectedLessons.push(allLessons[idx]);
-    }
-  }
-
-  return selectedLessons.map((les, idx) => {
-    const cleanTopic = cleanConceptTopic(cleanPlacementText(les.title)) || cleanPlacementText(les.title);
-    const glossaryHits = matchConceptsForText(cleanTopic);
-    const conceptWithQ = glossaryHits.find((g) => g.question);
-
-    let questionText = "";
-    let correctOption = "";
-    let wrong1 = "";
-    let wrong2 = "";
-    let wrong3 = "";
-    let explanation = "";
-
-    if (conceptWithQ?.question) {
-      questionText = conceptWithQ.question.prompt;
-      correctOption = conceptWithQ.question.correct;
-      [wrong1, wrong2, wrong3] = conceptWithQ.question.distractors;
-      explanation = conceptWithQ.question.explanation;
-    } else if (glossaryHits[0]) {
-      const c = glossaryHits[0];
-      questionText = `Which core engineering principle best describes "${c.term}" when building ${cleanTopic}?`;
-      correctOption = c.definition;
-      wrong1 = "Storing all state inside mutable global variables without validation or interfaces.";
-      wrong2 = "Disabling schema verification and runtime error handling in production.";
-      wrong3 = "Eliminating automated tests and deployment checks to ship unverified builds.";
-      explanation = `${c.term}: ${c.takeaway}`;
-    } else {
-      questionText = `In practical software development, what is the core architectural objective when working with ${cleanTopic}?`;
-      correctOption = `Building modular, verifiable components with strict contracts tailored to ${cleanTopic}.`;
-      wrong1 = "Merging all business logic, database queries, and UI components into one unmaintainable script.";
-      wrong2 = "Disabling automated verification and validation checks prior to release.";
-      wrong3 = "Bypassing error handling and allowing unhandled exceptions to terminate execution.";
-      explanation = "Engineering best practices emphasize modularity, clear contracts, and automated test coverage.";
-    }
-
-    const targetCorrectIdx = idx % 4;
-    const rawOptions = [correctOption, wrong1, wrong2, wrong3];
-    const options: string[] = [];
-    let wrongIdx = 1;
-    for (let o = 0; o < 4; o++) {
-      if (o === targetCorrectIdx) {
-        options.push(correctOption);
-      } else {
-        options.push(rawOptions[wrongIdx]);
-        wrongIdx++;
-      }
-    }
-
-    return {
-      topicName: cleanTopic,
-      questionText,
-      options,
-      correctOptionIndex: targetCorrectIdx,
-      explanation,
-    };
-  });
 }
 

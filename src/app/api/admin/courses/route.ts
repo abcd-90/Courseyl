@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { hashPassword } from "@/lib/auth";
 import { generateCourse } from "@/lib/ai/courseGenerator";
+import { buildPlacementQuestionsFromCurriculum } from "@/lib/ai/placementGenerator";
 import { synthesizeLessonQuizQuestions } from "@/lib/ai/quizGenerator";
 import { getCleanThumbnailUrl } from "@/lib/thumbnail";
 import { parseYouTubeUrl } from "@/lib/youtube";
@@ -363,36 +364,41 @@ export async function POST(req: Request) {
           create: chaptersPayload,
         },
         placementQuestions: {
-          create: [
-            {
-              orderIndex: 1,
-              topicName: "Foundations",
-              questionText: `Which statement best describes the core goal of ${cleanTitle}?`,
-              correctOptionIndex: 0,
-              explanation: `Building structured hands-on mastery through focused lessons.`,
-              options: {
-                create: [
-                  { optionIndex: 0, optionText: "Applying foundational concepts step by step" },
-                  { optionIndex: 1, optionText: "Ignoring architecture and testing" },
-                  { optionIndex: 2, optionText: "Copying unverified snippets blindly" },
-                ],
-              },
+          create: buildPlacementQuestionsFromCurriculum({
+            courseTitle: cleanTitle,
+            difficulty: safeDifficulty,
+            chapters: chaptersPayload.map((ch) => ({
+              title: ch.title,
+              lessons: ch.lessons.create.map((l) => ({
+                title: l.title,
+                description: l.description,
+                summary: l.summary,
+                keyTakeaways: l.keyTakeaways,
+                importantDefinitions: l.importantDefinitions,
+                startSeconds: l.startSeconds,
+                endSeconds: l.endSeconds,
+                durationSeconds: l.durationSeconds,
+                quizQuestions: l.quizQuestions.create.map((qq) => ({
+                  questionText: qq.questionText,
+                  correctOptionIndex: qq.correctOptionIndex,
+                  explanation: qq.explanation,
+                  options: qq.options.create,
+                })),
+              })),
+            })),
+          }).map((pq, pqIdx) => ({
+            orderIndex: pqIdx + 1,
+            topicName: pq.topicName,
+            questionText: pq.questionText,
+            correctOptionIndex: pq.correctOptionIndex,
+            explanation: pq.explanation,
+            options: {
+              create: pq.options.map((optionText, optionIndex) => ({
+                optionIndex,
+                optionText,
+              })),
             },
-            {
-              orderIndex: 2,
-              topicName: "Real-World Architecture",
-              questionText: `When scaling solutions taught in ${cleanTitle}, what matters most?`,
-              correctOptionIndex: 1,
-              explanation: `Clean separation of responsibilities and measurable verification.`,
-              options: {
-                create: [
-                  { optionIndex: 0, optionText: "Hardcoding every dependency inline" },
-                  { optionIndex: 1, optionText: "Clear modular structure and verification" },
-                  { optionIndex: 2, optionText: "Avoiding error handling altogether" },
-                ],
-              },
-            },
-          ],
+          })),
         },
       },
       include: {

@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { clampDailyStudyMinutes } from "@/lib/pacing";
 import { createNotification } from "@/lib/notifications";
+import {
+  generatePlacementQuestionsWithAI,
+  hasLowQualityPlacementSet,
+} from "@/lib/ai/placementGenerator";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -171,7 +176,113 @@ export async function GET(
       return NextResponse.json({ error: "Course not found" }, { status: 404 });
     }
 
-    const questions = course.placementQuestions.map((q) => ({
+    let persistedQuestions = course.placementQuestions;
+
+    // Dynamically regenerate curriculum-grounded placement questions if missing
+    // or if stored rows came from legacy generic templates.
+    if (hasLowQualityPlacementSet(persistedQuestions)) {
+      const fullCourse = await prisma.course.findUnique({
+        where: { id: course.id },
+        include: {
+          chapters: {
+            orderBy: { orderIndex: "asc" },
+            include: {
+              lessons: {
+                orderBy: { orderIndex: "asc" },
+                include: {
+                  quizQuestions: {
+                    orderBy: { orderIndex: "asc" },
+                    include: {
+                      options: {
+                        orderBy: { optionIndex: "asc" },
+                        select: { optionIndex: true, optionText: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (fullCourse && fullCourse.chapters.length > 0) {
+        const generated = await generatePlacementQuestionsWithAI({
+          courseTitle: fullCourse.title,
+          difficulty: fullCourse.difficulty,
+          chapters: fullCourse.chapters.map((ch) => ({
+            title: ch.title,
+            lessons: ch.lessons.map((l) => ({
+              title: l.title,
+              description: l.description,
+              summary: l.summary,
+              keyTakeaways: l.keyTakeaways,
+              importantDefinitions: l.importantDefinitions,
+              startSeconds: l.startSeconds,
+              endSeconds: l.endSeconds,
+              durationSeconds: l.durationSeconds,
+              quizQuestions: l.quizQuestions.map((qq) => ({
+                questionText: qq.questionText,
+                options: qq.options,
+                correctOptionIndex: qq.correctOptionIndex,
+                explanation: qq.explanation,
+              })),
+            })),
+          })),
+        });
+
+        if (generated.length > 0) {
+          const makeId = () => `c${randomUUID().replace(/-/g, "").slice(0, 24)}`;
+          const newRows = generated.map((pq, pIdx) => ({
+            id: makeId(),
+            topicName: pq.topicName,
+            questionText: pq.questionText,
+            correctOptionIndex: pq.correctOptionIndex,
+            explanation: pq.explanation,
+            orderIndex: pIdx,
+            options: pq.options.map((optionText, optionIndex) => ({
+              optionIndex,
+              optionText,
+            })),
+          }));
+
+          await prisma.$transaction(async (tx) => {
+            await tx.placementQuestion.deleteMany({
+              where: { courseId: course.id },
+            });
+            for (const row of newRows) {
+              await tx.placementQuestion.create({
+                data: {
+                  id: row.id,
+                  courseId: course.id,
+                  orderIndex: row.orderIndex,
+                  topicName: row.topicName,
+                  questionText: row.questionText,
+                  correctOptionIndex: row.correctOptionIndex,
+                  explanation: row.explanation,
+                  options: {
+                    create: row.options,
+                  },
+                },
+              });
+            }
+          });
+
+          persistedQuestions = newRows.map((row) => ({
+            id: row.id,
+            courseId: course.id,
+            orderIndex: row.orderIndex,
+            topicName: row.topicName,
+            questionText: row.questionText,
+            correctOptionIndex: row.correctOptionIndex,
+            explanation: row.explanation,
+            options: row.options,
+          })) as typeof persistedQuestions;
+        }
+      }
+    }
+
+    const questions = persistedQuestions.map((q) => ({
       id: q.id,
       topicName: q.topicName,
       questionText: q.questionText,
