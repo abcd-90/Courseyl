@@ -23,7 +23,7 @@ export default function SupportPage() {
 
   const brandName = settings?.branding?.brandName || "Courseyl";
   const userEmail = currentUser?.email || "your account email";
-  const supportEmail = settings?.structure?.socialLinks?.contactEmail || "thecourseyl@gmail.com";
+  const supportEmail = "thecourseyl@gmail.com";
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-[#fafcf7] dark:bg-[#0c120e] text-ink">
@@ -149,7 +149,7 @@ export default function SupportPage() {
             </div>
 
             <p className="text-xs text-ink-soft/75 pt-4">
-              {brandName} is a product of Triggerfy Services.{" "}
+              {brandName}.{" "}
               <Link href="/terms" className="underline hover:text-ink">
                 Terms
               </Link>{" "}

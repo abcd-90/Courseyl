@@ -127,6 +127,11 @@ export function SiteSettingsProvider({
                 socialLinks: {
                   ...DEFAULT_SETTINGS.structure.socialLinks,
                   ...(data.structure.socialLinks || {}),
+                  contactEmail:
+                    data.structure.socialLinks?.contactEmail &&
+                    !data.structure.socialLinks.contactEmail.includes("triggerfy.xyz")
+                      ? data.structure.socialLinks.contactEmail
+                      : "thecourseyl@gmail.com",
                 },
                 navLinks:
                   Array.isArray(data.structure.navLinks) && data.structure.navLinks.length > 0

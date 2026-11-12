@@ -51,6 +51,11 @@ export async function getFullSettings(): Promise<FullSiteSettings> {
           socialLinks: {
             ...DEFAULT_SETTINGS.structure.socialLinks,
             ...(parsed.socialLinks || {}),
+            contactEmail:
+              parsed.socialLinks?.contactEmail &&
+              !parsed.socialLinks.contactEmail.includes("triggerfy.xyz")
+                ? parsed.socialLinks.contactEmail
+                : "thecourseyl@gmail.com",
           },
           navLinks:
             Array.isArray(parsed.navLinks) && parsed.navLinks.length > 0

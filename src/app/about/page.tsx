@@ -20,7 +20,7 @@ export default function AboutPage() {
           </p>
 
           <p>
-            CourseIt is a product of Triggerfy, a small studio building simple, focused tools for learners and creators.
+            Courseyl is built to provide simple, focused tools for learners and creators.
           </p>
 
           <h2 className="text-2xl font-display font-semibold text-[#0f1611] pt-6">How it works</h2>

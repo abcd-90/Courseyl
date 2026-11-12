@@ -209,16 +209,7 @@ export function CourseItFooter() {
         {/* Bottom copyright banner */}
         <div className="mt-14 flex flex-wrap justify-between gap-3 border-t border-[#0f1611]/20 pt-5 text-sm text-[#0f1611]/75">
           <span>
-            © 2026 {copyrightName}, a{" "}
-            <a
-              href="https://triggerfy.xyz"
-              target="_blank"
-              rel="noreferrer"
-              className="font-medium underline underline-offset-3 hover:text-[#0f1611]"
-            >
-              Triggerfy
-            </a>{" "}
-            product. {footerSubNote}
+            © 2026 {copyrightName}. {footerSubNote}
           </span>
           <span>{footerRightNote}</span>
         </div>
