@@ -71,122 +71,275 @@ const GENERIC_PLACEMENT_PATTERNS: RegExp[] = [
   /what is the central objective of/i,
   /what principle keeps implementations reliable/i,
   /when reviewing or applying skills from/i,
+  // Quiz/course generator template-fallback signatures that must never leak into placement tests
+  /what accurately defines/i,
+  /an anti-pattern that bypasses input checks/i,
+  /a deprecated legacy syntax (?:disallowed inside|removed from)/i,
+  /a purely cosmetic label unrelated to/i,
+  /core module taught from \d{1,2}:\d{2}/i,
+  /production reliability:\s*validating schemas/i,
+  /an outdated myth that ignores the core principles/i,
+  /a decorative label with no practical effect/i,
+  /a shortcut that skips foundational accuracy/i,
+  /which engineering practice reflects a key takeaway/i,
+  /which key takeaway accurately reflects what is taught/i,
+  /skipping validation constraints and ignoring edge cases/i,
+  /duplicating unstructured scripts rather than designing/i,
+  /swallowing exceptions silently so faults/i,
+  /relying strictly on hardcoded trial-and-error/i,
+  /removing error handling and boundaries once/i,
+  /mixing unrelated concerns and unvalidated inputs/i,
+  /an external third-party billing hook unrelated to/i,
+  /a manual override that bypasses runtime checks/i,
+  /skipping .+ entirely because it has no effect/i,
+  /using unrelated tools from outside/i,
+  /avoiding verification checks when applying/i,
+  /mastering .+ techniques inside/i,
+  /understanding the core mechanics and practical implementation of/i,
+  /how should you apply .+ effectively when studying/i,
+  /relies on structured application and context checks/i,
 ];
 
 interface PlacementConceptQuestion {
   keywords: string[];
-  languages?: string[];
+  domains: string[];
   questionText: string;
   correct: string;
   distractors: [string, string, string];
   explanation: string;
 }
 
-const JAVASCRIPT_CONCEPT_BANK: PlacementConceptQuestion[] = [
+const DOMAIN_PLACEMENT_BANK: PlacementConceptQuestion[] = [
+  // ---- JavaScript / TypeScript / Web ----
   {
-    keywords: ["variable", "variables", "declaration", "let", "const", "var", "hoisting", "scope"],
-    languages: ["javascript", "js", "typescript", "frontend", "web"],
-    questionText: "What is the key difference between `var`, `let`, and `const` declarations in JavaScript?",
-    correct: "`let` and `const` are block-scoped with a Temporal Dead Zone, whereas `var` is function-scoped and hoisted initialized as `undefined`.",
+    keywords: ["variable", "variables", "declaration", "let", "const", "var", "hoisting", "scope", "tdz"],
+    domains: ["javascript", "js", "typescript", "ts", "ecmascript", "web", "frontend", "react", "node"],
+    questionText: "What is the key difference between var, let, and const declarations in JavaScript?",
+    correct: "let and const are block-scoped with a Temporal Dead Zone, whereas var is function-scoped and hoisted initialized as undefined.",
     distractors: [
-      "`const` prevents object properties from ever mutating, while `let` only works inside loops.",
-      "`var` is strictly block-scoped and throws a ReferenceError if accessed anywhere above its line.",
-      "`let` creates global immutable constants attached to `window`, whereas `var` stays local to `{}` blocks.",
+      "const freezes nested object properties deeply so object values cannot mutate, while let only works inside loops.",
+      "var is strictly block-scoped and throws a ReferenceError whenever accessed before its declaration line.",
+      "let binds variables to the global window object automatically, whereas var remains isolated inside if/for blocks.",
     ],
-    explanation: "Understanding block scope vs function scope and the Temporal Dead Zone avoids accidental leaks and ReferenceErrors.",
+    explanation: "Block scope and the Temporal Dead Zone on let/const prevent accidental hoisting bugs compared to function-scoped var.",
   },
   {
-    keywords: ["data type", "data types", "type system", "primitive", "primitives", "typeof", "coercion"],
-    languages: ["javascript", "js", "typescript", "web"],
-    questionText: "In JavaScript's type system, how do primitive values behave compared to reference types (objects/arrays)?",
-    correct: "Primitives (string, number, boolean, null, undefined, symbol, bigint) are copied by value and immutable, whereas objects are copied by reference.",
+    keywords: ["data type", "data types", "type system", "primitive", "primitives", "typeof", "coercion", "bigint", "symbol"],
+    domains: ["javascript", "js", "typescript", "ts", "ecmascript", "web", "frontend", "node"],
+    questionText: "In JavaScript's type system, how do primitive values behave compared to reference types (objects and arrays)?",
+    correct: "Primitives (string, number, boolean, null, undefined, symbol, bigint) are immutable and copied by value, whereas objects/arrays are copied by reference.",
     distractors: [
-      "`typeof null` evaluates to `'null'` and mutating a copied primitive updates the original variable too.",
-      "Arrays and objects are stored by value on the call stack and cannot share mutable references.",
-      "JavaScript enforces static compile-time types and throws a syntax error if a variable changes type.",
+      "typeof null evaluates to 'null' and reassigning a copied primitive automatically mutates the original variable.",
+      "Arrays and objects are stored strictly by value on the call stack and never share references across assignments.",
+      "JavaScript enforces static compile-time types and rejects reassigning a string variable to a number.",
     ],
-    explanation: "Distinguishing value semantics for primitives from reference semantics for objects prevents unexpected side-effect mutations.",
+    explanation: "Distinguishing value copies for primitives from shared references for objects prevents unintended mutations.",
   },
   {
-    keywords: ["operator", "operators", "comparison", "equality", "ternary", "logical"],
-    languages: ["javascript", "js", "typescript", "web"],
-    questionText: "Why does JavaScript recommend strict equality (`===`) over loose equality (`==`) in conditional logic?",
-    correct: "`===` checks both value and type without implicit type coercion, preventing surprises like `0 == ''` or `'5' == 5`.",
+    keywords: ["operator", "operators", "comparison", "equality", "ternary", "logical", "conditional", "statements"],
+    domains: ["javascript", "js", "typescript", "ecmascript", "web", "frontend", "node"],
+    questionText: "Why does JavaScript recommend strict equality (===) over loose equality (==) in conditional checks?",
+    correct: "=== compares both value and type without implicit coercion, avoiding bugs such as 0 == '' or '5' == 5 evaluating true.",
     distractors: [
-      "`===` performs deep structural equality on two separate object references automatically.",
-      "`==` is deprecated syntax that throws a TypeError in modern ES6+ strict mode.",
-      "`===` converts strings to numbers before comparing so numeric strings match numbers safely.",
+      "=== performs recursive deep value comparison on two separate object or array instances automatically.",
+      "== throws a SyntaxError whenever ES module strict mode is active in modern browsers.",
+      "=== automatically casts numeric strings into IEEE-754 integers before evaluating equality.",
     ],
-    explanation: "Strict equality avoids JavaScript's implicit coercion rules that lead to subtle truthiness bugs.",
+    explanation: "Strict equality avoids implicit type coercion surprises in JavaScript conditional expressions.",
   },
   {
-    keywords: ["loop", "loops", "iteration", "for", "while", "break", "continue"],
-    languages: ["javascript", "js", "typescript", "web"],
-    questionText: "When iterating in JavaScript, what distinguishes `for...of` from `for...in` and `while` loops?",
-    correct: "`for...of` iterates directly over iterable values (arrays, strings, Maps/Sets), while `for...in` enumerates enumerable object keys.",
+    keywords: ["loop", "loops", "iteration", "for", "while", "break", "continue", "string", "strings"],
+    domains: ["javascript", "js", "typescript", "ecmascript", "web", "frontend", "node"],
+    questionText: "When iterating in JavaScript, what distinguishes for...of from for...in?",
+    correct: "for...of iterates over iterable values (such as arrays, strings, Maps, or Sets), while for...in enumerates enumerable property keys.",
     distractors: [
-      "`for...of` only iterates plain object keys and cannot run on arrays or strings.",
-      "`continue` exits the entire enclosing function immediately rather than skipping the current iteration.",
-      "`for...in` guarantees numeric array index types instead of string property keys.",
+      "for...of only reads plain object property names and throws an error on arrays or strings.",
+      "for...in yields element values sorted numerically and skips inherited prototype keys automatically.",
+      "Using continue inside a loop exits the enclosing function immediately instead of advancing to the next iteration.",
     ],
-    explanation: "Using `for...of` for array values and `for...in` only for object keys prevents inherited-property and string-index bugs.",
+    explanation: "Use for...of for sequential array/string values and for...in only when inspecting object keys.",
   },
   {
-    keywords: ["function", "functions", "closure", "closures", "arrow", "callback", "parameter"],
-    languages: ["javascript", "js", "typescript", "web"],
-    questionText: "How does lexical `this` binding work in a JavaScript arrow function compared to a regular `function`?",
-    correct: "Arrow functions inherit `this` lexically from their enclosing scope instead of rebinding `this` dynamically based on the caller.",
+    keywords: ["array", "arrays", "map", "filter", "reduce", "splice", "slice", "push", "pop"],
+    domains: ["javascript", "js", "typescript", "ecmascript", "web", "frontend", "node"],
+    questionText: "What is the practical difference between Array.prototype.map(), slice(), and splice() in JavaScript?",
+    correct: "map() and slice() return new arrays without mutating the source array, whereas splice() mutates the original array in place.",
     distractors: [
-      "Arrow functions always bind `this` to `undefined` unless `.call()` overrides them.",
-      "Regular functions capture lexical `this` permanently and ignore `.bind()` calls.",
-      "Arrow functions cannot form closures over outer variables when returned from another function.",
+      "slice() deletes items from the source array directly, while splice() creates a shallow read-only copy.",
+      "map() mutates every element inside the source array in place and discards the return value.",
+      "reduce() runs iterations concurrently in parallel threads without maintaining an accumulator state.",
     ],
-    explanation: "Lexical `this` makes arrow functions ideal for callbacks inside methods while unsuitable as dynamic object methods.",
+    explanation: "Knowing which array methods return derived copies vs mutate in place keeps application state predictable.",
   },
   {
-    keywords: ["array", "arrays", "map", "filter", "reduce", "splice", "slice"],
-    languages: ["javascript", "js", "typescript", "web"],
-    questionText: "What is the practical difference between `Array.prototype.map()`, `slice()`, and `splice()` in JavaScript?",
-    correct: "`map()` and `slice()` return new arrays without mutating the original array, whereas `splice()` modifies the original array in place.",
+    keywords: ["function", "functions", "closure", "closures", "arrow", "parameter", "return", "method", "methods"],
+    domains: ["javascript", "js", "typescript", "ecmascript", "web", "frontend", "react", "node"],
+    questionText: "How does 'this' binding behave inside a JavaScript arrow function compared to a regular function declaration?",
+    correct: "An arrow function captures 'this' lexically from its surrounding scope rather than dynamically from how it is called.",
     distractors: [
-      "`slice()` mutates the original array and returns removed items, while `splice()` leaves it untouched.",
-      "`map()` filters out falsy values automatically and alters the source array in place.",
-      "`reduce()` executes callbacks in parallel across multiple threads without an accumulator.",
+      "Arrow functions create a brand-new dynamic 'this' on each call that .bind() overrides permanently.",
+      "Regular function expressions always lock 'this' to the parent module and ignore the receiver object.",
+      "Arrow functions cannot close over variables declared inside an outer enclosing function.",
     ],
-    explanation: "Knowing which array methods return new copies vs mutate in place prevents state bugs in JS apps.",
+    explanation: "Lexical 'this' preserves outer context in callbacks while regular methods bind 'this' to the receiver.",
   },
   {
     keywords: ["object", "objects", "destructuring", "spread", "rest", "prototype"],
-    languages: ["javascript", "js", "typescript", "web"],
-    questionText: "What does shallow copying an object with the spread syntax (`{ ...obj }`) actually duplicate?",
-    correct: "It creates a new top-level object with copied own enumerable properties, while nested objects remain shared references.",
+    domains: ["javascript", "js", "typescript", "ecmascript", "web", "frontend", "node"],
+    questionText: "What does shallow copying a JavaScript object with spread syntax ({ ...obj }) duplicate?",
+    correct: "It copies own enumerable top-level properties into a new object, while nested objects remain shared references.",
     distractors: [
-      "It performs a full deep clone recursively across every nested object and Map.",
-      "It binds both objects bidirectionally so top-level key additions synchronize automatically.",
-      "It copies prototype chain methods as own enumerable JSON properties.",
+      "It performs a deep recursive clone across all nested objects, Maps, and circular structures.",
+      "It links both variables two-way so reassigning a top-level string updates the original object automatically.",
+      "It serializes non-enumerable symbols and prototype methods into JSON string properties.",
     ],
-    explanation: "Spread syntax only clones one level deep; nested objects still reference the original nested objects.",
+    explanation: "Spread syntax copies one level deep; nested objects must be cloned separately if mutated.",
   },
   {
-    keywords: ["dom", "event", "events", "bubbling", "listener", "queryselector", "async", "promise", "fetch"],
-    languages: ["javascript", "js", "typescript", "web"],
-    questionText: "Why use DOM event delegation (attaching one listener to a parent container) instead of separate listeners on every child item?",
-    correct: "Events bubble up to the parent, lowering memory overhead and automatically handling dynamically added child elements.",
+    keywords: ["dom", "document", "queryselector", "innerhtml", "textcontent", "element", "elements", "css", "styling"],
+    domains: ["javascript", "js", "typescript", "ecmascript", "web", "frontend", "html", "css"],
+    questionText: "When updating DOM text from user-supplied input in the browser, why prefer textContent over innerHTML?",
+    correct: "textContent inserts plain text safely without parsing HTML tags, preventing Cross-Site Scripting (XSS) script injection.",
     distractors: [
-      "Event bubbling only works when `event.preventDefault()` is disabled on child nodes.",
-      "Parent listeners intercept events exclusively during capture phase before targets exist.",
-      "Adding individual child listeners disables `fetch()` and async Promise resolution in the browser.",
+      "innerHTML is read-only in modern browsers and cannot inject child elements after initial page load.",
+      "textContent executes inline <script> tags faster while preserving CSS layout styles automatically.",
+      "innerHTML strips all whitespace and forces synchronous browser page reloads on every update.",
     ],
-    explanation: "Event delegation leverages DOM bubbling via `event.target` to keep dynamic UIs fast and clean.",
+    explanation: "Using textContent treats untrusted text literally instead of parsing and executing HTML markup.",
+  },
+  {
+    keywords: ["event", "events", "listener", "addeventlistener", "bubbling", "delegation", "preventdefault", "click"],
+    domains: ["javascript", "js", "typescript", "ecmascript", "web", "frontend", "react"],
+    questionText: "Why use DOM event delegation on a parent container instead of attaching separate listeners to every child button?",
+    correct: "Click events bubble to the parent, reducing listener memory overhead and supporting dynamically added children automatically.",
+    distractors: [
+      "Event bubbling only reaches parent containers if event.preventDefault() is disabled on the document body.",
+      "Child buttons lose click accessibility unless each element binds its own inline onclick attribute.",
+      "Parent listeners intercept events exclusively during capture phase before DOM targets finish mounting.",
+    ],
+    explanation: "Event delegation leverages event bubbling and event.target/closest() for dynamic lists and grids.",
+  },
+  {
+    keywords: ["game", "building game", "tic tac toe", "rock paper", "project", "score", "reset", "turn"],
+    domains: ["javascript", "js", "typescript", "ecmascript", "web", "frontend", "react"],
+    questionText: "When building an interactive browser game (like Tic-Tac-Toe or Rock-Paper-Scissors) with DOM state, what causes stale clicks or corrupted rounds on game reset?",
+    correct: "Failing to reset state flags (such as turn counters/board arrays) and re-enabling or clearing per-cell UI state consistently on restart.",
+    distractors: [
+      "Using document.querySelectorAll() instead of hardcoding inline style tags inside HTML comments.",
+      "Storing win-pattern index combinations inside a constant nested array before the first move.",
+      "Preventing browser page reloads by calling event.stopPropagation() inside every button click handler.",
+    ],
+    explanation: "Clean game resets synchronize data state, disabled button flags, and winner banners together before the next round.",
+  },
+  {
+    keywords: ["class", "classes", "constructor", "extends", "super", "oop", "inheritance", "new"],
+    domains: ["javascript", "js", "typescript", "ecmascript", "web", "frontend", "node"],
+    questionText: "In an ES6 JavaScript subclass declared with 'class Child extends Parent', why must super() be called inside constructor() before referencing 'this'?",
+    correct: "super() invokes the Parent constructor to initialize the 'this' instance before Child adds its own properties.",
+    distractors: [
+      "super() compiles the subclass into static global variables rather than prototype-linked methods.",
+      "Calling super() is optional unless Parent overrides Object.prototype.toString explicitly.",
+      "super() copies all private methods onto Child while severing the prototype chain to Parent.",
+    ],
+    explanation: "In derived classes, the base constructor creates and binds 'this', so super() must execute before 'this' access.",
+  },
+  {
+    keywords: ["callback", "callbacks", "promise", "promises", "async", "await", "asynchronous", "settimeout", "event loop"],
+    domains: ["javascript", "js", "typescript", "ecmascript", "web", "frontend", "node"],
+    questionText: "How do Promises and async/await improve on deeply nested callbacks in asynchronous JavaScript?",
+    correct: "They flatten nested control flow into sequential steps and centralize rejection/error handling with .catch() or try/catch.",
+    distractors: [
+      "async/await executes synchronous blocking CPU sleeps on the main thread without using the event loop.",
+      "Promises automatically run every callback inside parallel OS worker threads outside V8.",
+      "Returning a value from an async function strips away Promise wrapping and returns synchronously.",
+    ],
+    explanation: "Promises and async/await simplify async composition and prevent silent error drops common in nested callbacks.",
+  },
+  {
+    keywords: ["fetch", "api", "currency", "converter", "http", "json", "response", "request", "endpoint"],
+    domains: ["javascript", "js", "typescript", "ecmascript", "web", "frontend", "node", "react"],
+    questionText: "When calling fetch() in JavaScript, why should you check response.ok in addition to wrapping await fetch(...) in try/catch?",
+    correct: "fetch() only rejects on network failures, so HTTP 404 or 500 error responses still resolve with response.ok === false.",
+    distractors: [
+      "response.json() converts any HTTP 4xx status into a synchronous SyntaxError automatically.",
+      "fetch() blocks the browser UI thread until every response header finishes streaming.",
+      "Checking response.ok automatically caches POST responses inside localStorage across reloads.",
+    ],
+    explanation: "fetch() resolves normally on HTTP error status codes; inspecting response.ok lets your code handle 4xx/5xx failures explicitly.",
+  },
+  {
+    keywords: ["error", "exception", "try", "catch", "finally", "debugging"],
+    domains: ["javascript", "js", "typescript", "ecmascript", "web", "frontend", "node"],
+    questionText: "What role does the finally block serve inside a try / catch / finally statement?",
+    correct: "It runs after try and any matching catch block regardless of whether an exception was thrown or caught, ideal for cleanup.",
+    distractors: [
+      "It executes exclusively when catch catches a TypeError, skipping execution on successful runs.",
+      "It suppresses uncaught errors inside async callbacks without propagating Promise rejections.",
+      "It pauses loop iteration until all pending timers in the macrotask queue finish.",
+    ],
+    explanation: "finally always runs after try/catch completion to release locks, loading spinners, or connections reliably.",
+  },
+  // ---- React / Next.js ----
+  {
+    keywords: ["component", "props", "state", "usestate", "useeffect", "jsx", "hooks", "react", "next"],
+    domains: ["react", "next", "nextjs", "frontend", "typescript", "javascript"],
+    questionText: "Why does React require calling state setter functions (e.g. setCount(c => c + 1)) instead of mutating state variables directly?",
+    correct: "State setters notify React to schedule a re-render with the new snapshot, whereas direct mutation leaves UI stale.",
+    distractors: [
+      "Direct mutation throws an immediate compile-time JSX syntax error during bundling.",
+      "State setters bypass reconciliation and update DOM text nodes without re-running component logic.",
+      "Functional updates execute inside a separate worker process that disables useEffect hooks.",
+    ],
+    explanation: "Immutable state updates through setters trigger React's reconciliation and keep concurrent updates accurate.",
+  },
+  // ---- SQL / Databases ----
+  {
+    keywords: ["sql", "select", "join", "where", "having", "group by", "index", "database", "postgres", "mysql"],
+    domains: ["sql", "postgres", "postgresql", "mysql", "sqlite", "database", "databases", "prisma"],
+    questionText: "In SQL queries using GROUP BY, what distinguishes WHERE from HAVING?",
+    correct: "WHERE filters individual rows before grouping/aggregation occurs, while HAVING filters grouped aggregate results afterward.",
+    distractors: [
+      "HAVING filters ungrouped rows faster by forcing full sequential table scans without indexes.",
+      "WHERE can evaluate COUNT(*) and SUM() aggregates directly without a GROUP BY clause.",
+      "HAVING runs before FROM joins so unrelated tables are excluded prior to row matching.",
+    ],
+    explanation: "Apply WHERE to filter raw rows first and HAVING to constrain aggregated groups like COUNT(*) > 5.",
+  },
+  // ---- HTML / CSS ----
+  {
+    keywords: ["flexbox", "grid", "box model", "margin", "padding", "css", "responsive", "media query", "semantic"],
+    domains: ["css", "html", "tailwind", "design", "ui", "web"],
+    questionText: "When choosing CSS layout tools, when is CSS Grid usually a better fit than Flexbox?",
+    correct: "CSS Grid excels at two-dimensional layouts aligning rows and columns together, whereas Flexbox aligns along one axis at a time.",
+    distractors: [
+      "Flexbox cannot wrap items across lines, whereas CSS Grid enforces single-row horizontal scrolling.",
+      "CSS Grid ignores padding and border inside box-sizing calculations by default.",
+      "Flexbox works only inside inline <span> elements and disables responsive media queries.",
+    ],
+    explanation: "Use Flexbox for one-dimensional rows or columns and CSS Grid when coordinating both axes simultaneously.",
+  },
+  // ---- Git / Version Control ----
+  {
+    keywords: ["git", "branch", "commit", "merge", "rebase", "pull request", "github"],
+    domains: ["git", "github", "devops", "workflow"],
+    questionText: "What is the key difference between 'git merge' and 'git rebase' when integrating changes onto a feature branch?",
+    correct: "git merge preserves full branch history via a merge commit, whereas git rebase replays commits linearly onto the updated base.",
+    distractors: [
+      "git rebase deletes all untracked working-tree files before comparing commit hashes.",
+      "git merge rewrites public remote commit SHAs unconditionally without creating a commit object.",
+      "git rebase only works on the initial commit and cannot resolve line conflicts.",
+    ],
+    explanation: "Merge retains parallel branch history; rebase rewrites local commits cleanly onto the target tip.",
   },
 ];
 
 function matchesCourseLanguageMismatch(
   courseTitle: string,
-  questionText: string
+  questionText: string,
+  optionsText = ""
 ): boolean {
   const cLower = courseTitle.toLowerCase();
-  const qLower = questionText.toLowerCase();
+  const combinedQ = `${questionText} ${optionsText}`.toLowerCase();
   const isJsCourse =
     /\b(javascript|ecmascript|typescript|react|next\.js|node\.js|express)\b/.test(cLower) &&
     !/\bpython\b/.test(cLower);
@@ -194,39 +347,67 @@ function matchesCourseLanguageMismatch(
     /\bpython\b/.test(cLower) &&
     !/\b(javascript|typescript|node\.js|react)\b/.test(cLower);
 
-  if (isJsCourse && /\b(python|python's|elif|__init__|tuple|pytest)\b/.test(qLower)) {
+  if (
+    isJsCourse &&
+    /\b(python|python's|pyjokes|pip|elif|__init__|tuple|pytest|triple quotes|built-in module)\b/.test(combinedQ)
+  ) {
     return true;
   }
-  if (isPythonCourse && /\b(console\.log|===|temporal dead zone|queryselector)\b/.test(qLower)) {
+  if (
+    isPythonCourse &&
+    /\b(console\.log|===|temporal dead zone|queryselector|innerhtml|addeventlistener)\b/.test(combinedQ)
+  ) {
     return true;
   }
   return false;
 }
 
-function matchJavaScriptPlacementConcept(
+function scoreDomainPlacementCandidate(
+  item: PlacementConceptQuestion,
+  courseTitle: string,
+  topicName: string,
+  bodyText: string
+): number {
+  const topicLower = topicName.toLowerCase();
+  const courseLower = courseTitle.toLowerCase();
+  const bodyLower = `${topicName} ${bodyText}`.toLowerCase();
+  const domainHit = item.domains.some((d) =>
+    new RegExp(`(?:^|[^a-z0-9_])${d.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:$|[^a-z0-9_])`).test(
+      `${courseLower} ${bodyLower}`
+    )
+  );
+  if (!domainHit) return 0;
+
+  let score = 0;
+  for (const kw of item.keywords) {
+    const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const wordRe = new RegExp(`(?:^|[^a-z0-9_])${escaped}(?:$|[^a-z0-9_])`);
+    if (wordRe.test(topicLower)) score += 6;
+    else if (wordRe.test(bodyLower)) score += 2;
+  }
+  return score;
+}
+
+function matchDomainPlacementConcept(
   courseTitle: string,
   topicName: string,
   bodyText: string,
   usedPrompts: Set<string>,
+  usedOptionTexts: Set<string>,
   seedIdx: number
 ): Omit<GeneratedPlacementQuestion, "topicName"> | null {
-  const combined = `${courseTitle} ${topicName} ${bodyText}`.toLowerCase();
-  if (!/\b(javascript|js|typescript|frontend|web|dom|react|node)\b/.test(combined)) {
-    return null;
-  }
-
   let best: PlacementConceptQuestion | null = null;
   let bestScore = 0;
 
-  for (const item of JAVASCRIPT_CONCEPT_BANK) {
-    if (usedPrompts.has(item.questionText.toLowerCase())) continue;
-    let score = 0;
-    for (const kw of item.keywords) {
-      const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const wordRe = new RegExp(`(?:^|[^a-z0-9_])${escaped}(?:$|[^a-z0-9_])`);
-      if (wordRe.test(topicName.toLowerCase())) score += 6;
-      else if (wordRe.test(combined)) score += 2;
-    }
+  for (const item of DOMAIN_PLACEMENT_BANK) {
+    const cleanPrompt = cleanPlacementText(item.questionText);
+    if (usedPrompts.has(cleanPrompt.toLowerCase())) continue;
+    const optCollision = [item.correct, ...item.distractors].some((opt) =>
+      usedOptionTexts.has(cleanPlacementText(opt).toLowerCase())
+    );
+    if (optCollision) continue;
+
+    const score = scoreDomainPlacementCandidate(item, courseTitle, topicName, bodyText);
     if (score > bestScore) {
       bestScore = score;
       best = item;
@@ -234,12 +415,20 @@ function matchJavaScriptPlacementConcept(
   }
 
   if (!best || bestScore < 4) return null;
-  const rotated = rotateMCQOptions(best.correct, best.distractors, seedIdx);
+  const rotated = rotateMCQOptions(
+    cleanPlacementText(best.correct),
+    [
+      cleanPlacementText(best.distractors[0]),
+      cleanPlacementText(best.distractors[1]),
+      cleanPlacementText(best.distractors[2]),
+    ],
+    seedIdx
+  );
   return {
-    questionText: best.questionText,
+    questionText: cleanPlacementText(best.questionText),
     options: rotated.options,
     correctOptionIndex: rotated.correctOptionIndex,
-    explanation: best.explanation,
+    explanation: cleanPlacementText(best.explanation),
   };
 }
 
@@ -277,6 +466,8 @@ export function cleanPlacementText(input = ""): string {
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/\*\*([^*\n]+)\*\*/g, "$1")
+    .replace(/__([^_\n]+)__/g, "$1")
     .replace(/^\d+[\.\:\-]\s*/, "")
     .replace(/\s+/g, " ")
     .trim();
@@ -308,7 +499,28 @@ export function hasLowQualityPlacementSet(
   }>
 ): boolean {
   if (!Array.isArray(questions) || questions.length < 3) return true;
-  return questions.some((q) => isGenericPlacementQuestion(q));
+
+  const seenOptions = new Set<string>();
+  for (const q of questions) {
+    if (isGenericPlacementQuestion(q)) return true;
+    if (/\*\*[^*\n]+\*\*/.test(q.questionText || "")) return true;
+
+    const rawOpts = (q.options || [])
+      .map((o) => cleanPlacementText(typeof o === "string" ? o : o?.optionText || ""))
+      .filter(Boolean);
+    if (rawOpts.length < 4) return true;
+
+    const perQuestionSet = new Set(rawOpts.map((o) => o.toLowerCase()));
+    if (perQuestionSet.size < 4) return true;
+
+    // If any option repeats verbatim across 2+ placement questions, treat the set as low quality
+    for (const normOpt of perQuestionSet) {
+      if (seenOptions.has(normOpt)) return true;
+      seenOptions.add(normOpt);
+    }
+  }
+
+  return false;
 }
 
 function parseStringArray(
@@ -556,16 +768,28 @@ export function buildPlacementQuestionsFromCurriculum(params: {
   const sampled = selectPlacementSampleLessons(chapters, 6);
   if (sampled.length === 0) return [];
 
-  // Course-wide definition & takeaway pools for authentic same-course distractors
+  // Course-wide non-boilerplate definition & takeaway pools for authentic same-course distractors
   const courseDefinitions: ParsedDefinition[] = [];
   const courseTakeaways: { text: string; topic: string }[] = [];
+  const allTopicNames: string[] = [];
 
   for (const ch of chapters) {
     for (const les of ch.lessons || []) {
       const topic = cleanPlacementTopic(les.title) || les.title;
-      courseDefinitions.push(...parseDefinitions(les.importantDefinitions, topic));
+      if (topic && !allTopicNames.includes(topic)) {
+        allTopicNames.push(topic);
+      }
+      for (const d of parseDefinitions(les.importantDefinitions, topic)) {
+        if (!isGenericPlacementQuestion({ questionText: `${d.term}: ${d.definition}` })) {
+          courseDefinitions.push(d);
+        }
+      }
       for (const tk of parseStringArray(les.keyTakeaways)) {
-        if (tk.length >= 25 && tk.length <= 180) {
+        if (
+          tk.length >= 25 &&
+          tk.length <= 180 &&
+          !isGenericPlacementQuestion({ questionText: tk })
+        ) {
           courseTakeaways.push({ text: tk, topic });
         }
       }
@@ -573,30 +797,65 @@ export function buildPlacementQuestionsFromCurriculum(params: {
   }
 
   const usedPrompts = new Set<string>();
+  const usedOptionTexts = new Set<string>();
   const results: GeneratedPlacementQuestion[] = [];
+
+  const canAcceptQuestion = (
+    norm: {
+      questionText: string;
+      options: string[];
+      correctOptionIndex: number;
+      explanation: string;
+    } | null
+  ): norm is Omit<GeneratedPlacementQuestion, "topicName"> => {
+    if (!norm) return false;
+    if (usedPrompts.has(norm.questionText.toLowerCase())) return false;
+    if (isGenericPlacementQuestion(norm)) return false;
+    if (isTimestampOrSegmentReferential(norm.questionText)) return false;
+    if (matchesCourseLanguageMismatch(courseTitle, norm.questionText, norm.options.join(" "))) {
+      return false;
+    }
+    return norm.options.every((opt) => !usedOptionTexts.has(opt.toLowerCase()));
+  };
 
   for (let i = 0; i < sampled.length; i++) {
     const { chapterTitle, lesson, lessonIndex, topicName } = sampled[i];
-    const takeaways = parseStringArray(lesson.keyTakeaways);
-    const definitions = parseDefinitions(lesson.importantDefinitions, topicName);
+    const takeaways = parseStringArray(lesson.keyTakeaways).filter(
+      (t) => !isGenericPlacementQuestion({ questionText: t })
+    );
+    const definitions = parseDefinitions(lesson.importantDefinitions, topicName).filter(
+      (d) => !isGenericPlacementQuestion({ questionText: `${d.term}: ${d.definition}` })
+    );
 
     let chosen: Omit<GeneratedPlacementQuestion, "topicName"> | null = null;
 
-    // Tier 1: Strong pre-existing lesson quiz question (domain-specific, non-boilerplate)
+    // Tier 1: Strong pre-existing lesson quiz question (domain-specific, non-boilerplate, unique options)
     if (Array.isArray(lesson.quizQuestions) && lesson.quizQuestions.length > 0) {
       for (const rawQ of lesson.quizQuestions) {
         const norm = normalizeQuizQuestionOptions(rawQ);
-        if (!norm) continue;
-        if (usedPrompts.has(norm.questionText.toLowerCase())) continue;
-        if (isGenericPlacementQuestion(norm)) continue;
-        if (isTimestampOrSegmentReferential(norm.questionText)) continue;
-        if (matchesCourseLanguageMismatch(courseTitle, norm.questionText)) continue;
-        chosen = norm;
-        break;
+        if (canAcceptQuestion(norm)) {
+          chosen = norm;
+          break;
+        }
       }
     }
 
-    // Tier 2A: Synthesize via quizGenerator (matches technical banks + takeaways + definitions)
+    // Tier 2A: Domain placement concept bank (JS/TS, React, SQL, CSS/HTML, Git)
+    if (!chosen) {
+      const domainMatch = matchDomainPlacementConcept(
+        courseTitle,
+        topicName,
+        `${chapterTitle} ${lesson.summary || ""} ${lesson.description || ""} ${takeaways.join(" ")}`,
+        usedPrompts,
+        usedOptionTexts,
+        i + lessonIndex
+      );
+      if (canAcceptQuestion(domainMatch)) {
+        chosen = domainMatch;
+      }
+    }
+
+    // Tier 2B: Synthesize via quizGenerator domain banks (Python, AI/LLM, FastAPI, System Design, Excel, Cybersecurity, etc.)
     if (!chosen) {
       const synthesized: SynthesizedQuizQuestion[] = synthesizeLessonQuizQuestions(
         {
@@ -618,62 +877,61 @@ export function buildPlacementQuestionsFromCurriculum(params: {
 
       for (const sq of synthesized) {
         const norm = normalizeQuizQuestionOptions(sq);
-        if (!norm) continue;
-        if (usedPrompts.has(norm.questionText.toLowerCase())) continue;
-        if (isGenericPlacementQuestion(norm)) continue;
-        if (isTimestampOrSegmentReferential(norm.questionText)) continue;
-        if (matchesCourseLanguageMismatch(courseTitle, norm.questionText)) continue;
-        chosen = norm;
-        break;
+        if (canAcceptQuestion(norm)) {
+          chosen = norm;
+          break;
+        }
       }
     }
 
-    // Tier 2B: JavaScript / Web concept bank when course is JS/Frontend-focused
-    if (!chosen) {
-      chosen = matchJavaScriptPlacementConcept(
-        courseTitle,
-        topicName,
-        `${lesson.summary || ""} ${lesson.description || ""} ${takeaways.join(" ")}`,
-        usedPrompts,
-        i + lessonIndex
-      );
-    }
-
-    // Tier 3: Course-grounded Definition or Takeaway question using real sibling-concept distractors
+    // Tier 3: Course-grounded Definition or Takeaway question using unique per-topic & sibling-module distractors
     if (!chosen && definitions.length > 0) {
       const targetDef = definitions[0];
       const prompt = `In ${courseTitle}, what does "${targetDef.term}" (covered in ${topicName}) refer to?`;
-      if (!usedPrompts.has(prompt.toLowerCase())) {
+      if (
+        !usedPrompts.has(prompt.toLowerCase()) &&
+        !usedOptionTexts.has(targetDef.definition.toLowerCase())
+      ) {
         const otherDefs = courseDefinitions
           .filter(
             (d) =>
               d.term.toLowerCase() !== targetDef.term.toLowerCase() &&
-              d.definition.toLowerCase() !== targetDef.definition.toLowerCase()
+              d.definition.toLowerCase() !== targetDef.definition.toLowerCase() &&
+              !usedOptionTexts.has(d.definition.toLowerCase())
           )
           .map((d) => d.definition);
+        const siblingTopics = allTopicNames.filter(
+          (t) => t.toLowerCase() !== topicName.toLowerCase()
+        );
+        const siblingA = siblingTopics[i % Math.max(1, siblingTopics.length)] || "later modules";
         const uniqueOthers = Array.from(new Set(otherDefs)).slice(0, 3);
-        while (uniqueOthers.length < 3) {
-          const fallbackDistractors = [
-            `A deprecated legacy syntax removed from modern ${courseTitle} workflows`,
-            `An external third-party billing hook unrelated to ${topicName}`,
-            `A manual override that bypasses runtime checks in ${chapterTitle || topicName}`,
-          ];
-          const candidate = fallbackDistractors[uniqueOthers.length];
-          if (!uniqueOthers.includes(candidate)) {
+        const topicSpecificFallbacks = [
+          `A configuration concept belonging strictly to "${siblingA}" rather than "${targetDef.term}" in "${topicName}"`,
+          `An optional visual style override that has no effect on how "${targetDef.term}" behaves at runtime`,
+          `A manual workaround that disables core checks introduced during "${topicName}"`,
+        ];
+        for (const candidate of topicSpecificFallbacks) {
+          if (uniqueOthers.length >= 3) break;
+          if (
+            !uniqueOthers.includes(candidate) &&
+            !usedOptionTexts.has(candidate.toLowerCase())
+          ) {
             uniqueOthers.push(candidate);
           }
         }
-        const rotated = rotateMCQOptions(
-          targetDef.definition,
-          [uniqueOthers[0], uniqueOthers[1], uniqueOthers[2]],
-          i + lessonIndex
-        );
-        chosen = {
-          questionText: prompt,
-          options: rotated.options,
-          correctOptionIndex: rotated.correctOptionIndex,
-          explanation: `${targetDef.term}: ${targetDef.definition}`,
-        };
+        if (uniqueOthers.length >= 3) {
+          const rotated = rotateMCQOptions(
+            targetDef.definition,
+            [uniqueOthers[0], uniqueOthers[1], uniqueOthers[2]],
+            i + lessonIndex
+          );
+          chosen = {
+            questionText: prompt,
+            options: rotated.options,
+            correctOptionIndex: rotated.correctOptionIndex,
+            explanation: `${targetDef.term}: ${targetDef.definition}`,
+          };
+        }
       }
     }
 
@@ -681,36 +939,56 @@ export function buildPlacementQuestionsFromCurriculum(params: {
       const summarySentences = extractSummarySentences(
         `${lesson.summary || ""} ${lesson.description || ""}`
       );
+      const siblingTopics = allTopicNames.filter(
+        (t) => t.toLowerCase() !== topicName.toLowerCase()
+      );
+      const siblingA = siblingTopics[i % Math.max(1, siblingTopics.length)] || "downstream workflows";
+      const siblingB =
+        siblingTopics[(i + 1) % Math.max(1, siblingTopics.length)] || "project setup";
+
       const coreFact =
-        takeaways.find((t) => t.length >= 25 && !GENERIC_PLACEMENT_PATTERNS.some((re) => re.test(t))) ||
-        summarySentences[0] ||
-        `Mastering ${topicName} techniques inside ${chapterTitle || courseTitle}`;
+        takeaways.find(
+          (t) => t.length >= 25 && !usedOptionTexts.has(t.toLowerCase())
+        ) ||
+        summarySentences.find((s) => !usedOptionTexts.has(s.toLowerCase())) ||
+        `Applying "${topicName}" directly inside "${chapterTitle || courseTitle}" examples with verified inputs and outputs`;
 
       const siblingDistractors = courseTakeaways
         .filter(
           (t) =>
             t.topic.toLowerCase() !== topicName.toLowerCase() &&
-            t.text.toLowerCase() !== coreFact.toLowerCase()
+            t.text.toLowerCase() !== coreFact.toLowerCase() &&
+            !usedOptionTexts.has(t.text.toLowerCase())
         )
         .map((t) => t.text);
       const uniqueDistractors = Array.from(new Set(siblingDistractors)).slice(0, 3);
 
-      const fallbackBank: [string, string, string] = [
-        `Skipping ${topicName} entirely because it has no effect on downstream topics in ${courseTitle}`,
-        `Using unrelated tools from outside ${chapterTitle || courseTitle} instead of ${topicName}`,
-        `Avoiding verification checks when applying ${topicName}`,
+      const perQuestionFallbacks = [
+        `Deferring "${topicName}" setup entirely until finishing "${siblingA}" in an unrelated stage`,
+        `Replacing "${topicName}" rules with assumptions copied unchanged from "${siblingB}"`,
+        `Skipping validation when transferring values out of "${topicName}" into "${siblingA}"`,
       ];
-      while (uniqueDistractors.length < 3) {
-        uniqueDistractors.push(fallbackBank[uniqueDistractors.length]);
+      for (const fb of perQuestionFallbacks) {
+        if (uniqueDistractors.length >= 3) break;
+        if (
+          !uniqueDistractors.includes(fb) &&
+          !usedOptionTexts.has(fb.toLowerCase())
+        ) {
+          uniqueDistractors.push(fb);
+        }
       }
 
       const rotated = rotateMCQOptions(
         coreFact,
-        [uniqueDistractors[0], uniqueDistractors[1], uniqueDistractors[2]],
+        [
+          uniqueDistractors[0] || perQuestionFallbacks[0],
+          uniqueDistractors[1] || perQuestionFallbacks[1],
+          uniqueDistractors[2] || perQuestionFallbacks[2],
+        ],
         i + lessonIndex
       );
       chosen = {
-        questionText: `Which statement best reflects a core concept taught in "${topicName}" (${chapterTitle || courseTitle})?`,
+        questionText: `Which statement accurately describes how "${topicName}" is applied in ${courseTitle}?`,
         options: rotated.options,
         correctOptionIndex: rotated.correctOptionIndex,
         explanation: coreFact,
@@ -718,6 +996,9 @@ export function buildPlacementQuestionsFromCurriculum(params: {
     }
 
     usedPrompts.add(chosen.questionText.toLowerCase());
+    for (const opt of chosen.options) {
+      usedOptionTexts.add(opt.toLowerCase());
+    }
     results.push({
       topicName,
       questionText: chosen.questionText,
@@ -823,6 +1104,7 @@ Strict rules:
       if (parsed?.questions && Array.isArray(parsed.questions)) {
         const valid: GeneratedPlacementQuestion[] = [];
         const seenPrompts = new Set<string>();
+        const seenOptions = new Set<string>();
 
         for (const q of parsed.questions) {
           if (
@@ -845,8 +1127,12 @@ Strict rules:
           if (!norm) continue;
           if (seenPrompts.has(norm.questionText.toLowerCase())) continue;
           if (isGenericPlacementQuestion(norm)) continue;
+          if (norm.options.some((opt) => seenOptions.has(opt.toLowerCase()))) continue;
 
           seenPrompts.add(norm.questionText.toLowerCase());
+          for (const opt of norm.options) {
+            seenOptions.add(opt.toLowerCase());
+          }
           valid.push({
             topicName: cleanPlacementTopic(q.topicName) || q.topicName.trim(),
             questionText: norm.questionText,
@@ -856,7 +1142,7 @@ Strict rules:
           });
         }
 
-        if (valid.length >= 3) {
+        if (valid.length >= 3 && !hasLowQualityPlacementSet(valid)) {
           return valid.slice(0, 8);
         }
       }
