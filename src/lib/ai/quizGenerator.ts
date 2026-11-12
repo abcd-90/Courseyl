@@ -89,10 +89,11 @@ const regexCache = new Map<string, RegExp>();
 function containsKeyword(textLower: string, rawKw: string): boolean {
   const kw = rawKw.trim().toLowerCase();
   if (!kw) return false;
-  if (/^[a-z0-9_]+$/.test(kw) && kw.length <= 6) {
+  if (/^[a-z0-9_.-]+$/.test(kw)) {
     let re = regexCache.get(kw);
     if (!re) {
-      re = new RegExp(`(?:^|[^a-z0-9_])${kw}(?:$|[^a-z0-9_])`);
+      const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      re = new RegExp(`(?:^|[^a-z0-9_])${escaped}(?:$|[^a-z0-9_])`);
       regexCache.set(kw, re);
     }
     return re.test(textLower);
@@ -2668,6 +2669,178 @@ const TOPIC_QUESTION_BANKS: TopicQuestionBank[] = [
       },
     ],
   },
+  {
+    id: "nodejs_express_backend",
+    priorityPhrases: [
+      "node.js",
+      "nodejs",
+      "express js",
+      "express.js",
+      "read and write files",
+      "npm modules",
+      "event emitter",
+      "middleware",
+      "jwt auth",
+      "user roles",
+      "mongodb",
+      "mongoose",
+      "async crud",
+      "mvc model",
+    ],
+    keywords: [
+      "node.js",
+      "nodejs",
+      "express",
+      "npm",
+      "middleware",
+      "jwt",
+      "mongodb",
+      "mongoose",
+      "crud",
+      "mvc",
+      "commonjs",
+      "fs",
+      "eventemitter",
+      "bcrypt",
+      "cors",
+      "cookies",
+      "router",
+    ],
+    questions: [
+      {
+        subtopic: "node.js runtime & commonjs",
+        keywords: ["node.js", "nodejs", "commonjs", "require", "runtime", "start here", "intro"],
+        prompt: "How does **Node.js** differ from JavaScript running inside a web browser?",
+        correct: "Node.js runs on the V8 engine outside the browser, providing server APIs (`process`, `fs`, `path`, `http`, CommonJS `require`/ES modules) without a DOM or `window` object.",
+        distractors: [
+          "Node.js executes inside browser `localStorage` and requires `document.querySelector`",
+          "Node.js compiles Python bytecode directly into CSS stylesheets",
+          "Node.js blocks every HTTP request synchronously on separate OS threads by default",
+        ],
+        explanation: "Node.js brings JavaScript to the server with OS/filesystem APIs and module resolution (`require`/`import`) instead of browser DOM globals.",
+      },
+      {
+        subtopic: "read and write files (fs & path)",
+        keywords: ["read", "write", "files", "fs", "path", "promises", "async"],
+        prompt: "Why should Node.js services prefer `fs.promises` (`async/await`) + `path.join(__dirname, ...)` over `readFileSync` and hardcoded `/` paths?",
+        correct: "Async file I/O avoids blocking the single event loop under concurrent traffic, while `path.join` handles cross-platform OS separators safely.",
+        distractors: [
+          "`readFileSync` automatically parallelizes disk reads across multiple worker clusters",
+          "Hardcoding Windows backslashes works identically on Linux containers without escaping",
+          "`fs.promises` bypasses OS file permissions so any user can read `.env`",
+        ],
+        explanation: "Non-blocking `fs/promises` keeps the event loop responsive while `path.join` avoids platform-specific path separator bugs.",
+      },
+      {
+        subtopic: "npm modules & package.json",
+        keywords: ["npm", "modules", "package.json", "dependencies", "semver"],
+        prompt: "In `package.json`, what is the role of `dependencies` vs `devDependencies` and the `package-lock.json` file?",
+        correct: "`dependencies` are needed in production runtime, `devDependencies` only for local dev/testing/builds, and `package-lock.json` pins exact transitive versions for reproducible installs.",
+        distractors: [
+          "`package-lock.json` stores encrypted database passwords for Express routes",
+          "`devDependencies` are bundled automatically into browser HTML `<script>` tags",
+          "Semantic versioning caret (`^1.2.3`) locks only patch releases and allows breaking major bumps",
+        ],
+        explanation: "Separating runtime vs dev dependencies and committing `package-lock.json` ensures consistent, lean production installs.",
+      },
+      {
+        subtopic: "node event emitter & http server",
+        keywords: ["event", "emitter", "eventemitter", "web server", "http"],
+        prompt: "How does Node's `EventEmitter` pattern power logging, streams, and custom application events?",
+        correct: "Objects emit named events (`emitter.emit('log', ...)`) that decoupled listeners subscribe to (`emitter.on('log', handler)`), executing callbacks asynchronously/sequentially when triggered.",
+        distractors: [
+          "`EventEmitter` replaces HTTP status codes with WebGL canvas frames",
+          "`emitter.emit()` polls MongoDB every 50ms in an infinite `while(true)` loop",
+          "Only one listener may ever register per Node.js process",
+        ],
+        explanation: "The observer/pub-sub `EventEmitter` interface underpins streams, HTTP servers, and decoupled logging in Node.js.",
+      },
+      {
+        subtopic: "express.js routing & res helpers",
+        keywords: ["express", "routing", "router", "req", "res", "intro"],
+        prompt: "Why does **Express.js** organize routes with `express.Router()` and explicit HTTP status codes (`res.status(201).json(...)`)?",
+        correct: "Modular `Router` instances group feature endpoints cleanly (`routes/api/...`) while explicit status codes and JSON payloads keep REST API contracts predictable.",
+        distractors: [
+          "Express automatically returns HTTP `500` on every `GET` request unless `res.sendFile` is used",
+          "`express.Router()` runs client-side React hooks inside the browser URL bar",
+          "Omitting `return` after `res.json()` automatically prevents sending duplicate headers",
+        ],
+        explanation: "Modular Express routers and explicit status/JSON responses make REST APIs maintainable and client-friendly.",
+      },
+      {
+        subtopic: "express middleware & next()",
+        keywords: ["middleware", "next", "cors", "express.json", "error"],
+        prompt: "In an Express middleware function `(req, res, next) => { ... }`, what happens if it neither sends a response nor calls `next()`?",
+        correct: "The HTTP request hangs indefinitely because Express never advances to downstream middleware or route handlers.",
+        distractors: [
+          "Express automatically skips to the error handler after 50ms",
+          "Node restarts the server process cleanly on port 3500",
+          "The browser converts the pending request into a `204 No Content` success",
+        ],
+        explanation: "Every middleware must either terminate the request-response cycle (`res.json`/`res.sendStatus`) or delegate via `next()`.",
+      },
+      {
+        subtopic: "mvc architecture & controllers",
+        keywords: ["mvc", "controller", "model", "routes", "architecture"],
+        prompt: "How does separating Express apps into **Routes, Controllers, and Models (MVC)** improve maintainability?",
+        correct: "Routes map URLs & middleware, Controllers hold request/business logic, and Models encapsulate data schemas/queries—keeping each layer focused and testable.",
+        distractors: [
+          "MVC forces SQL queries to execute inside client-side CSS files",
+          "Controllers bypass authentication middleware so routes stay shorter",
+          "MVC removes the need for error handling or input validation",
+        ],
+        explanation: "Clean separation between routing, controller logic, and data models prevents bloated route files.",
+      },
+      {
+        subtopic: "jwt authentication & refresh tokens",
+        keywords: ["jwt", "authentication", "auth", "refresh", "access token", "cookies", "bcrypt"],
+        prompt: "Why pair short-lived **JWT access tokens** (in `Authorization: Bearer ...`) with **httpOnly refresh token cookies** and `bcrypt` password hashing?",
+        correct: "`bcrypt` salted hashes protect stored passwords, short-lived access tokens limit exposure if leaked, and `httpOnly` refresh cookies mitigate XSS token theft.",
+        distractors: [
+          "Plaintext passwords in MongoDB speed up `===` comparisons safely",
+          "`httpOnly` cookies allow client-side `document.cookie` JavaScript to read refresh secrets freely",
+          "Storing 10-year access tokens in `localStorage` eliminates the need for signature verification",
+        ],
+        explanation: "Salted password hashing, short access-token TTLs, and `httpOnly` refresh rotation harden Node/Express authentication.",
+      },
+      {
+        subtopic: "role-based access control (rbac)",
+        keywords: ["roles", "user roles", "authorization", "permissions", "rbac", "verifyroles"],
+        prompt: "In an Express `verifyRoles(...allowedRoles)` middleware, why must role verification run **after** `verifyJWT`?",
+        correct: "`verifyJWT` validates the token signature and attaches `req.roles` from the verified identity; `verifyRoles` then checks whether those roles intersect `allowedRoles` (`401` vs `403`).",
+        distractors: [
+          "Because `verifyRoles` issues new JWT signing secrets on every unauthenticated request",
+          "Because clients can safely pass `?isAdmin=true` without a signed token",
+          "Because Express runs middleware in reverse bottom-to-top order on every route",
+        ],
+        explanation: "Authentication (`401`) establishes verified identity/roles first so authorization middleware (`403`) can enforce permissions.",
+      },
+      {
+        subtopic: "mongodb & mongoose schemas",
+        keywords: ["mongodb", "mongoose", "data models", "schema", "model"],
+        prompt: "What role does a **Mongoose `Schema` & `Model`** play when connecting Express.js to MongoDB?",
+        correct: "A `Schema` defines document structure, types, defaults, and validation rules, while the compiled `Model` provides async CRUD query methods against the MongoDB collection.",
+        distractors: [
+          "Mongoose converts MongoDB into an in-memory browser `IndexedDB` cache",
+          "Schemas disable type casting so invalid objects save silently as raw HTML",
+          "Mongoose models execute synchronous SQL joins on local `.txt` files",
+        ],
+        explanation: "Mongoose schemas enforce structure and validation on MongoDB documents and expose clean async model methods.",
+      },
+      {
+        subtopic: "async crud operations & error handling",
+        keywords: ["async", "crud", "operations", "async/await", "mongoose", "express", "error"],
+        prompt: "When implementing **async CRUD** controllers (`create`, `find`, `update`, `deleteOne`) in Express + Mongoose, why validate IDs/required fields and handle rejected promises?",
+        correct: "Checking required inputs (`400`), missing documents (`404`), and catching rejected async DB calls prevents unhandled promise rejections from crashing or hanging the request.",
+        distractors: [
+          "Mongoose automatically returns HTTP `404` JSON responses without controller checks",
+          "Omitting `await` before `Model.findOne().exec()` guarantees the updated document returns immediately",
+          "Async Express handlers ignore thrown database errors automatically in Express 4",
+        ],
+        explanation: "Explicit validation, `await` on Mongoose queries, and structured error handling keep async CRUD endpoints reliable.",
+      },
+    ],
+  },
 ];
 
 function scoreBankMatch(bank: TopicQuestionBank, titleLower: string, bodyLower: string): number {
@@ -2743,7 +2916,7 @@ function buildContextDerivedFallbackQuestions(
     .filter((s) => s.length >= 28 && s.length <= 210 && !isTemplateFluff(s));
 
   const isTechDomain =
-    /\b(python|javascript|typescript|react|next\.?js|fastapi|sql|postgres|redis|docker|api|code|coding|programming|algorithm|function|variable|git|linux|backend|frontend|agent|llm|ai|cybersecurity|exploit|nmap|sharding|database|excel|formula|power query)\b/i.test(
+    /\b(python|javascript|typescript|node\.?js|nodejs|express|mongodb|mongoose|npm|jwt|middleware|crud|react|next\.?js|fastapi|sql|postgres|redis|docker|api|code|coding|programming|algorithm|function|variable|git|linux|backend|frontend|agent|llm|ai|cybersecurity|exploit|nmap|sharding|database|excel|formula|power query)\b/i.test(
       `${cleanTitle} ${courseHead} ${summarySource}`
     );
 

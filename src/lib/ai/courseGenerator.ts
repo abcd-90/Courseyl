@@ -1264,7 +1264,7 @@ interface ConceptEntry {
 
 const KNOWLEDGE_GLOSSARY: ConceptEntry[] = [
   {
-    keywords: ["langgraph", "stategraph", "node", "edge", "graph"],
+    keywords: ["langgraph", "stategraph", "cyclic graph", "agent graph"],
     term: "LangGraph StateGraph",
     definition: "Graph-based orchestration framework that models agent execution as stateful nodes and conditional/cyclic edges.",
     takeaway: "Design agent workflows explicitly using typed state schemas, nodes, and conditional routing edges.",
@@ -1402,10 +1402,22 @@ const KNOWLEDGE_GLOSSARY: ConceptEntry[] = [
     },
   },
   {
-    keywords: ["fastapi", "postgresql", "postgres", "sqlalchemy", "database", "crud", "groq", "api"],
+    keywords: ["fastapi", "postgresql", "postgres", "sqlalchemy", "groq"],
     term: "Backend API & Relational Storage",
     definition: "Exposing typed REST endpoints (e.g., FastAPI) backed by transactional PostgreSQL/SQLAlchemy models and low-latency inference APIs.",
     takeaway: "Decouple stateless HTTP request handlers from connection-pooled database persistence and strict schema validation.",
+  },
+  {
+    keywords: ["node.js", "nodejs", "express", "middleware", "npm", "commonjs", "eventemitter"],
+    term: "Node.js & Express Middleware",
+    definition: "Event-driven JavaScript server runtime pairing non-blocking I/O with Express route handlers and composable request/error middleware.",
+    takeaway: "Keep Node.js event loops non-blocking, isolate route middleware cleanly, and validate inputs before database mutations.",
+  },
+  {
+    keywords: ["mongodb", "mongoose", "crud", "jwt", "cookies", "bcrypt"],
+    term: "Auth & Async Document CRUD",
+    definition: "Securing REST endpoints with hashed credentials, short-lived JWT access tokens + httpOnly refresh cookies, and Mongoose schema models.",
+    takeaway: "Verify JWT signatures and role claims in middleware while keeping async Mongoose CRUD operations wrapped in explicit error handling.",
   },
   {
     keywords: ["llm", "llms", "chatgpt", "token", "evolution", "agentic"],
@@ -1644,7 +1656,7 @@ function detectCourseDomain(title: string, description = ""): CourseDomain {
   if (/generative ai|genai|llm|rag|prompt|chatgpt|openai|gemini|transformer/.test(haystack)) return "genai";
   if (/system design|distributed|caching|cdn|load balanc|sharding|scalability/.test(haystack)) return "system_design";
   if (/hacking|penetration|pentest|cyber|security|kali|wireshark|exploit/.test(haystack)) return "cybersecurity";
-  if (/backend|fastapi|express|nestjs|redis|docker|kubernetes|microservice/.test(haystack)) return "backend";
+  if (/backend|node\.?js|nodejs|fastapi|express|nestjs|mongoose|redis|docker|kubernetes|microservice/.test(haystack)) return "backend";
   if (/excel|power bi|tableau|pandas|analytics|data science|sql/.test(haystack)) return "data";
   if (/react|next\.?js|javascript|typescript|frontend|tailwind|html|css/.test(haystack)) return "frontend";
   if (/python|codewithharry|cs50p/.test(haystack)) return "python";
@@ -1671,11 +1683,21 @@ function extractTranscriptExcerpt(
   return `${combined.slice(0, maxChars).replace(/\s+\S*$/, "")}...`;
 }
 
+function matchesGlossaryKeyword(lowerText: string, rawKw: string): boolean {
+  const kw = rawKw.trim().toLowerCase();
+  if (!kw) return false;
+  if (/^[a-z0-9_.-]+$/.test(kw)) {
+    const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(?:^|[^a-z0-9_])${escaped}(?:$|[^a-z0-9_])`).test(lowerText);
+  }
+  return lowerText.includes(kw);
+}
+
 function matchConceptsForText(text: string): ConceptEntry[] {
   const lower = text.toLowerCase();
   const hits: ConceptEntry[] = [];
   for (const entry of KNOWLEDGE_GLOSSARY) {
-    if (entry.keywords.some((kw) => lower.includes(kw))) {
+    if (entry.keywords.some((kw) => matchesGlossaryKeyword(lower, kw))) {
       hits.push(entry);
     }
   }
