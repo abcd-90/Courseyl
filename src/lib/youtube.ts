@@ -180,32 +180,47 @@ function finalizeChapterRanges(
   return chapters;
 }
 
+function stripLeadingChapterBullets(line: string): string {
+  let s = line.trimStart();
+  // Bounded iterative strip with flat patterns (prevents exponential ReDoS on divider lines like "----")
+  for (let i = 0; i < 8; i++) {
+    const next = s
+      .replace(/^\d{1,3}[.)]\s+/, "")
+      .replace(/^[-*•\u25b6\u23e9\u23f0\u2b50\ufe0f\u{1F300}-\u{1FAFF}]+\s*/u, "");
+    if (next === s) break;
+    s = next;
+  }
+  return s;
+}
+
 export function parseChaptersFromDescription(description: string, totalDuration: number): VideoChapter[] {
   if (!description) return [];
 
   const lines = description.split(/\r?\n/);
+  // Flat, non-backtracking patterns (no nested quantifiers)
   const startRegex =
-    /^(?:(?:\d{1,3}[.)]|[-*•▶⏩⏰⭐️🎯📌🔹👉]+)\s*)*(?:\[|\()?\s*(\d{1,3}:\d{2}(?::\d{2})?)\s*(?:\]|\))?\s*[-–—:|]*\s*(.+)$/;
+    /^[\[(]?\s*(\d{1,3}:\d{2}(?::\d{2})?)\s*[\])]?[\s\-–—:|]*(.+)$/;
   const endRegex =
-    /^(.+?)\s*[-–—|:]+\s*(?:\[|\()?\s*(\d{1,3}:\d{2}(?::\d{2})?)\s*(?:\]|\))?\s*$/;
+    /^(.+?)[\s\-–—|:]+[\[(]?(\d{1,3}:\d{2}(?::\d{2})?)[\])]?$/;
 
   const rawList: { seconds: number; title: string }[] = [];
 
   for (const line of lines) {
     const trimmed = line.trim();
-    if (!trimmed || /^https?:\/\//i.test(trimmed)) continue;
+    if (!trimmed || /^https?:\/\//i.test(trimmed) || !/\d:\d{2}/.test(trimmed)) continue;
 
     let timeStr = "";
     let rawTitle = "";
 
-    const startMatch = trimmed.match(startRegex);
+    const startCandidate = stripLeadingChapterBullets(trimmed);
+    const startMatch = startCandidate.match(startRegex);
     if (startMatch) {
       timeStr = startMatch[1];
       rawTitle = startMatch[2];
     } else {
       const endMatch = trimmed.match(endRegex);
       if (endMatch && !/https?:\/\//i.test(endMatch[1])) {
-        rawTitle = endMatch[1];
+        rawTitle = endMatch[1].replace(/[\s\-–—|:]+$/, "");
         timeStr = endMatch[2];
       }
     }
@@ -530,22 +545,6 @@ async function fetchDurationViaSearch(videoId: string): Promise<{
   }
 }
 
-async function resolveBestThumbnail(videoId: string, oembedThumbnail?: string): Promise<string> {
-  const maxResUrl = `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;
-  try {
-    const headRes = await fetch(maxResUrl, {
-      method: "HEAD",
-      signal: AbortSignal.timeout(2500),
-    });
-    if (headRes.ok) {
-      return maxResUrl;
-    }
-  } catch {
-    // Fallback cleanly if maxresdefault check times out or fails
-  }
-  return oembedThumbnail || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
-}
-
 export async function fetchYouTubeMetadata(videoId: string): Promise<VideoMetadata> {
   let durationSeconds = 0;
   let description = "";
@@ -588,7 +587,7 @@ export async function fetchYouTubeMetadata(videoId: string): Promise<VideoMetada
     }
   }
 
-  // 2. Fetch official oEmbed metadata in parallel with Watch Page HTML
+  // 2. Fetch official oEmbed metadata & maxres thumbnail availability in parallel with Watch Page HTML
   let oembedTitle = "";
   let oembedAuthor = "";
   let oembedThumbnail = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
@@ -598,6 +597,13 @@ export async function fetchYouTubeMetadata(videoId: string): Promise<VideoMetada
     { signal: AbortSignal.timeout(6000) }
   )
     .then(async (r) => (r.ok ? r.json() : null))
+    .catch(() => null);
+
+  const maxResThumbPromise = fetch(`https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`, {
+    method: "HEAD",
+    signal: AbortSignal.timeout(2500),
+  })
+    .then((r) => (r.ok ? `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg` : null))
     .catch(() => null);
 
   let watchHtml = "";
@@ -698,14 +704,22 @@ export async function fetchYouTubeMetadata(videoId: string): Promise<VideoMetada
     }
   }
 
-  // 4. Innertube /next & /search backups when description, chapters, or duration are still missing
+  // 4. Parse description & watchHtml chapters first before calling Innertube /next backup
+  if (description) {
+    chapters = parseChaptersFromDescription(description, durationSeconds);
+  }
+  if (chapters.length === 0 && watchHtml) {
+    chapters = extractChaptersFromInitialData(watchHtml, durationSeconds);
+  }
+
+  // Innertube /next & /search backups only when description, chapters, or duration are still missing
   if (!description || chapters.length === 0) {
     const nextInfo = await fetchNextViaInnertube(videoId);
     if (nextInfo.description && nextInfo.description.length > description.length) {
       description = nextInfo.description;
     }
     if (!scrapedTitle && nextInfo.title) scrapedTitle = nextInfo.title;
-    if (nextInfo.chapters.length > 0) {
+    if (nextInfo.chapters.length > chapters.length) {
       chapters = nextInfo.chapters;
     }
   }
@@ -719,7 +733,7 @@ export async function fetchYouTubeMetadata(videoId: string): Promise<VideoMetada
     if (!scrapedAuthor && searchInfo.author) scrapedAuthor = searchInfo.author;
   }
 
-  // 5. Reconcile description chapters vs ytInitialData chapters using resolved durationSeconds
+  // 5. Reconcile description chapters vs Innertube /next chapters using resolved durationSeconds
   if (description) {
     const parsedDescChapters = parseChaptersFromDescription(description, durationSeconds);
     if (parsedDescChapters.length > chapters.length) {
@@ -736,7 +750,7 @@ export async function fetchYouTubeMetadata(videoId: string): Promise<VideoMetada
     );
   }
 
-  const oData = await oembedPromise;
+  const [oData, maxResThumb] = await Promise.all([oembedPromise, maxResThumbPromise]);
   if (oData?.title) oembedTitle = oData.title;
   if (oData?.author_name) oembedAuthor = oData.author_name;
   if (oData?.thumbnail_url) oembedThumbnail = oData.thumbnail_url;
@@ -752,7 +766,7 @@ export async function fetchYouTubeMetadata(videoId: string): Promise<VideoMetada
   }
 
   const finalDuration = durationSeconds > 0 ? durationSeconds : 3600;
-  const thumbnailUrl = await resolveBestThumbnail(videoId, oembedThumbnail);
+  const thumbnailUrl = maxResThumb || oembedThumbnail || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
 
   return {
     videoId,
