@@ -207,10 +207,8 @@ export default function PlacementTestPage({ params }: { params: Promise<{ id: st
     const firstActiveLessonId = result.firstActiveLessonId || activeLessons[0]?.id || result.lessons?.[0]?.id;
 
     return (
-      <div className="min-h-screen flex flex-col lg:flex-row bg-[#fafcf7] dark:bg-[#0c120e] text-ink">
-        <AppSidebar />
-
-        <main className="w-full min-w-0 flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto max-w-6xl">
+      <div className="min-h-screen flex flex-col bg-[#fafcf7] dark:bg-[#0c120e] text-ink">
+        <main className="w-full min-w-0 flex-1 p-4 sm:p-6 md:p-8 lg:p-10 overflow-y-auto max-w-6xl mx-auto">
           {/* Top navigation row */}
           <div className="flex items-center justify-between mb-6">
             <Link
