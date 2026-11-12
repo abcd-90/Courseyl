@@ -46,3 +46,17 @@ This codebase serves production learners. Whenever modifying features, UI, or ba
 11. **Light & Dark Mode Glassmorphism Auth UI Consistency:**
     - Never hardcode single-mode dark backgrounds (`bg-[#0e1311]`) or single-theme text colors on `/login`, `/register`, `/auth/callback`, `/privacy`, or `/terms`.
     - Keep `/login` (both Sign-In, Email view, and `Check your inbox.` states) synchronized with the live `MarketingNavbar` theme switch (`dark:` Tailwind variants + sunrise/starlight `LandscapeIllustration` backdrop) using crystal translucent frosted glassmorphism (`bg-white/25` / `dark:bg-[#0e1722]/45`, `backdrop-blur-xl`, sheer frosted pill buttons) without top-navbar overlap, and accessible `bg-paper text-ink` surfaces on legal/auth helper pages.
+
+12. **Curriculum-Grounded Placement Test Integrity & Strict Option Deduplication:**
+    - Placement tests must NEVER emit generic filler or template boilerplates ("core architectural objective", "an anti-pattern that bypasses input checks", "deprecated legacy syntax", "purely cosmetic label", etc.).
+    - Every question within a placement test MUST have 100% unique, non-repeating options across the entire test set — NEVER reuse the same distractors or answer options across multiple questions.
+    - Question and option text must be clean plain text without literal markdown bold markers (`**...**` or `__...__`).
+    - Database-persisted placement questions must pass `hasLowQualityPlacementSet()`; any low-quality set must dynamically regenerate on the fly without breaking user test submission.
+
+13. **ReDoS-Safe YouTube Metadata & Chapter Ingestion:**
+    - YouTube description parsing in `parseChaptersFromDescription` (`src/lib/youtube.ts`) must NEVER use nested regex quantifiers or vulnerable exponential backtracking patterns on divider lines (e.g. `---...---`).
+    - Video metadata extraction must resolve cleanly and quickly (< 3 seconds) without blocking generation or stalling the live build pipeline at 15%.
+
+14. **Production Workflow & Feature Lock:**
+    - All existing learning flows, quiz modal UX, watch telemetry (`POST /api/watch`), study notes, course generator pipeline, user deletion cascade, home page course layout, lesson player day bins, placement test engine, and dashboard metrics are verified and LOCKED.
+    - NEVER alter, refactor, or touch these stable workflows or files unless the user explicitly asks for a specific change.
