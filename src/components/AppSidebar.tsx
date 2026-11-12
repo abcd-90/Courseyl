@@ -6,6 +6,12 @@ import { usePathname } from "next/navigation";
 import { CourseItLogo } from "./CourseItLogo";
 import { useSiteSettings } from "./SiteSettingsProvider";
 import { getCleanThumbnailUrl } from "@/lib/thumbnail";
+import {
+  clearRecentCourses,
+  readRecentCourses,
+  writeRecentCourses,
+  type RecentCourseEntry,
+} from "@/lib/recentCourses";
 import { supabase } from "@/lib/supabaseClient";
 
 export function AppSidebar() {
@@ -38,62 +44,94 @@ export function AppSidebar() {
   useEffect(() => {
     const fetchUserData = () => {
       fetch("/api/auth/me", { cache: "no-store" })
-        .then((res) => res.json())
+        .then((res) => (res.ok ? res.json() : { authenticated: false, user: null }))
         .then((data) => {
-          if (data.authenticated && data.user) {
-            setCurrentUser(data.user);
-            // Fetch user's real enrolled courses count
-            fetch("/api/courses?enrolled=true", { cache: "no-store" })
-              .then((r) => r.json())
-              .then((cd) => {
-                if (Array.isArray(cd.courses) && cd.courses.length > 0) {
-                  setEnrolledCount(cd.courses.length);
+          if (!data?.authenticated || !data?.user?.id) {
+            setCurrentUser(null);
+            setEnrolledCount(0);
+            setRecents([]);
+            clearRecentCourses();
+            return;
+          }
 
-                  // Auto-enrich recents with accurate thumbnails from database
-                  setRecents((prev) => {
-                    if (!prev || prev.length === 0) {
-                      const fallbackRecents = cd.courses.slice(0, 3).map((c: any) => {
-                        const cleanThumb = getCleanThumbnailUrl(c.thumbnailUrl, c.slug);
-                        return {
-                          id: c.id,
-                          slug: c.slug,
-                          title: c.title,
-                          thumbnail: cleanThumb,
-                          thumbnailUrl: cleanThumb,
-                          progress: c.progressPercentage || 0,
-                        };
-                      });
-                      try {
-                        localStorage.setItem("courseit_recent_courses", JSON.stringify(fallbackRecents));
-                      } catch {}
-                      return fallbackRecents;
-                    }
+          const activeUserId: string = data.user.id;
+          setCurrentUser(data.user);
 
-                    const enriched = prev.map((r: any) => {
-                      const match = cd.courses.find((c: any) => c.slug === r.slug || c.id === r.id);
-                      const thumb = getCleanThumbnailUrl(
-                        match?.thumbnailUrl || r.thumbnail || r.thumbnailUrl,
-                        r.slug || match?.slug
+          const initialScoped = readRecentCourses(activeUserId).map((item) => {
+            const cleanThumb = getCleanThumbnailUrl(
+              item.thumbnail || item.thumbnailUrl,
+              item.slug
+            );
+            return {
+              ...item,
+              thumbnail: cleanThumb,
+              thumbnailUrl: cleanThumb,
+            };
+          });
+          setRecents(initialScoped);
+
+          // Fetch user's real enrolled/created courses strictly tied to activeUserId
+          fetch("/api/courses?enrolled=true", { cache: "no-store" })
+            .then((r) => r.json())
+            .then((cd) => {
+              const dbCourses = Array.isArray(cd?.courses) ? cd.courses : [];
+              setEnrolledCount(dbCourses.length);
+
+              if (dbCourses.length === 0) {
+                setRecents([]);
+                clearRecentCourses();
+                return;
+              }
+
+              const currentCached = readRecentCourses(activeUserId);
+              const reconciled = currentCached
+                .map((r) => {
+                  const match = dbCourses.find(
+                    (c: any) => c.slug === r.slug || c.id === r.id
+                  );
+                  if (!match) return null;
+                  const thumb = getCleanThumbnailUrl(
+                    match.thumbnailUrl || r.thumbnail || r.thumbnailUrl,
+                    match.slug || r.slug,
+                    match.youtubeId
+                  );
+                  return {
+                    id: match.id,
+                    slug: match.slug,
+                    title: match.title || r.title,
+                    thumbnail: thumb,
+                    thumbnailUrl: thumb,
+                    progress:
+                      typeof match.progressPercentage === "number"
+                        ? match.progressPercentage
+                        : r.progress || 0,
+                  };
+                })
+                .filter(Boolean) as RecentCourseEntry[];
+
+              const nextRecents =
+                reconciled.length > 0
+                  ? reconciled
+                  : dbCourses.slice(0, 3).map((c: any) => {
+                      const cleanThumb = getCleanThumbnailUrl(
+                        c.thumbnailUrl,
+                        c.slug,
+                        c.youtubeId
                       );
-
                       return {
-                        ...r,
-                        title: r.title || match?.title,
-                        thumbnail: thumb,
-                        thumbnailUrl: thumb,
-                        progress: typeof r.progress === "number" ? r.progress : (match?.progressPercentage || 0),
+                        id: c.id,
+                        slug: c.slug,
+                        title: c.title,
+                        thumbnail: cleanThumb,
+                        thumbnailUrl: cleanThumb,
+                        progress: c.progressPercentage || 0,
                       };
                     });
 
-                    try {
-                      localStorage.setItem("courseit_recent_courses", JSON.stringify(enriched));
-                    } catch {}
-                    return enriched;
-                  });
-                }
-              })
-              .catch(() => {});
-          }
+              writeRecentCourses(activeUserId, nextRecents);
+              setRecents(nextRecents);
+            })
+            .catch(() => {});
         })
         .catch(() => {});
     };
@@ -111,25 +149,6 @@ export function AppSidebar() {
     window.addEventListener("user-updated", handleUserUpdated);
     window.addEventListener("focus", fetchUserData);
 
-    try {
-      const stored = localStorage.getItem("courseit_recent_courses");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const cleaned = parsed.map((item: any) => {
-            const cleanThumb = getCleanThumbnailUrl(item.thumbnail || item.thumbnailUrl, item.slug);
-            return {
-              ...item,
-              thumbnail: cleanThumb,
-              thumbnailUrl: cleanThumb,
-            };
-          });
-          setRecents(cleaned);
-          localStorage.setItem("courseit_recent_courses", JSON.stringify(cleaned));
-        }
-      }
-    } catch {}
-
     return () => {
       window.removeEventListener("user-updated", handleUserUpdated);
       window.removeEventListener("focus", fetchUserData);
@@ -144,6 +163,7 @@ export function AppSidebar() {
 
   const handleLogout = async () => {
     try {
+      clearRecentCourses();
       await supabase.auth.signOut().catch(() => {});
       await fetch("/api/auth/logout", { method: "POST" });
       window.location.href = "/login";

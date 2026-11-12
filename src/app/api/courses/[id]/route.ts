@@ -175,6 +175,7 @@ export async function GET(
         chapters: formattedChapters,
       },
       userState: {
+        userId: user?.id || null,
         isEnrolled: !!enrollment,
         enrollmentId: enrollment?.id,
         isCreator: user ? course.creatorId === user.id || user.role === "ADMIN" : false,

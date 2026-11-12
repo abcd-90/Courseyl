@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/AppSidebar";
 import { getCleanThumbnailUrl } from "@/lib/thumbnail";
+import { recordRecentCourse } from "@/lib/recentCourses";
 import { clampDailyStudyMinutes, groupLessonsIntoDayBins } from "@/lib/pacing";
 
 export default function CourseDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -51,28 +52,22 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
             setDailyMinutes(clampDailyStudyMinutes(data.userState.dailyStudyMinutes, 60));
           }
 
-          // Save to local storage for "Recents" & "My Courses"
-          try {
-            const stored = localStorage.getItem("courseit_recent_courses");
-            const recents = stored ? JSON.parse(stored) : [];
+          // Save to user-scoped local storage for "Recents" only when authenticated
+          if (data.userState?.userId) {
             const thumb = getCleanThumbnailUrl(
               data.course.thumbnailUrl,
               data.course.slug,
               data.course.source?.youtubeId
             );
-            const updated = [
-              {
-                id: data.course.id,
-                slug: data.course.slug,
-                title: data.course.title,
-                thumbnail: thumb,
-                thumbnailUrl: thumb,
-                progress: data.userState?.progressPercentage || 0,
-              },
-              ...recents.filter((r: any) => r.slug !== data.course.slug && r.id !== data.course.id),
-            ].slice(0, 5);
-            localStorage.setItem("courseit_recent_courses", JSON.stringify(updated));
-          } catch {}
+            recordRecentCourse(data.userState.userId, {
+              id: data.course.id,
+              slug: data.course.slug,
+              title: data.course.title,
+              thumbnail: thumb,
+              thumbnailUrl: thumb,
+              progress: data.userState?.progressPercentage || 0,
+            });
+          }
         }
       })
       .catch(() => {})

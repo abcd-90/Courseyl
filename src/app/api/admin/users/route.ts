@@ -180,14 +180,82 @@ export async function DELETE(req: Request) {
       }
     }
 
-    await prisma.$transaction([
-      prisma.authVerificationToken.deleteMany({
-        where: { email: targetUser.email.toLowerCase() },
-      }),
-      prisma.user.delete({
-        where: { id: targetUserId },
-      }),
-    ]);
+    await prisma.$transaction(
+      async (tx) => {
+        const [userEnrollments, userRoadmapEnrollments] = await Promise.all([
+          tx.enrollment.findMany({
+            where: { userId: targetUserId },
+            select: { courseId: true },
+          }),
+          tx.roadmapEnrollment.findMany({
+            where: { userId: targetUserId },
+            select: { roadmapId: true },
+          }),
+        ]);
+
+        const enrolledCourseIds = Array.from(
+          new Set(userEnrollments.map((e) => e.courseId))
+        );
+        const enrolledRoadmapIds = Array.from(
+          new Set(userRoadmapEnrollments.map((e) => e.roadmapId))
+        );
+
+        if (enrolledCourseIds.length > 0) {
+          await tx.course.updateMany({
+            where: {
+              id: { in: enrolledCourseIds },
+              creatorId: { not: targetUserId },
+              enrollmentCount: { gt: 0 },
+            },
+            data: { enrollmentCount: { decrement: 1 } },
+          });
+        }
+
+        if (enrolledRoadmapIds.length > 0) {
+          await tx.roadmap.updateMany({
+            where: {
+              id: { in: enrolledRoadmapIds },
+              creatorId: { not: targetUserId },
+              enrollmentCount: { gt: 0 },
+            },
+            data: { enrollmentCount: { decrement: 1 } },
+          });
+        }
+
+        // Purge all user-owned records cleanly inside the atomic transaction
+        // so zero orphaned enrollments, progress, notes, quizzes, or tokens remain.
+        await tx.authVerificationToken.deleteMany({
+          where: {
+            email: { equals: targetUser.email, mode: "insensitive" },
+          },
+        });
+        await tx.quizAnswer.deleteMany({ where: { userId: targetUserId } });
+        await tx.quizAttempt.deleteMany({ where: { userId: targetUserId } });
+        await tx.lessonWatchProgress.deleteMany({
+          where: { userId: targetUserId },
+        });
+        await tx.studyNote.deleteMany({ where: { userId: targetUserId } });
+        await tx.dailyPlan.deleteMany({ where: { userId: targetUserId } });
+        await tx.notification.deleteMany({ where: { userId: targetUserId } });
+        await tx.lessonProgress.deleteMany({
+          where: { enrollment: { userId: targetUserId } },
+        });
+        await tx.placementAttempt.deleteMany({
+          where: { enrollment: { userId: targetUserId } },
+        });
+        await tx.enrollment.deleteMany({ where: { userId: targetUserId } });
+        await tx.roadmapEnrollment.deleteMany({
+          where: { userId: targetUserId },
+        });
+        await tx.generationJob.deleteMany({ where: { userId: targetUserId } });
+        await tx.roadmap.deleteMany({ where: { creatorId: targetUserId } });
+        await tx.course.deleteMany({ where: { creatorId: targetUserId } });
+        await tx.profile.deleteMany({ where: { userId: targetUserId } });
+        await tx.subscription.deleteMany({ where: { userId: targetUserId } });
+        await tx.user.delete({ where: { id: targetUserId } });
+      },
+      { maxWait: 10000, timeout: 20000 }
+    );
 
     return NextResponse.json({
       success: true,

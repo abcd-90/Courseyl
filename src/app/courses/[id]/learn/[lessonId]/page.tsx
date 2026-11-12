@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/AppSidebar";
 import { getCleanThumbnailUrl } from "@/lib/thumbnail";
+import { recordRecentCourse } from "@/lib/recentCourses";
 import { InlineQuizPanel } from "@/components/InlineQuizPanel";
 import {
   DEFAULT_DAILY_STUDY_MINUTES,
@@ -151,28 +152,6 @@ export default function LessonLearnPage({
           setCompleted(data.progress?.isCompleted || false);
           setWatched(Boolean(data.progress?.watched));
           setWatchedSeconds(Number(data.progress?.watchedSeconds || 0));
-
-          try {
-            const stored = localStorage.getItem("courseit_recent_courses");
-            const existing = stored ? JSON.parse(stored) : [];
-            const thumb = getCleanThumbnailUrl(
-              data.lesson.thumbnailUrl,
-              data.lesson.courseSlug || resolvedParams.id,
-              data.lesson.youtubeVideoId
-            );
-            const updated = [
-              {
-                id: resolvedParams.id,
-                title: data.lesson.courseTitle || resolvedParams.id,
-                slug: data.lesson.courseSlug || resolvedParams.id,
-                thumbnail: thumb,
-                thumbnailUrl: thumb,
-                progress: data.progress?.isCompleted ? 100 : 0,
-              },
-              ...existing.filter((e: any) => e.slug !== (data.lesson.courseSlug || resolvedParams.id)),
-            ].slice(0, 5);
-            localStorage.setItem("courseit_recent_courses", JSON.stringify(updated));
-          } catch {}
         }
       })
       .catch(() => {})
@@ -186,6 +165,21 @@ export default function LessonLearnPage({
           DEFAULT_DAILY_STUDY_MINUTES
         );
         setDailyMinutes(nextDailyMinutes);
+        if (data.userState?.userId && data.course) {
+          const thumb = getCleanThumbnailUrl(
+            data.course.thumbnailUrl,
+            data.course.slug || resolvedParams.id,
+            data.course.source?.youtubeId
+          );
+          recordRecentCourse(data.userState.userId, {
+            id: data.course.id || resolvedParams.id,
+            title: data.course.title || resolvedParams.id,
+            slug: data.course.slug || resolvedParams.id,
+            thumbnail: thumb,
+            thumbnailUrl: thumb,
+            progress: data.userState?.progressPercentage || 0,
+          });
+        }
         if (data.course?.chapters) {
           setChapters(data.course.chapters);
           const bins = groupLessonsIntoDayBins(data.course.chapters, nextDailyMinutes);
