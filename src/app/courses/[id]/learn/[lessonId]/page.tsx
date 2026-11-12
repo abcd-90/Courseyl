@@ -1,11 +1,16 @@
 "use client";
 
-import React, { useEffect, useState, useRef, use, useCallback } from "react";
+import React, { useEffect, useState, useRef, use, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/AppSidebar";
 import { getCleanThumbnailUrl } from "@/lib/thumbnail";
 import { InlineQuizPanel } from "@/components/InlineQuizPanel";
+import {
+  DEFAULT_DAILY_STUDY_MINUTES,
+  clampDailyStudyMinutes,
+  groupLessonsIntoDayBins,
+} from "@/lib/pacing";
 import {
   AutoplayCountdownOverlay,
   AUTOPLAY_COUNTDOWN_SECONDS,
@@ -27,6 +32,7 @@ export default function LessonLearnPage({
   const [lesson, setLesson] = useState<any>(null);
   const [course, setCourse] = useState<any>(null);
   const [chapters, setChapters] = useState<any[]>([]);
+  const [dailyMinutes, setDailyMinutes] = useState<number>(DEFAULT_DAILY_STUDY_MINUTES);
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const [navigation, setNavigation] = useState<any>(null);
   const [quizQuestions, setQuizQuestions] = useState<any[]>([]);
@@ -172,13 +178,19 @@ export default function LessonLearnPage({
       .catch(() => {})
       .finally(() => setLoading(false));
 
-    fetch(`/api/courses/${resolvedParams.id}`)
+    fetch(`/api/courses/${resolvedParams.id}`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
+        const nextDailyMinutes = clampDailyStudyMinutes(
+          data.userState?.dailyStudyMinutes,
+          DEFAULT_DAILY_STUDY_MINUTES
+        );
+        setDailyMinutes(nextDailyMinutes);
         if (data.course?.chapters) {
           setChapters(data.course.chapters);
-          const foundIdx = data.course.chapters.findIndex((ch: any) =>
-            ch.lessons?.some((l: any) => l.id === resolvedParams.lessonId)
+          const bins = groupLessonsIntoDayBins(data.course.chapters, nextDailyMinutes);
+          const foundIdx = bins.findIndex((bin) =>
+            bin.lessons?.some((l: any) => l.id === resolvedParams.lessonId)
           );
           if (foundIdx !== -1) {
             setSelectedDayIndex(foundIdx);
@@ -194,6 +206,44 @@ export default function LessonLearnPage({
       })
       .catch(() => {});
   }, [resolvedParams.id, resolvedParams.lessonId]);
+
+  // Keep daily study pace and Day bin selection synced with user preferences
+  useEffect(() => {
+    const handleUserUpdated = (e: any) => {
+      const updatedMins = e?.detail?.profile?.dailyStudyMinutes;
+      if (updatedMins !== undefined) {
+        setDailyMinutes(clampDailyStudyMinutes(updatedMins, DEFAULT_DAILY_STUDY_MINUTES));
+      } else {
+        fetch(`/api/courses/${resolvedParams.id}`, { cache: "no-store" })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.userState?.dailyStudyMinutes !== undefined) {
+              setDailyMinutes(
+                clampDailyStudyMinutes(data.userState.dailyStudyMinutes, DEFAULT_DAILY_STUDY_MINUTES)
+              );
+            }
+          })
+          .catch(() => {});
+      }
+    };
+    window.addEventListener("user-updated", handleUserUpdated);
+    return () => window.removeEventListener("user-updated", handleUserUpdated);
+  }, [resolvedParams.id]);
+
+  const dayBins = useMemo(
+    () => groupLessonsIntoDayBins(chapters, dailyMinutes),
+    [chapters, dailyMinutes]
+  );
+
+  useEffect(() => {
+    if (dayBins.length === 0) return;
+    const foundIdx = dayBins.findIndex((bin) =>
+      bin.lessons?.some((l: any) => l.id === resolvedParams.lessonId)
+    );
+    if (foundIdx !== -1) {
+      setSelectedDayIndex(foundIdx);
+    }
+  }, [dayBins, resolvedParams.lessonId]);
 
   // Handle lesson completion & start autoplay countdown
   const handleLessonCompletedAndNext = useCallback(() => {
@@ -751,8 +801,10 @@ export default function LessonLearnPage({
     );
   }
 
-  const selectedChapter = chapters[selectedDayIndex] || chapters[0];
-  const dayLessons = selectedChapter?.lessons || [];
+  const safeSelectedDayIndex =
+    dayBins.length > 0 ? Math.min(selectedDayIndex, dayBins.length - 1) : 0;
+  const selectedDay = dayBins[safeSelectedDayIndex] || dayBins[0];
+  const dayLessons = selectedDay?.lessons || [];
   const videoId =
     (lesson?.youtubeVideoId && lesson.youtubeVideoId !== "urbkF3zPpxw" ? lesson.youtubeVideoId : null) ||
     course?.source?.youtubeId ||
@@ -1397,11 +1449,11 @@ export default function LessonLearnPage({
 
               {/* Day Pills Bar with Horizontal Scroll Snap */}
               <div className="w-full min-w-0 flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-2 scroll-smooth">
-                {chapters.map((ch, idx) => {
-                  const isSelected = selectedDayIndex === idx;
+                {dayBins.map((bin, idx) => {
+                  const isSelected = safeSelectedDayIndex === idx;
                   return (
                     <button
-                      key={ch.id || idx}
+                      key={`day-${bin.dayNumber}-${idx}`}
                       onClick={() => setSelectedDayIndex(idx)}
                       className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
                         isSelected
@@ -1409,20 +1461,23 @@ export default function LessonLearnPage({
                           : "bg-surface dark:bg-[#151c17] text-ink-soft border border-line dark:border-white/10 hover:text-ink hover:border-moss/40"
                       }`}
                     >
-                      Day {idx + 1} {isSelected ? "•" : ""}
+                      {bin.label || `Day ${idx + 1}`} {isSelected ? "•" : ""}
                     </button>
                   );
                 })}
               </div>
 
               {/* Selected Day Focus Card */}
-              {chapters[selectedDayIndex]?.title && (
+              {selectedDay?.title && (
                 <div className="px-3 py-2 rounded-xl bg-black/5 dark:bg-[#141d16] border border-line dark:border-white/5">
                   <span className="text-[0.65rem] uppercase tracking-wider font-mono text-[#b8c460] font-bold block">
-                    Day {selectedDayIndex + 1} Focus
+                    Day {selectedDay.dayNumber} Focus
                   </span>
                   <p className="text-xs text-ink font-medium truncate mt-0.5">
-                    {chapters[selectedDayIndex].title.replace(/^Day\s*\d+\s*[\(:]?/, "").replace(/\)$/, "").trim() || chapters[selectedDayIndex].title}
+                    {selectedDay.title
+                      .replace(/^Day\s*\d+\s*(?:[\(:]|·)?\s*/, "")
+                      .replace(/\)$/, "")
+                      .trim() || selectedDay.title}
                   </p>
                 </div>
               )}
