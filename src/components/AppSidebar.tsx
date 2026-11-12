@@ -13,6 +13,15 @@ import {
   type RecentCourseEntry,
 } from "@/lib/recentCourses";
 import { supabase } from "@/lib/supabaseClient";
+import {
+  Settings,
+  Crown,
+  LifeBuoy,
+  LogOut,
+  ShieldCheck,
+  ChevronUp,
+  ChevronDown,
+} from "lucide-react";
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -21,6 +30,43 @@ export function AppSidebar() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [enrolledCount, setEnrolledCount] = useState<number>(0);
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    setIsDark(document.documentElement.classList.contains("dark"));
+  }, []);
+
+  const toggleTheme = () => {
+    const isCurrentlyDark = document.documentElement.classList.contains("dark");
+    if (isCurrentlyDark) {
+      document.documentElement.classList.remove("dark");
+      document.documentElement.classList.add("light");
+      document.documentElement.style.colorScheme = "light";
+      localStorage.setItem("theme", "light");
+      setIsDark(false);
+    } else {
+      document.documentElement.classList.add("dark");
+      document.documentElement.classList.remove("light");
+      document.documentElement.style.colorScheme = "dark";
+      localStorage.setItem("theme", "dark");
+      setIsDark(true);
+    }
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && !target.closest("[data-user-menu-container]")) {
+        setShowUserMenu(false);
+      }
+    };
+    if (showUserMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showUserMenu]);
 
   const isUnlimitedMode =
     settings?.plans?.unlimitedFreeMode === true ||
@@ -423,15 +469,19 @@ export function AppSidebar() {
       </div>
 
       {/* User profile capsule at bottom */}
-      <div className="pt-4 border-t border-line dark:border-white/10 relative mt-auto">
+      <div data-user-menu-container className="pt-4 border-t border-line dark:border-white/10 relative mt-auto">
         {currentUser ? (
           <div>
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-left"
+              className={`w-full flex items-center justify-between p-2.5 rounded-2xl transition-colors cursor-pointer text-left ${
+                showUserMenu
+                  ? "bg-[#eef2e6] dark:bg-[#1a231b]"
+                  : "hover:bg-black/5 dark:hover:bg-white/5"
+              }`}
             >
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-8 h-8 rounded-full bg-[#f97316] text-white flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden shadow-xs">
+                <div className="w-8 h-8 rounded-full bg-[#f25123] text-white flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden shadow-xs">
                   {currentUser.profile?.avatarUrl && !currentUser.profile.avatarUrl.includes("dicebear.com") ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={currentUser.profile.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
@@ -452,81 +502,90 @@ export function AppSidebar() {
                   <p className="text-sm font-semibold text-ink leading-tight truncate">
                     {currentUser.profile?.displayName || currentUser.name || currentUser.displayName || currentUser.email.split("@")[0]}
                   </p>
-                  <p className="text-xs text-ink-soft leading-tight">
-                    {currentUser.subscription?.tier ? `${currentUser.subscription.tier.charAt(0) + currentUser.subscription.tier.slice(1).toLowerCase()} plan` : "Free plan"}
+                  <p className="text-xs text-ink-soft leading-tight mt-0.5">
+                    {currentUser.subscription?.tier && currentUser.subscription.tier !== "FREE"
+                      ? `${currentUser.subscription.tier.charAt(0) + currentUser.subscription.tier.slice(1).toLowerCase()} plan`
+                      : "No plan"}
                   </p>
                 </div>
               </div>
-              <svg className="w-4 h-4 text-ink-soft shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
+              {showUserMenu ? (
+                <ChevronUp className="w-4 h-4 text-ink-soft shrink-0" strokeWidth={2} />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-ink-soft shrink-0" strokeWidth={2} />
+              )}
             </button>
 
             {showUserMenu && (
-              <div className="absolute bottom-16 left-0 right-0 bg-surface dark:bg-[#121a15] rounded-2xl border border-line dark:border-white/10 p-2 shadow-2xl space-y-1 z-30">
-                <div className="px-3 py-2 border-b border-line dark:border-white/5">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold text-ink truncate">
-                      {currentUser.profile?.displayName || currentUser.name || currentUser.displayName || "Learner"}
-                    </p>
-                    {currentUser.role === "ADMIN" && (
-                      <span className="px-1.5 py-0.5 rounded-md bg-[#b8c460] text-[#0f1611] font-mono font-bold text-[0.6rem]">
-                        ADMIN
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[0.68rem] text-ink-soft truncate">{currentUser.email}</p>
-                </div>
+              <div className="absolute bottom-[calc(100%+8px)] left-0 right-0 bg-white dark:bg-[#151e18] rounded-2xl border border-line/80 dark:border-white/10 p-1.5 shadow-xl dark:shadow-2xl space-y-0.5 z-40">
                 {currentUser.role === "ADMIN" && (
                   <Link
                     href="/studio-hub"
-                    onClick={() => isMobile && setIsMobileOpen(false)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold text-[#b8c460] hover:bg-[#b8c460]/10 transition-colors"
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      if (isMobile) setIsMobileOpen(false);
+                    }}
+                    className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-[#556947] dark:text-[#b8c460] hover:bg-[#556947]/10 dark:hover:bg-[#b8c460]/10 transition-colors"
                   >
-                    <span>⚡</span>
+                    <ShieldCheck className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
                     <span>Studio Vault (Admin)</span>
                   </Link>
                 )}
                 <Link
                   href="/settings"
-                  onClick={() => isMobile && setIsMobileOpen(false)}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    if (isMobile) setIsMobileOpen(false);
+                  }}
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 >
-                  <span>⚙️</span>
-                  <span>Account Settings</span>
+                  <Settings className="w-[18px] h-[18px] text-ink-soft shrink-0" strokeWidth={1.75} />
+                  <span>Settings</span>
                 </Link>
                 <Link
-                  href="/billing"
-                  onClick={() => isMobile && setIsMobileOpen(false)}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  href="/pricing"
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    if (isMobile) setIsMobileOpen(false);
+                  }}
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 >
-                  <span>💳</span>
-                  <span>Subscription</span>
+                  <Crown className="w-[18px] h-[18px] text-ink-soft shrink-0" strokeWidth={1.75} />
+                  <span>Pricing</span>
+                </Link>
+                <Link
+                  href="/support"
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    if (isMobile) setIsMobileOpen(false);
+                  }}
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                >
+                  <LifeBuoy className="w-[18px] h-[18px] text-ink-soft shrink-0" strokeWidth={1.75} />
+                  <span>Support</span>
                 </Link>
                 <button
                   type="button"
-                  onClick={() => {
-                    const isDark = document.documentElement.classList.contains("dark");
-                    if (isDark) {
-                      document.documentElement.classList.remove("dark");
-                      document.documentElement.classList.add("light");
-                      localStorage.setItem("theme", "light");
-                    } else {
-                      document.documentElement.classList.add("dark");
-                      document.documentElement.classList.remove("light");
-                      localStorage.setItem("theme", "dark");
-                    }
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-left"
+                  onClick={toggleTheme}
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-left"
                 >
-                  <span>🌓</span>
-                  <span>Toggle Light / Dark Mode</span>
+                  <div
+                    className={`w-8 h-[18px] rounded-full p-0.5 transition-colors duration-200 ease-in-out flex items-center shrink-0 ${
+                      isDark
+                        ? "bg-[#556947] dark:bg-[#788b5e] justify-end"
+                        : "bg-[#d3d8ce] dark:bg-zinc-600 justify-start"
+                    }`}
+                  >
+                    <div className="w-3.5 h-3.5 rounded-full bg-white shadow-xs" />
+                  </div>
+                  <span>Dark mode</span>
                 </button>
+                <div className="my-1 border-t border-line/60 dark:border-white/10" />
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer text-left"
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-left"
                 >
-                  <span>🚪</span>
+                  <LogOut className="w-[18px] h-[18px] text-ink-soft shrink-0" strokeWidth={1.75} />
                   <span>Log out</span>
                 </button>
               </div>
