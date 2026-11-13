@@ -13,7 +13,12 @@ export async function generateMetadata(): Promise<Metadata> {
     title: `${name} — Turn YouTube into Interactive Courses with AI`,
     description: settings.branding.tagline || "Transform multi-hour YouTube videos and playlists into structured courses with bite-sized lessons, interactive notes, and placement tests.",
     icons: {
-      icon: "/favicon.ico",
+      icon: [
+        { url: "/icon.svg", type: "image/svg+xml" },
+        { url: "/favicon.ico", sizes: "any" },
+        { url: "/icon-32.png", type: "image/png", sizes: "32x32" },
+      ],
+      apple: "/apple-touch-icon.png",
     },
   };
 }
