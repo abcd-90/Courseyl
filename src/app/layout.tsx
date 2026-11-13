@@ -27,6 +27,11 @@ export async function generateMetadata(): Promise<Metadata> {
       "courseyl",
       "courseyl.online",
       "Courseyl AI",
+      "CourseIt",
+      "courseit.xyz",
+      "CourseIt alternative",
+      "CourseIt vs Courseyl",
+      "best CourseIt alternative",
       "YouTube to course",
       "AI course generator",
       "interactive learning",
@@ -108,7 +113,13 @@ export default async function RootLayout({
                   "@id": "https://courseyl.online/#website",
                   "url": "https://courseyl.online",
                   "name": publicSettings.branding?.brandName || "Courseyl",
-                  "alternateName": ["Courseyl", "Courseyl Online", "Courseyl AI"],
+                  "alternateName": [
+                    "Courseyl",
+                    "Courseyl Online",
+                    "Courseyl AI",
+                    "CourseIt Alternative",
+                    "Best CourseIt Alternative",
+                  ],
                   "description":
                     publicSettings.branding?.tagline ||
                     "Transform multi-hour YouTube videos and playlists into structured courses with bite-sized lessons, interactive notes, and placement tests.",

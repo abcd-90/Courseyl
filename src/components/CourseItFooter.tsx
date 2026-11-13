@@ -176,6 +176,11 @@ export function CourseItFooter() {
                   </Link>
                 </li>
                 <li>
+                  <Link className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline" href="/vs-courseit">
+                    CourseIt Alternative
+                  </Link>
+                </li>
+                <li>
                   <a className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline" href={`mailto:${socialLinks.contactEmail || "thecourseyl@gmail.com"}`}>
                     Contact us
                   </a>
