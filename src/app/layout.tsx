@@ -217,13 +217,6 @@ export default async function RootLayout({
             })();`,
           }}
         />
-        <meta
-          name="google-site-verification"
-          content={
-            publicSettings?.structure?.googleSearchConsoleToken?.trim() ||
-            "yQE25xFJSaYPDeBvbvdTlsRkYyIMASgBcJnhjjGt4IA"
-          }
-        />
         {gaId && (
           <>
             <script
