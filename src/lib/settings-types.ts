@@ -301,7 +301,7 @@ export const DEFAULT_SETTINGS: FullSiteSettings = {
       telegramEnabled: true,
       contactEmail: "thecourseyl@gmail.com",
     },
-    googleAnalyticsId: "",
+    googleAnalyticsId: "G-WRH1LQ397G",
     googleSearchConsoleToken: "yQE25xFJSaYPDeBvbvdTlsRkYyIMASgBcJnhjjGt4IA",
     customHeadScripts: "",
   },
