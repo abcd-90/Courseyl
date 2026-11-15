@@ -268,7 +268,7 @@ export default function HomePage() {
       <section aria-label={tourSec.badge || "Product tour"} className={`relative z-20 px-6 ${tourFollowsHero ? "-mt-[230px]" : "pt-28 pb-10"}`}>
         <div
           ref={tourRef}
-          className="mx-auto aspect-[16/9] w-full max-w-[1200px] overflow-hidden rounded-[28px] bg-card shadow-[0_0_0_6px_var(--surface),0_40px_80px_-30px_rgba(22,49,92,0.5)] transition-transform duration-100 ease-out"
+          className="mx-auto aspect-[1600/1038] w-[min(100%,calc((100vh-140px)*1600/1038))] max-w-[1200px] overflow-hidden rounded-[32px] bg-card shadow-[0_0_0_6px_var(--surface),0_40px_80px_-30px_rgba(22,49,92,0.5)] transition-transform duration-100 ease-out"
           style={{
             transformOrigin: "center top",
             transform: `perspective(1200px) scale(${transformStyle.scale}) rotateX(${transformStyle.rotateX}deg)`,
@@ -283,7 +283,7 @@ export default function HomePage() {
             playsInline
             preload="auto"
             aria-label={`${brandName} demo: paste a YouTube link, get a course with a placement test, lessons and quizzes`}
-            className="size-full object-contain bg-black/90"
+            className="size-full object-cover"
           />
         </div>
       </section>
