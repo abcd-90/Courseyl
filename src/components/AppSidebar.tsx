@@ -31,6 +31,27 @@ export function AppSidebar() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [enrolledCount, setEnrolledCount] = useState<number>(0);
   const [isDark, setIsDark] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("courseyl_sidebar_collapsed");
+      if (saved === "true") {
+        setIsCollapsed(true);
+      }
+    } catch {}
+  }, []);
+
+  const toggleCollapse = () => {
+    setIsCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("courseyl_sidebar_collapsed", String(next));
+      } catch {}
+      window.dispatchEvent(new Event("sidebar-toggle"));
+      return next;
+    });
+  };
 
   useEffect(() => {
     setIsDark(document.documentElement.classList.contains("dark"));
@@ -270,6 +291,221 @@ export function AppSidebar() {
     },
   ];
 
+  const renderUserMenuItems = (isMobile = false) => (
+    <>
+      {currentUser?.role === "ADMIN" && (
+        <Link
+          href="/studio-hub"
+          onClick={() => {
+            setShowUserMenu(false);
+            if (isMobile) setIsMobileOpen(false);
+          }}
+          className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-[#556947] dark:text-[#b8c460] hover:bg-[#556947]/10 dark:hover:bg-[#b8c460]/10 transition-colors"
+        >
+          <ShieldCheck className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
+          <span>Studio Vault (Admin)</span>
+        </Link>
+      )}
+      <Link
+        href="/settings"
+        onClick={() => {
+          setShowUserMenu(false);
+          if (isMobile) setIsMobileOpen(false);
+        }}
+        className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+      >
+        <Settings className="w-[18px] h-[18px] text-ink-soft shrink-0" strokeWidth={1.75} />
+        <span>Settings</span>
+      </Link>
+      <Link
+        href="/pricing"
+        onClick={() => {
+          setShowUserMenu(false);
+          if (isMobile) setIsMobileOpen(false);
+        }}
+        className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+      >
+        <Crown className="w-[18px] h-[18px] text-ink-soft shrink-0" strokeWidth={1.75} />
+        <span>Pricing</span>
+      </Link>
+      <Link
+        href="/support"
+        onClick={() => {
+          setShowUserMenu(false);
+          if (isMobile) setIsMobileOpen(false);
+        }}
+        className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+      >
+        <LifeBuoy className="w-[18px] h-[18px] text-ink-soft shrink-0" strokeWidth={1.75} />
+        <span>Support</span>
+      </Link>
+      <button
+        type="button"
+        onClick={toggleTheme}
+        className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-left"
+      >
+        <div
+          className={`w-8 h-[18px] rounded-full p-0.5 transition-colors duration-200 ease-in-out flex items-center shrink-0 ${
+            isDark
+              ? "bg-[#556947] dark:bg-[#788b5e] justify-end"
+              : "bg-[#d3d8ce] dark:bg-zinc-600 justify-start"
+          }`}
+        >
+          <div className="w-3.5 h-3.5 rounded-full bg-white shadow-xs" />
+        </div>
+        <span>Dark mode</span>
+      </button>
+      <div className="my-1 border-t border-line/60 dark:border-white/10" />
+      <button
+        onClick={handleLogout}
+        className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-left"
+      >
+        <LogOut className="w-[18px] h-[18px] text-ink-soft shrink-0" strokeWidth={1.75} />
+        <span>Log out</span>
+      </button>
+    </>
+  );
+
+  const renderCollapsedSidebarContent = () => (
+    <div className="flex flex-col items-center justify-between h-full min-h-0 w-full py-1">
+      <div className="flex flex-col items-center space-y-3.5 w-full">
+        {/* Top: Logo Cap (Icon Only) */}
+        <div className="flex items-center justify-center pt-1">
+          <CourseItLogo size="default" iconOnly href="/dashboard" />
+        </div>
+
+        {/* Toggle Expand Button */}
+        <button
+          onClick={toggleCollapse}
+          className="text-ink-soft hover:text-ink p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+          title="Expand sidebar"
+          aria-label="Expand sidebar"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <path d="M9 4v16" />
+          </svg>
+        </button>
+
+        {/* + Circular New Course Button */}
+        <Link
+          href="/generate"
+          className="w-10 h-10 rounded-full bg-[#b8c460] text-[#0f1611] flex items-center justify-center font-bold text-lg hover:bg-[#a6b350] transition-transform hover:scale-105 shadow-xs shrink-0 cursor-pointer"
+          title="New course"
+        >
+          +
+        </Link>
+
+        {/* Navigation list in icon-only mode */}
+        <nav className="flex flex-col items-center space-y-1 w-full pt-1">
+          {navItems.map((item) => (
+            <Link
+              key={item.name}
+              href={item.href}
+              title={item.name + (item.badge ? ` (${item.badge})` : "")}
+              className={`w-10 h-10 flex items-center justify-center rounded-xl transition-colors ${
+                item.active
+                  ? "bg-sidebar-accent text-moss"
+                  : "text-ink-soft hover:bg-black/5 dark:hover:bg-white/5 hover:text-ink"
+              }`}
+            >
+              {item.icon}
+            </Link>
+          ))}
+        </nav>
+
+        {/* RECENTS Thumbnails in collapsed mode */}
+        {recents.length > 0 && (
+          <div className="flex flex-col items-center space-y-2 pt-2 border-t border-line/60 dark:border-white/10 w-full">
+            {recents.slice(0, 3).map((r, idx) => {
+              const thumb = getCleanThumbnailUrl(
+                r.thumbnail || r.thumbnailUrl,
+                r.slug
+              );
+
+              return (
+                <Link
+                  key={r.slug || idx}
+                  href={`/courses/${r.slug}`}
+                  title={`${r.title} (${r.progress || 0}%)`}
+                  className="w-7 h-7 rounded-lg overflow-hidden border border-line bg-black shrink-0 hover:scale-110 transition-transform cursor-pointer"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={thumb}
+                    alt={r.title || "Course thumbnail"}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src =
+                        "https://i.ytimg.com/vi/3iFMc6ELt7k/hqdefault.jpg";
+                    }}
+                  />
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Bottom Area: Explore Community & User Profile Avatar */}
+      <div className="flex flex-col items-center space-y-2.5 w-full pb-1 pt-2 border-t border-line/60 dark:border-white/10 relative" data-user-menu-container>
+        <Link
+          href="/community"
+          title="Community"
+          className={`w-10 h-10 flex items-center justify-center rounded-xl transition-colors ${
+            pathname === "/community"
+              ? "bg-sidebar-accent text-moss dark:text-[#b8c460]"
+              : "text-ink-soft hover:bg-black/5 dark:hover:bg-white/5 hover:text-ink"
+          }`}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+        </Link>
+
+        {currentUser ? (
+          <div className="relative">
+            <button
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="w-8 h-8 rounded-full bg-[#f25123] text-white flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden shadow-xs hover:ring-2 hover:ring-moss/40 transition-all cursor-pointer"
+              title={currentUser.profile?.displayName || currentUser.name || "User profile"}
+            >
+              {currentUser.profile?.avatarUrl && !currentUser.profile.avatarUrl.includes("dicebear.com") ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={currentUser.profile.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <span>
+                  {(
+                    (currentUser.profile?.displayName || currentUser.name || currentUser.email || "S")
+                      .replace(/^(mr|dr|ms|mrs)\.?\s+/i, "")
+                      .trim()
+                      .charAt(0) ||
+                    (currentUser.profile?.displayName || currentUser.name || "S").charAt(0) ||
+                    "S"
+                  ).toUpperCase()}
+                </span>
+              )}
+            </button>
+
+            {showUserMenu && (
+              <div className="absolute left-[calc(100%+12px)] bottom-0 w-52 bg-white dark:bg-[#151e18] rounded-2xl border border-line/80 dark:border-white/10 p-1.5 shadow-xl dark:shadow-2xl space-y-0.5 z-50">
+                {renderUserMenuItems(false)}
+              </div>
+            )}
+          </div>
+        ) : (
+          <Link
+            href="/login"
+            title="Sign in / Register"
+            className="w-8 h-8 rounded-full bg-[#b8c460] text-[#0f1611] flex items-center justify-center font-bold text-xs hover:bg-[#a6b350] transition-colors"
+          >
+            👤
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+
   const renderSidebarContent = (isMobile = false) => (
     <div className="flex flex-col justify-between h-full min-h-0 space-y-5">
       <div className="space-y-5 overflow-y-auto pr-1">
@@ -288,8 +524,10 @@ export function AppSidebar() {
             </button>
           ) : (
             <button
+              onClick={toggleCollapse}
               className="text-ink-soft hover:text-ink p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-              title="CourseIt Workspace"
+              title="Collapse sidebar"
+              aria-label="Collapse sidebar"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
                 <rect x="3" y="4" width="18" height="16" rx="2" />
@@ -518,76 +756,7 @@ export function AppSidebar() {
 
             {showUserMenu && (
               <div className="absolute bottom-[calc(100%+8px)] left-0 right-0 bg-white dark:bg-[#151e18] rounded-2xl border border-line/80 dark:border-white/10 p-1.5 shadow-xl dark:shadow-2xl space-y-0.5 z-40">
-                {currentUser.role === "ADMIN" && (
-                  <Link
-                    href="/studio-hub"
-                    onClick={() => {
-                      setShowUserMenu(false);
-                      if (isMobile) setIsMobileOpen(false);
-                    }}
-                    className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-[#556947] dark:text-[#b8c460] hover:bg-[#556947]/10 dark:hover:bg-[#b8c460]/10 transition-colors"
-                  >
-                    <ShieldCheck className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
-                    <span>Studio Vault (Admin)</span>
-                  </Link>
-                )}
-                <Link
-                  href="/settings"
-                  onClick={() => {
-                    setShowUserMenu(false);
-                    if (isMobile) setIsMobileOpen(false);
-                  }}
-                  className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-                >
-                  <Settings className="w-[18px] h-[18px] text-ink-soft shrink-0" strokeWidth={1.75} />
-                  <span>Settings</span>
-                </Link>
-                <Link
-                  href="/pricing"
-                  onClick={() => {
-                    setShowUserMenu(false);
-                    if (isMobile) setIsMobileOpen(false);
-                  }}
-                  className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-                >
-                  <Crown className="w-[18px] h-[18px] text-ink-soft shrink-0" strokeWidth={1.75} />
-                  <span>Pricing</span>
-                </Link>
-                <Link
-                  href="/support"
-                  onClick={() => {
-                    setShowUserMenu(false);
-                    if (isMobile) setIsMobileOpen(false);
-                  }}
-                  className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-                >
-                  <LifeBuoy className="w-[18px] h-[18px] text-ink-soft shrink-0" strokeWidth={1.75} />
-                  <span>Support</span>
-                </Link>
-                <button
-                  type="button"
-                  onClick={toggleTheme}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-left"
-                >
-                  <div
-                    className={`w-8 h-[18px] rounded-full p-0.5 transition-colors duration-200 ease-in-out flex items-center shrink-0 ${
-                      isDark
-                        ? "bg-[#556947] dark:bg-[#788b5e] justify-end"
-                        : "bg-[#d3d8ce] dark:bg-zinc-600 justify-start"
-                    }`}
-                  >
-                    <div className="w-3.5 h-3.5 rounded-full bg-white shadow-xs" />
-                  </div>
-                  <span>Dark mode</span>
-                </button>
-                <div className="my-1 border-t border-line/60 dark:border-white/10" />
-                <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-left"
-                >
-                  <LogOut className="w-[18px] h-[18px] text-ink-soft shrink-0" strokeWidth={1.75} />
-                  <span>Log out</span>
-                </button>
+                {renderUserMenuItems(isMobile)}
               </div>
             )}
           </div>
@@ -688,9 +857,18 @@ export function AppSidebar() {
       </aside>
 
       {/* 3. DESKTOP PERMANENT SIDEBAR (Fixed to viewport matching reference site) */}
-      <div className="hidden lg:block lg:w-64 lg:shrink-0" aria-hidden="true" />
-      <aside className="hidden lg:flex fixed inset-y-0 left-0 z-30 w-64 bg-sidebar border-r border-sidebar-border flex-col justify-between h-screen p-4 text-sidebar-foreground">
-        {renderSidebarContent(false)}
+      <div
+        className={`hidden lg:block lg:shrink-0 transition-[width] duration-200 ease-in-out ${
+          isCollapsed ? "lg:w-16" : "lg:w-64"
+        }`}
+        aria-hidden="true"
+      />
+      <aside
+        className={`hidden lg:flex fixed inset-y-0 left-0 z-30 bg-sidebar border-r border-sidebar-border flex-col justify-between h-screen transition-[width] duration-200 ease-in-out text-sidebar-foreground ${
+          isCollapsed ? "w-16 p-2" : "w-64 p-4"
+        }`}
+      >
+        {isCollapsed ? renderCollapsedSidebarContent() : renderSidebarContent(false)}
       </aside>
     </>
   );

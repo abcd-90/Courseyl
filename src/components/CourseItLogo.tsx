@@ -8,10 +8,12 @@ export function CourseItLogo({
   className = "",
   size = "default",
   href = "/",
+  iconOnly = false,
 }: {
   className?: string;
   size?: "sm" | "default" | "lg";
   href?: string;
+  iconOnly?: boolean;
 }) {
   const { settings } = useSiteSettings();
   const logoIcon = settings?.branding?.logoIcon || "grad-cap";
@@ -98,10 +100,12 @@ export function CourseItLogo({
   const Content = (
     <div className={`inline-flex items-center gap-2 font-display font-bold tracking-tight ${className}`}>
       {renderIcon()}
-      <span className={`${textSizes[size]} font-bold tracking-tight`}>
-        <span className="text-ink">{brandPrefix}</span>
-        {brandHighlight ? <span className="text-moss">{brandHighlight}</span> : null}
-      </span>
+      {!iconOnly && (
+        <span className={`${textSizes[size]} font-bold tracking-tight`}>
+          <span className="text-ink">{brandPrefix}</span>
+          {brandHighlight ? <span className="text-moss">{brandHighlight}</span> : null}
+        </span>
+      )}
     </div>
   );
 
