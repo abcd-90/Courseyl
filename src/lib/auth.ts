@@ -198,6 +198,14 @@ export async function upsertVerifiedUser(params: UpsertVerifiedUserParams) {
       },
       include: { profile: true, subscription: true },
     });
+
+    if (settings?.plans?.sendWelcomeEmail !== false) {
+      import("./mailer")
+        .then(({ sendWelcomeEmail }) => {
+          sendWelcomeEmail({ email: cleanEmail, name: cleanName }).catch(() => {});
+        })
+        .catch(() => {});
+    }
   } else {
     const needsVerificationUpdate =
       !user.emailVerified ||

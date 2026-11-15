@@ -1401,6 +1401,152 @@ export default function StudioHubAdminPage() {
                     </div>
                   </div>
 
+                  {/* Course Generation & Video Guardrails */}
+                  <div className="pt-2 border-t border-line space-y-4">
+                    <div>
+                      <h4 className="text-sm font-display font-bold text-ink">
+                        Course Generation &amp; Video Guardrails
+                      </h4>
+                      <p className="text-xs text-ink-soft">
+                        Control maximum video lengths and student diagnostic test settings.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                          Max Video Duration (Hours)
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={48}
+                          value={plansForm.maxVideoDurationHours ?? 24}
+                          onChange={(e) =>
+                            setPlansForm({
+                              ...plansForm,
+                              maxVideoDurationHours: Number(e.target.value),
+                            })
+                          }
+                          className="w-full h-10 rounded-xl bg-paper px-3 text-sm font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+                        />
+                        <span className="text-[0.62rem] text-ink-soft mt-1 block">
+                          Set 0 for unlimited marathon lengths.
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col justify-center">
+                        <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                          Diagnostic Placement Tests
+                        </label>
+                        <label className="flex items-center gap-2 h-10 px-3 rounded-xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] cursor-pointer select-none text-xs text-ink">
+                          <input
+                            type="checkbox"
+                            checked={plansForm.placementTestsEnabled !== false}
+                            onChange={(e) =>
+                              setPlansForm({
+                                ...plansForm,
+                                placementTestsEnabled: e.target.checked,
+                              })
+                            }
+                            className="accent-[#4b5e1e] size-4 rounded cursor-pointer"
+                          />
+                          <span>
+                            {plansForm.placementTestsEnabled !== false
+                              ? "Enabled (Syllabus Check)"
+                              : "Disabled (Direct Study)"}
+                          </span>
+                        </label>
+                      </div>
+
+                      <div className="flex flex-col justify-center">
+                        <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                          Community Auto-Publish
+                        </label>
+                        <label className="flex items-center gap-2 h-10 px-3 rounded-xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] cursor-pointer select-none text-xs text-ink">
+                          <input
+                            type="checkbox"
+                            checked={plansForm.autoPublishToCommunity !== false}
+                            onChange={(e) =>
+                              setPlansForm({
+                                ...plansForm,
+                                autoPublishToCommunity: e.target.checked,
+                              })
+                            }
+                            className="accent-[#4b5e1e] size-4 rounded cursor-pointer"
+                          />
+                          <span>
+                            {plansForm.autoPublishToCommunity !== false
+                              ? "Public By Default"
+                              : "Private By Default"}
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* User Onboarding & Email Controls */}
+                  <div className="pt-2 border-t border-line space-y-4">
+                    <div>
+                      <h4 className="text-sm font-display font-bold text-ink">
+                        User Onboarding &amp; Email Controls
+                      </h4>
+                      <p className="text-xs text-ink-soft">
+                        Automated student emails and security verification filters.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                          Automated Welcome Email
+                        </label>
+                        <label className="flex items-center gap-2 h-10 px-3 rounded-xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] cursor-pointer select-none text-xs text-ink">
+                          <input
+                            type="checkbox"
+                            checked={plansForm.sendWelcomeEmail !== false}
+                            onChange={(e) =>
+                              setPlansForm({
+                                ...plansForm,
+                                sendWelcomeEmail: e.target.checked,
+                              })
+                            }
+                            className="accent-[#4b5e1e] size-4 rounded cursor-pointer"
+                          />
+                          <span>
+                            {plansForm.sendWelcomeEmail !== false
+                              ? "Send Welcome Email to New Students"
+                              : "Welcome Emails Disabled"}
+                          </span>
+                        </label>
+                      </div>
+
+                      <div>
+                        <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                          Block Disposable &amp; Temp Inboxes
+                        </label>
+                        <label className="flex items-center gap-2 h-10 px-3 rounded-xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] cursor-pointer select-none text-xs text-ink">
+                          <input
+                            type="checkbox"
+                            checked={plansForm.blockDisposableEmails !== false}
+                            onChange={(e) =>
+                              setPlansForm({
+                                ...plansForm,
+                                blockDisposableEmails: e.target.checked,
+                              })
+                            }
+                            className="accent-[#4b5e1e] size-4 rounded cursor-pointer"
+                          />
+                          <span>
+                            {plansForm.blockDisposableEmails !== false
+                              ? "Block Fake/Temp Inboxes"
+                              : "Allow Any Inbox (Testing Mode)"}
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
                       Maintenance Banner Message (Shown if Maintenance Mode ON)

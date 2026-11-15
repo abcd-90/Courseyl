@@ -365,6 +365,52 @@ export function AdminStructureEditor({
               />
             </div>
           </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div>
+              <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                Banner Urgency & Theme
+              </label>
+              <select
+                value={structure.announcementBanner.variant || "info"}
+                onChange={(e) =>
+                  onChange({
+                    ...structure,
+                    announcementBanner: {
+                      ...structure.announcementBanner,
+                      variant: e.target.value as "info" | "alert" | "urgent",
+                    },
+                  })
+                }
+                className="w-full h-10 rounded-xl bg-paper px-3 text-xs font-semibold text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
+              >
+                <option value="info">Info · Signature Moss Green</option>
+                <option value="alert">Alert · Warm Amber Warning</option>
+                <option value="urgent">Urgent · Ruby Red Critical</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                Learner Dismissal
+              </label>
+              <label className="flex items-center gap-2 h-10 px-3 rounded-xl bg-paper shadow-[inset_0_0_0_1px_var(--line)] cursor-pointer select-none text-xs text-ink">
+                <input
+                  type="checkbox"
+                  checked={structure.announcementBanner.dismissible !== false}
+                  onChange={(e) =>
+                    onChange({
+                      ...structure,
+                      announcementBanner: {
+                        ...structure.announcementBanner,
+                        dismissible: e.target.checked,
+                      },
+                    })
+                  }
+                  className="accent-[#4b5e1e] size-4 rounded cursor-pointer"
+                />
+                <span>Allow learners to close with '✕' button</span>
+              </label>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -642,6 +688,78 @@ export function AdminStructureEditor({
                 className="w-full h-9 rounded-lg bg-paper px-2.5 text-xs text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
               />
             </div>
+          </div>
+        </div>
+
+        <div className="rounded-[28px] bg-surface p-6 sm:p-8 shadow-[0_0_0_1px_var(--line)] space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-display font-bold text-ink">
+                SEO, Analytics &amp; Head Tags
+              </h3>
+              <p className="text-xs text-ink-soft mt-0.5">
+                Configure live tracking tags and search engine verification tokens without manual deployments.
+              </p>
+            </div>
+            <span className="px-2.5 py-1 rounded-full bg-lime-soft text-moss font-mono text-[0.68rem] font-bold uppercase">
+              Web &amp; Crawlers
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                Google Analytics (GA4) Measurement ID
+              </label>
+              <input
+                type="text"
+                placeholder="G-XXXXXXXXXX"
+                value={structure.googleAnalyticsId || ""}
+                onChange={(e) =>
+                  onChange({ ...structure, googleAnalyticsId: e.target.value.trim() })
+                }
+                className="w-full h-10 rounded-xl bg-paper px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none placeholder:text-ink-soft/40"
+              />
+              <span className="text-[0.65rem] text-ink-soft mt-1 block">
+                Auto-injects official gtag.js across all pages.
+              </span>
+            </div>
+
+            <div>
+              <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+                Google Search Console Token
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. your verification code from HTML tag"
+                value={structure.googleSearchConsoleToken || ""}
+                onChange={(e) =>
+                  onChange({
+                    ...structure,
+                    googleSearchConsoleToken: e.target.value.trim(),
+                  })
+                }
+                className="w-full h-10 rounded-xl bg-paper px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none placeholder:text-ink-soft/40"
+              />
+              <span className="text-[0.65rem] text-ink-soft mt-1 block">
+                Injects &lt;meta name=&quot;google-site-verification&quot; content=&quot;...&quot;&gt;
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
+              Custom &lt;head&gt; Scripts &amp; Tracking Pixels (Optional)
+            </label>
+            <textarea
+              rows={3}
+              placeholder="<!-- Paste custom Microsoft Clarity, Meta Pixel, or analytics scripts here -->"
+              value={structure.customHeadScripts || ""}
+              onChange={(e) =>
+                onChange({ ...structure, customHeadScripts: e.target.value })
+              }
+              className="w-full rounded-xl bg-paper p-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none placeholder:text-ink-soft/40"
+            />
           </div>
         </div>
       </div>

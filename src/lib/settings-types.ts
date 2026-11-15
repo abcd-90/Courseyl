@@ -32,6 +32,11 @@ export interface SitePlanSettings {
   allowNewSignups: boolean;
   maintenanceMode: boolean;
   maintenanceMessage: string;
+  maxVideoDurationHours?: number;
+  placementTestsEnabled?: boolean;
+  autoPublishToCommunity?: boolean;
+  sendWelcomeEmail?: boolean;
+  blockDisposableEmails?: boolean;
 }
 
 export type HomeSectionId =
@@ -67,6 +72,8 @@ export interface SiteStructureSettings {
     text: string;
     linkLabel: string;
     linkHref: string;
+    dismissible?: boolean;
+    variant?: "info" | "alert" | "urgent";
   };
   navLinks: NavLinkConfig[];
   navLoginLabel: string;
@@ -103,6 +110,9 @@ export interface SiteStructureSettings {
     telegramEnabled?: boolean;
     contactEmail: string;
   };
+  googleAnalyticsId?: string;
+  googleSearchConsoleToken?: string;
+  customHeadScripts?: string;
 }
 
 export interface SiteAiSettings {
@@ -229,6 +239,11 @@ export const DEFAULT_SETTINGS: FullSiteSettings = {
     allowNewSignups: true,
     maintenanceMode: false,
     maintenanceMessage: "Courseyl is currently undergoing scheduled platform upgrades. We will be back shortly!",
+    maxVideoDurationHours: 24,
+    placementTestsEnabled: true,
+    autoPublishToCommunity: true,
+    sendWelcomeEmail: true,
+    blockDisposableEmails: true,
   },
   ai: {
     activeProvider: "NVIDIA_NEMOTRON",
@@ -243,6 +258,8 @@ export const DEFAULT_SETTINGS: FullSiteSettings = {
       text: "Unlimited Full Free Access is currently enabled across all AI course tools.",
       linkLabel: "Build a course",
       linkHref: "/dashboard",
+      dismissible: true,
+      variant: "info",
     },
     navLinks: [
       { id: "features", label: "Features", href: "/#features", visible: true },
@@ -284,6 +301,9 @@ export const DEFAULT_SETTINGS: FullSiteSettings = {
       telegramEnabled: true,
       contactEmail: "thecourseyl@gmail.com",
     },
+    googleAnalyticsId: "",
+    googleSearchConsoleToken: "",
+    customHeadScripts: "",
   },
 };
 

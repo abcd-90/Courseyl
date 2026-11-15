@@ -374,3 +374,83 @@ export async function sendAdminMailerTestEmail(params: {
     : result;
 }
 
+/**
+ * Dispatches an automated onboarding welcome email to newly verified learners.
+ * Runs non-blocking in background; skips if no custom SMTP/Resend is configured.
+ */
+export async function sendWelcomeEmail(params: {
+  email: string;
+  name?: string;
+}): Promise<boolean> {
+  try {
+    const { email, name } = params;
+    const settings = await getPublicSettings().catch(() => null);
+    const brandName = settings?.branding?.brandName || "Courseyl";
+    const cfg = await getEffectiveAuthConfig();
+
+    const hasResend = Boolean(cfg.resendApiKey);
+    const hasSmtp = Boolean(cfg.smtpHost && cfg.smtpUser && cfg.smtpPass);
+    if (!hasResend && !hasSmtp) {
+      return false;
+    }
+
+    const recipientName = (name || email.split("@")[0] || "Learner").trim();
+    const subject = `Welcome to ${brandName} – Start Turning YouTube into Courses!`;
+    const dashboardUrl = "https://courseyl.online/dashboard";
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Welcome to ${brandName}</title>
+</head>
+<body style="margin: 0; padding: 28px 12px; background: #f6f8ec; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; color: #0f1611;">
+  <div style="max-width: 520px; margin: 0 auto; padding: 36px 30px; background: #ffffff; border: 1px solid #e4e9c6; border-radius: 20px; box-shadow: 0 4px 14px rgba(15,22,17,0.04);">
+    <div style="display: inline-block; padding: 5px 14px; background: #eef3d4; color: #4b5e1e; font-size: 12px; font-weight: 700; border-radius: 999px; margin-bottom: 18px;">
+      Welcome to ${brandName} 🎓
+    </div>
+    <h1 style="font-size: 24px; font-weight: 800; margin: 0 0 14px; color: #0f1611; letter-spacing: -0.02em;">
+      Hey ${recipientName}, your learning journey begins now!
+    </h1>
+    <p style="font-size: 15px; line-height: 1.6; color: #4c4c3d; margin: 0 0 22px;">
+      Welcome to your distraction-free educational space. ${brandName} turns long technical YouTube tutorials into structured, day-by-day courses with active recall quizzes, timestamped study notes, and diagnostic placement tests.
+    </p>
+    <div style="background: #fafbf5; border: 1px dashed #d5ddaa; border-radius: 14px; padding: 18px 22px; margin: 0 0 26px;">
+      <p style="font-size: 13px; font-weight: 700; color: #4b5e1e; margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.05em;">Quick 30-Second Start:</p>
+      <ol style="margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.65; color: #2e3524;">
+        <li>Open your <strong>Courseyl Dashboard</strong></li>
+        <li>Paste any YouTube video or playlist link</li>
+        <li>Click <strong>Build my course</strong> & start Day 1</li>
+      </ol>
+    </div>
+    <p style="margin: 0 0 26px;">
+      <a href="${dashboardUrl}" style="display: inline-block; background: #4b5e1e; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 14px 34px; border-radius: 999px;">
+        Open Your Dashboard →
+      </a>
+    </p>
+    <p style="font-size: 13px; color: #767664; margin: 0; line-height: 1.55;">
+      Happy learning,<br />
+      <strong>The ${brandName} Team</strong>
+    </p>
+  </div>
+</body>
+</html>`;
+
+    const text = `Hey ${recipientName},\n\nWelcome to ${brandName}!\n\nTurn any YouTube video or playlist into a structured, distraction-free course:\n1. Open your dashboard: ${dashboardUrl}\n2. Paste any YouTube URL\n3. Click "Build my course"\n\nHappy learning!\nThe ${brandName} Team`;
+
+    const res = await deliverViaConfiguredMailer({
+      cfg,
+      brandName,
+      to: email,
+      subject,
+      html,
+      text,
+    });
+    return Boolean(res?.ok);
+  } catch (err) {
+    console.warn("sendWelcomeEmail background dispatch error:", err);
+    return false;
+  }
+}
+

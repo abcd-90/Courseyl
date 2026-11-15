@@ -7,10 +7,16 @@ import { getPublicSettings } from "@/lib/settings";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
+  const publicSettings = await getPublicSettings().catch(() => null);
   const baseUrl = "https://courseyl.online";
   const defaultTitle = "Courseyl - Turn Any YouTube Video Into an Interactive Course";
   const description =
     "Courseyl turns any YouTube video or playlist into structured courses with active recall quizzes, interactive notes, and personalized diagnostic placement tests.";
+
+  const googleVerification =
+    publicSettings?.structure?.googleSearchConsoleToken?.trim() ||
+    process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ||
+    "";
 
   return {
     metadataBase: new URL(baseUrl),
@@ -81,7 +87,7 @@ export async function generateMetadata(): Promise<Metadata> {
       apple: "/apple-touch-icon.png",
     },
     verification: {
-      google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "",
+      google: googleVerification,
     },
   };
 }
@@ -92,6 +98,8 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const publicSettings = await getPublicSettings();
+  const gaId = publicSettings?.structure?.googleAnalyticsId?.trim();
+  const customHeadScripts = publicSettings?.structure?.customHeadScripts?.trim();
 
   const jsonLdGraph = {
     "@context": "https://schema.org",
@@ -209,6 +217,27 @@ export default async function RootLayout({
             })();`,
           }}
         />
+        {gaId && (
+          <>
+            <script
+              async
+              src={`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(gaId)}`}
+            />
+            <script
+              id="google-analytics-inline"
+              dangerouslySetInnerHTML={{
+                __html: `window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', '${gaId.replace(/'/g, "\\'")}');`,
+              }}
+            />
+          </>
+        )}
+        {customHeadScripts && (
+          <div
+            id="custom-head-injection"
+            style={{ display: "none" }}
+            dangerouslySetInnerHTML={{ __html: customHeadScripts }}
+          />
+        )}
       </head>
       <body className="min-h-full flex flex-col selection:bg-[#4b5e1e] selection:text-[#f6f8ec]">
         <SiteSettingsProvider initialSettings={publicSettings as any}>

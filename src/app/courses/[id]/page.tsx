@@ -7,10 +7,12 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { getCleanThumbnailUrl } from "@/lib/thumbnail";
 import { recordRecentCourse } from "@/lib/recentCourses";
 import { clampDailyStudyMinutes, groupLessonsIntoDayBins } from "@/lib/pacing";
+import { useSiteSettings } from "@/components/SiteSettingsProvider";
 
 export default function CourseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const router = useRouter();
+  const { settings } = useSiteSettings();
   const [course, setCourse] = useState<any>(null);
   const [userState, setUserState] = useState<any>(null);
   const [dailyMinutes, setDailyMinutes] = useState<number>(60);
@@ -435,78 +437,80 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
         </div>
 
         {/* Diagnostic Placement Test Banner */}
-        <div className="mt-8 bg-lime-soft/40 dark:bg-[#162111] border border-line dark:border-[#26371a] rounded-2xl p-4 sm:p-5 flex flex-col gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            {userState?.hasCompletedPlacementTest ? (
-              <div className="space-y-1">
-                <p className="text-sm sm:text-base text-ink font-medium">
-                  Placement test:{" "}
-                  <strong className="font-bold text-moss dark:text-[#b8c460]">
-                    {userState.placementScore ?? 0}%
-                  </strong>
-                  . {skippedLessonsList.length} lesson
-                  {skippedLessonsList.length === 1 ? "" : "s"} skipped in your plan.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setShowSkippedPanel((prev) => !prev)}
-                  className="text-xs font-semibold text-moss dark:text-[#b8c460] hover:underline cursor-pointer"
-                >
-                  {showSkippedPanel
-                    ? "Hide skipped lessons"
-                    : "See or change skipped lessons"}
-                </button>
-              </div>
-            ) : (
-              <p className="text-sm sm:text-base text-ink font-medium">
-                Already know some of this? A 2-minute test skips the lessons you know.
-              </p>
-            )}
-
-            <Link
-              href={`/courses/${course.slug || course.id}/placement-test`}
-              className="px-5 py-2.5 rounded-full bg-[#2d3a14] dark:bg-[#b8c460] text-white dark:text-[#0f1611] font-semibold text-xs sm:text-sm hover:bg-[#202a0e] dark:hover:bg-[#a6b350] transition-colors shrink-0 text-center shadow-xs cursor-pointer"
-            >
-              {userState?.hasCompletedPlacementTest
-                ? "Retake placement test"
-                : "Take the placement test"}
-            </Link>
-          </div>
-
-          {showSkippedPanel && (
-            <div className="pt-3 border-t border-line/70 dark:border-[#26371a] space-y-2 max-h-64 overflow-y-auto">
-              <p className="text-xs text-ink-soft mb-2">
-                Flip any lesson below to skip or include it in your study plan:
-              </p>
-              {allLessons.map((l: any, idx: number) => (
-                <div
-                  key={l.id}
-                  className="flex items-center justify-between gap-3 py-1.5 px-2.5 rounded-xl bg-surface/70 dark:bg-[#0d140f]/80 text-xs"
-                >
-                  <span
-                    className={`truncate ${
-                      l.isSkipped ? "line-through text-ink-soft/70" : "text-ink font-medium"
-                    }`}
-                  >
-                    {idx + 1}. {l.title}
-                  </span>
+        {settings?.plans?.placementTestsEnabled !== false && (
+          <div className="mt-8 bg-lime-soft/40 dark:bg-[#162111] border border-line dark:border-[#26371a] rounded-2xl p-4 sm:p-5 flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              {userState?.hasCompletedPlacementTest ? (
+                <div className="space-y-1">
+                  <p className="text-sm sm:text-base text-ink font-medium">
+                    Placement test:{" "}
+                    <strong className="font-bold text-moss dark:text-[#b8c460]">
+                      {userState.placementScore ?? 0}%
+                    </strong>
+                    . {skippedLessonsList.length} lesson
+                    {skippedLessonsList.length === 1 ? "" : "s"} skipped in your plan.
+                  </p>
                   <button
                     type="button"
-                    disabled={togglingLessonId === l.id}
-                    onClick={() => handleToggleSkipLesson(l.id, Boolean(l.isSkipped))}
-                    className={`px-2.5 py-1 rounded-full text-[0.68rem] font-semibold shrink-0 cursor-pointer transition-colors ${
-                      l.isSkipped
-                        ? "bg-black/10 dark:bg-white/10 text-ink-soft hover:text-ink"
-                        : "bg-[#4b5e1e] dark:bg-[#b8c460] text-white dark:text-[#0f1611]"
-                    }`}
+                    onClick={() => setShowSkippedPanel((prev) => !prev)}
+                    className="text-xs font-semibold text-moss dark:text-[#b8c460] hover:underline cursor-pointer"
                   >
-                    {l.isSkipped ? "Skipped · Include" : "In plan · Skip"}
+                    {showSkippedPanel
+                      ? "Hide skipped lessons"
+                      : "See or change skipped lessons"}
                   </button>
                 </div>
-              ))}
+              ) : (
+                <p className="text-sm sm:text-base text-ink font-medium">
+                  Already know some of this? A 2-minute test skips the lessons you know.
+                </p>
+              )}
+
+              <Link
+                href={`/courses/${course.slug || course.id}/placement-test`}
+                className="px-5 py-2.5 rounded-full bg-[#2d3a14] dark:bg-[#b8c460] text-white dark:text-[#0f1611] font-semibold text-xs sm:text-sm hover:bg-[#202a0e] dark:hover:bg-[#a6b350] transition-colors shrink-0 text-center shadow-xs cursor-pointer"
+              >
+                {userState?.hasCompletedPlacementTest
+                  ? "Retake placement test"
+                  : "Take the placement test"}
+              </Link>
             </div>
-          )}
-        </div>
+
+            {showSkippedPanel && (
+              <div className="pt-3 border-t border-line/70 dark:border-[#26371a] space-y-2 max-h-64 overflow-y-auto">
+                <p className="text-xs text-ink-soft mb-2">
+                  Flip any lesson below to skip or include it in your study plan:
+                </p>
+                {allLessons.map((l: any, idx: number) => (
+                  <div
+                    key={l.id}
+                    className="flex items-center justify-between gap-3 py-1.5 px-2.5 rounded-xl bg-surface/70 dark:bg-[#0d140f]/80 text-xs"
+                  >
+                    <span
+                      className={`truncate ${
+                        l.isSkipped ? "line-through text-ink-soft/70" : "text-ink font-medium"
+                      }`}
+                    >
+                      {idx + 1}. {l.title}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={togglingLessonId === l.id}
+                      onClick={() => handleToggleSkipLesson(l.id, Boolean(l.isSkipped))}
+                      className={`px-2.5 py-1 rounded-full text-[0.68rem] font-semibold shrink-0 cursor-pointer transition-colors ${
+                        l.isSkipped
+                          ? "bg-black/10 dark:bg-white/10 text-ink-soft hover:text-ink"
+                          : "bg-[#4b5e1e] dark:bg-[#b8c460] text-white dark:text-[#0f1611]"
+                      }`}
+                    >
+                      {l.isSkipped ? "Skipped · Include" : "In plan · Skip"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Section: Your plan (Runtime Pacing View) */}
         <div className="mt-10">

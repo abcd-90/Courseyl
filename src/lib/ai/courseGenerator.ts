@@ -315,6 +315,17 @@ async function verifyUserQuota(userId: string, durationSecondsToCheck?: number) 
     );
   }
 
+  if (
+    plans?.maxVideoDurationHours &&
+    plans.maxVideoDurationHours > 0 &&
+    typeof durationSecondsToCheck === "number" &&
+    durationSecondsToCheck > plans.maxVideoDurationHours * 3600
+  ) {
+    throw new Error(
+      `Video duration (${formatDuration(durationSecondsToCheck)}) exceeds the platform maximum allowed duration of ${plans.maxVideoDurationHours} hours.`
+    );
+  }
+
   return { user, sub };
 }
 
@@ -438,7 +449,12 @@ export async function initializeCourseGenerationJob(
     tier === "PRO" ||
     tier === "MAX" ||
     Boolean(siteSettings?.plans?.unlimitedFreeMode);
-  const defaultIsPublic = tier === "PRO" || tier === "MAX" ? false : true;
+  const defaultIsPublic =
+    siteSettings?.plans?.autoPublishToCommunity === false
+      ? false
+      : tier === "PRO" || tier === "MAX"
+      ? false
+      : true;
   const resolvedIsPublic =
     typeof isPublic === "boolean"
       ? isPublic || !canCreatePrivate

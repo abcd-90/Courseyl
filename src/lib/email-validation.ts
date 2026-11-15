@@ -93,7 +93,8 @@ export interface EmailValidationResult {
  * so invalid or nonexistent mail domains are rejected before sending confirmation mail.
  */
 export async function validateRealEmailAddress(
-  rawEmail: unknown
+  rawEmail: unknown,
+  options?: { allowDisposable?: boolean }
 ): Promise<EmailValidationResult> {
   if (typeof rawEmail !== "string") {
     return {
@@ -136,7 +137,18 @@ export async function validateRealEmailAddress(
     };
   }
 
-  if (DISPOSABLE_EMAIL_DOMAINS.has(domain)) {
+  let allowDisposable = options?.allowDisposable;
+  if (typeof allowDisposable !== "boolean") {
+    try {
+      const { getPublicSettings } = await import("./settings");
+      const settings = await getPublicSettings().catch(() => null);
+      if (settings?.plans?.blockDisposableEmails === false) {
+        allowDisposable = true;
+      }
+    } catch {}
+  }
+
+  if (!allowDisposable && DISPOSABLE_EMAIL_DOMAINS.has(domain)) {
     return {
       valid: false,
       cleanEmail,
