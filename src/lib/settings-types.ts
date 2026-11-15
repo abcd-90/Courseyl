@@ -84,8 +84,23 @@ export interface SiteStructureSettings {
   footerRightNote: string;
   socialLinks: {
     twitterUrl: string;
+    twitterEnabled?: boolean;
     linkedinUrl: string;
+    linkedinEnabled?: boolean;
     instagramUrl: string;
+    instagramEnabled?: boolean;
+    youtubeUrl?: string;
+    youtubeEnabled?: boolean;
+    facebookUrl?: string;
+    facebookEnabled?: boolean;
+    githubUrl?: string;
+    githubEnabled?: boolean;
+    discordUrl?: string;
+    discordEnabled?: boolean;
+    tiktokUrl?: string;
+    tiktokEnabled?: boolean;
+    telegramUrl?: string;
+    telegramEnabled?: boolean;
     contactEmail: string;
   };
 }
@@ -250,8 +265,23 @@ export const DEFAULT_SETTINGS: FullSiteSettings = {
     footerRightNote: "Videos play in YouTube's own player. Creators keep their views.",
     socialLinks: {
       twitterUrl: "https://twitter.com/courseitxyz",
+      twitterEnabled: true,
       linkedinUrl: "https://www.linkedin.com/company/courseit/",
+      linkedinEnabled: true,
       instagramUrl: "https://www.instagram.com/courseitxyz",
+      instagramEnabled: true,
+      youtubeUrl: "",
+      youtubeEnabled: true,
+      facebookUrl: "",
+      facebookEnabled: true,
+      githubUrl: "",
+      githubEnabled: true,
+      discordUrl: "",
+      discordEnabled: true,
+      tiktokUrl: "",
+      tiktokEnabled: true,
+      telegramUrl: "",
+      telegramEnabled: true,
       contactEmail: "thecourseyl@gmail.com",
     },
   },

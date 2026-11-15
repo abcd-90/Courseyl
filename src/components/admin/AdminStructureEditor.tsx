@@ -481,54 +481,142 @@ export function AdminStructureEditor({
               />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <label className="block text-[0.62rem] font-mono font-bold uppercase text-ink-soft mb-1">
-                X / Twitter
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between">
+              <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft">
+                Social Links & Channels (Auto-Renders In Footer)
               </label>
-              <input
-                type="text"
-                value={structure.socialLinks.twitterUrl}
-                onChange={(e) =>
-                  onChange({
-                    ...structure,
-                    socialLinks: { ...structure.socialLinks, twitterUrl: e.target.value },
-                  })
-                }
-                className="w-full h-9 rounded-lg bg-paper px-2.5 text-[0.7rem] text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
-              />
+              <span className="text-[0.68rem] text-ink-soft/70">
+                Uncheck to hide, or enter custom URL
+              </span>
             </div>
-            <div>
-              <label className="block text-[0.62rem] font-mono font-bold uppercase text-ink-soft mb-1">
-                LinkedIn
-              </label>
-              <input
-                type="text"
-                value={structure.socialLinks.linkedinUrl}
-                onChange={(e) =>
-                  onChange({
-                    ...structure,
-                    socialLinks: { ...structure.socialLinks, linkedinUrl: e.target.value },
-                  })
-                }
-                className="w-full h-9 rounded-lg bg-paper px-2.5 text-[0.7rem] text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-[0.62rem] font-mono font-bold uppercase text-ink-soft mb-1">
-                Instagram
-              </label>
-              <input
-                type="text"
-                value={structure.socialLinks.instagramUrl}
-                onChange={(e) =>
-                  onChange({
-                    ...structure,
-                    socialLinks: { ...structure.socialLinks, instagramUrl: e.target.value },
-                  })
-                }
-                className="w-full h-9 rounded-lg bg-paper px-2.5 text-[0.7rem] text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {[
+                {
+                  id: "twitter",
+                  label: "X / Twitter",
+                  placeholder: "https://x.com/...",
+                  url: structure.socialLinks.twitterUrl || "",
+                  enabled: structure.socialLinks.twitterEnabled !== false,
+                  setUrl: (val: string) => ({ twitterUrl: val }),
+                  setEnabled: (val: boolean) => ({ twitterEnabled: val }),
+                },
+                {
+                  id: "linkedin",
+                  label: "LinkedIn",
+                  placeholder: "https://linkedin.com/company/...",
+                  url: structure.socialLinks.linkedinUrl || "",
+                  enabled: structure.socialLinks.linkedinEnabled !== false,
+                  setUrl: (val: string) => ({ linkedinUrl: val }),
+                  setEnabled: (val: boolean) => ({ linkedinEnabled: val }),
+                },
+                {
+                  id: "instagram",
+                  label: "Instagram",
+                  placeholder: "https://instagram.com/...",
+                  url: structure.socialLinks.instagramUrl || "",
+                  enabled: structure.socialLinks.instagramEnabled !== false,
+                  setUrl: (val: string) => ({ instagramUrl: val }),
+                  setEnabled: (val: boolean) => ({ instagramEnabled: val }),
+                },
+                {
+                  id: "youtube",
+                  label: "YouTube",
+                  placeholder: "https://youtube.com/@...",
+                  url: structure.socialLinks.youtubeUrl || "",
+                  enabled: structure.socialLinks.youtubeEnabled !== false,
+                  setUrl: (val: string) => ({ youtubeUrl: val }),
+                  setEnabled: (val: boolean) => ({ youtubeEnabled: val }),
+                },
+                {
+                  id: "facebook",
+                  label: "Facebook",
+                  placeholder: "https://facebook.com/...",
+                  url: structure.socialLinks.facebookUrl || "",
+                  enabled: structure.socialLinks.facebookEnabled !== false,
+                  setUrl: (val: string) => ({ facebookUrl: val }),
+                  setEnabled: (val: boolean) => ({ facebookEnabled: val }),
+                },
+                {
+                  id: "github",
+                  label: "GitHub",
+                  placeholder: "https://github.com/...",
+                  url: structure.socialLinks.githubUrl || "",
+                  enabled: structure.socialLinks.githubEnabled !== false,
+                  setUrl: (val: string) => ({ githubUrl: val }),
+                  setEnabled: (val: boolean) => ({ githubEnabled: val }),
+                },
+                {
+                  id: "discord",
+                  label: "Discord",
+                  placeholder: "https://discord.gg/...",
+                  url: structure.socialLinks.discordUrl || "",
+                  enabled: structure.socialLinks.discordEnabled !== false,
+                  setUrl: (val: string) => ({ discordUrl: val }),
+                  setEnabled: (val: boolean) => ({ discordEnabled: val }),
+                },
+                {
+                  id: "tiktok",
+                  label: "TikTok",
+                  placeholder: "https://tiktok.com/@...",
+                  url: structure.socialLinks.tiktokUrl || "",
+                  enabled: structure.socialLinks.tiktokEnabled !== false,
+                  setUrl: (val: string) => ({ tiktokUrl: val }),
+                  setEnabled: (val: boolean) => ({ tiktokEnabled: val }),
+                },
+                {
+                  id: "telegram",
+                  label: "Telegram",
+                  placeholder: "https://t.me/...",
+                  url: structure.socialLinks.telegramUrl || "",
+                  enabled: structure.socialLinks.telegramEnabled !== false,
+                  setUrl: (val: string) => ({ telegramUrl: val }),
+                  setEnabled: (val: boolean) => ({ telegramEnabled: val }),
+                },
+              ].map((platform) => (
+                <div
+                  key={platform.id}
+                  className="rounded-xl bg-paper p-2.5 shadow-[inset_0_0_0_1px_var(--line)] space-y-1.5"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[0.66rem] font-mono font-bold uppercase text-ink">
+                      {platform.label}
+                    </span>
+                    <label className="flex items-center gap-1 text-[0.68rem] text-ink-soft cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={platform.enabled}
+                        onChange={(e) =>
+                          onChange({
+                            ...structure,
+                            socialLinks: {
+                              ...structure.socialLinks,
+                              ...platform.setEnabled(e.target.checked),
+                            },
+                          })
+                        }
+                        className="accent-[#4b5e1e]"
+                      />
+                      Show
+                    </label>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder={platform.placeholder}
+                    value={platform.url}
+                    onChange={(e) =>
+                      onChange({
+                        ...structure,
+                        socialLinks: {
+                          ...structure.socialLinks,
+                          ...platform.setUrl(e.target.value),
+                        },
+                      })
+                    }
+                    className="w-full h-8 rounded-lg bg-surface px-2.5 text-xs text-ink outline-none placeholder:text-ink-soft/40 shadow-[inset_0_0_0_1px_var(--line)] focus:shadow-[inset_0_0_0_1.5px_var(--moss)]"
+                  />
+                </div>
+              ))}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
