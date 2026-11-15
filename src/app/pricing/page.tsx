@@ -15,12 +15,27 @@ export default function PricingPage() {
   const [checkoutError, setCheckoutError] = useState("");
   const [checkoutBanner, setCheckoutBanner] = useState("");
 
+  const isPricingVisible =
+    settings?.structure?.navLinks?.find(
+      (l) => l.id === "pricing" || l.href.includes("pricing")
+    )?.visible !== false;
+
+  useEffect(() => {
+    if (!isPricingVisible) {
+      window.location.replace("/dashboard");
+    }
+  }, [isPricingVisible]);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("checkout") === "canceled") {
       setCheckoutBanner("Checkout was canceled. No changes were made to your plan.");
     }
   }, []);
+
+  if (!isPricingVisible) {
+    return null;
+  }
 
   const plans = settings.plans;
   const brandName = settings.branding?.brandName || "Courseyl";

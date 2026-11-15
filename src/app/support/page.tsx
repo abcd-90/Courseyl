@@ -23,6 +23,10 @@ export default function SupportPage() {
 
   const brandName = settings?.branding?.brandName || "Courseyl";
   const userEmail = currentUser?.email || "your account email";
+  const isPricingVisible =
+    settings?.structure?.navLinks?.find(
+      (l) => l.id === "pricing" || l.href.includes("pricing")
+    )?.visible !== false;
   const supportEmail = "thecourseyl@gmail.com";
 
   return (
@@ -81,12 +85,14 @@ export default function SupportPage() {
                 Telegram support on Pro. WhatsApp and priority support on Max.
               </p>
             </div>
-            <Link
-              href="/pricing"
-              className="inline-flex items-center justify-center px-6 py-2 rounded-full border border-line dark:border-white/15 bg-surface dark:bg-white/5 text-xs sm:text-sm font-semibold text-ink hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0 text-center cursor-pointer"
-            >
-              See plans
-            </Link>
+            {isPricingVisible && (
+              <Link
+                href="/pricing"
+                className="inline-flex items-center justify-center px-6 py-2 rounded-full border border-line dark:border-white/15 bg-surface dark:bg-white/5 text-xs sm:text-sm font-semibold text-ink hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0 text-center cursor-pointer"
+              >
+                See plans
+              </Link>
+            )}
           </div>
 
           {/* Quick Answers Section */}
@@ -119,11 +125,16 @@ export default function SupportPage() {
                 <p className="text-ink-soft leading-relaxed">
                   Plans are measured in hours of video built into new courses, and each
                   build&apos;s hours come back after 30 days. Joining a course someone
-                  already built is always free. See{" "}
-                  <Link href="/pricing" className="font-medium text-ink underline">
-                    Plans
-                  </Link>{" "}
-                  for more hours.
+                  already built is always free.
+                  {isPricingVisible && (
+                    <>
+                      {" "}See{" "}
+                      <Link href="/pricing" className="font-medium text-ink underline">
+                        Plans
+                      </Link>{" "}
+                      for more hours.
+                    </>
+                  )}
                 </p>
               </div>
 

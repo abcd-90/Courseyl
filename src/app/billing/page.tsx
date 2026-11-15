@@ -11,6 +11,10 @@ export default function BillingPage() {
   const [cancelling, setCancelling] = useState(false);
   const [openingPortal, setOpeningPortal] = useState(false);
   const { settings } = useSiteSettings();
+  const isPricingVisible =
+    settings?.structure?.navLinks?.find(
+      (l) => l.id === "pricing" || l.href.includes("pricing")
+    )?.visible !== false;
   const isUnlimitedFree = settings?.plans?.unlimitedFreeMode === true || data?.unlimitedFreeMode === true;
   const [message, setMessage] = useState("");
   const [dates, setDates] = useState({ today: "Active Period", end: "End of billing cycle" });
@@ -131,12 +135,14 @@ export default function BillingPage() {
             </p>
           </div>
 
-          <Link
-            href="/pricing"
-            className="inline-flex items-center px-5 py-2.5 rounded-full bg-primary text-primary-foreground text-xs sm:text-sm font-semibold hover:bg-moss-dark transition-transform hover:-translate-y-0.5 shadow-sm self-start sm:self-auto"
-          >
-            Upgrade plan →
-          </Link>
+          {isPricingVisible && (
+            <Link
+              href="/pricing"
+              className="inline-flex items-center px-5 py-2.5 rounded-full bg-primary text-primary-foreground text-xs sm:text-sm font-semibold hover:bg-moss-dark transition-transform hover:-translate-y-0.5 shadow-sm self-start sm:self-auto"
+            >
+              Upgrade plan →
+            </Link>
+          )}
         </div>
 
         {message && (
@@ -251,14 +257,14 @@ export default function BillingPage() {
                     {cancelling ? "Cancelling..." : "Cancel subscription"}
                   </button>
                 </>
-              ) : (
+              ) : isPricingVisible ? (
                 <Link
                   href="/pricing"
                   className="px-4 py-2 rounded-full bg-lime-soft text-moss text-xs font-semibold hover:opacity-90 transition-opacity"
                 >
                   Upgrade to Pro or Max
                 </Link>
-              )}
+              ) : null}
             </div>
           </div>
         </div>

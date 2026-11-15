@@ -34,6 +34,11 @@ export function AppSidebar() {
   const [isDark, setIsDark] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
+  const isPricingVisible =
+    settings?.structure?.navLinks?.find(
+      (l) => l.id === "pricing" || l.href.includes("pricing")
+    )?.visible !== false;
+
   useEffect(() => {
     try {
       const saved = localStorage.getItem("courseyl_sidebar_collapsed");
@@ -355,17 +360,19 @@ export function AppSidebar() {
         <Settings className="w-[18px] h-[18px] text-ink-soft shrink-0" strokeWidth={1.75} />
         <span>Settings</span>
       </Link>
-      <Link
-        href="/pricing"
-        onClick={() => {
-          setShowUserMenu(false);
-          if (isMobile) setIsMobileOpen(false);
-        }}
-        className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-      >
-        <Crown className="w-[18px] h-[18px] text-ink-soft shrink-0" strokeWidth={1.75} />
-        <span>Pricing</span>
-      </Link>
+      {isPricingVisible && (
+        <Link
+          href="/pricing"
+          onClick={() => {
+            setShowUserMenu(false);
+            if (isMobile) setIsMobileOpen(false);
+          }}
+          className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-ink hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+        >
+          <Crown className="w-[18px] h-[18px] text-ink-soft shrink-0" strokeWidth={1.75} />
+          <span>Pricing</span>
+        </Link>
+      )}
       <Link
         href="/support"
         onClick={() => {
