@@ -691,74 +691,168 @@ export function AdminStructureEditor({
           </div>
         </div>
 
-        <div className="rounded-[28px] bg-surface p-6 sm:p-8 shadow-[0_0_0_1px_var(--line)] space-y-4">
-          <div className="flex items-center justify-between">
+        {/* 4. SEO, Analytics & Head Tags (Full Width) */}
+        <div className="lg:col-span-2 rounded-[28px] bg-surface p-6 sm:p-8 shadow-[0_0_0_1px_var(--line)] space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-line pb-4">
             <div>
-              <h3 className="text-lg font-display font-bold text-ink">
-                SEO, Analytics &amp; Head Tags
-              </h3>
-              <p className="text-xs text-ink-soft mt-0.5">
-                Configure live tracking tags and search engine verification tokens without manual deployments.
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🔍</span>
+                <h3 className="text-lg font-display font-bold text-ink">
+                  SEO, Web Analytics &amp; Head Tags
+                </h3>
+              </div>
+              <p className="text-xs text-ink-soft mt-1">
+                Connect Google Search Console, Google Analytics 4, and custom tracking tags. Changes take effect live immediately without rebuilding.
               </p>
             </div>
-            <span className="px-2.5 py-1 rounded-full bg-lime-soft text-moss font-mono text-[0.68rem] font-bold uppercase">
-              Web &amp; Crawlers
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
-                Google Analytics (GA4) Measurement ID
-              </label>
-              <input
-                type="text"
-                placeholder="G-XXXXXXXXXX"
-                value={structure.googleAnalyticsId || ""}
-                onChange={(e) =>
-                  onChange({ ...structure, googleAnalyticsId: e.target.value.trim() })
-                }
-                className="w-full h-10 rounded-xl bg-paper px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none placeholder:text-ink-soft/40"
-              />
-              <span className="text-[0.65rem] text-ink-soft mt-1 block">
-                Auto-injects official gtag.js across all pages.
-              </span>
-            </div>
-
-            <div>
-              <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
-                Google Search Console Token
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. your verification code from HTML tag"
-                value={structure.googleSearchConsoleToken || ""}
-                onChange={(e) =>
-                  onChange({
-                    ...structure,
-                    googleSearchConsoleToken: e.target.value.trim(),
-                  })
-                }
-                className="w-full h-10 rounded-xl bg-paper px-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none placeholder:text-ink-soft/40"
-              />
-              <span className="text-[0.65rem] text-ink-soft mt-1 block">
-                Injects &lt;meta name=&quot;google-site-verification&quot; content=&quot;...&quot;&gt;
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1 rounded-full bg-lime-soft text-moss font-mono text-[0.68rem] font-bold uppercase tracking-wider">
+                ⚡ Instant Live Injection
               </span>
             </div>
           </div>
 
-          <div>
-            <label className="block text-[0.68rem] font-mono font-bold uppercase text-ink-soft mb-1">
-              Custom &lt;head&gt; Scripts &amp; Tracking Pixels (Optional)
-            </label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Google Search Console Card */}
+            <div className="rounded-2xl bg-paper p-4 sm:p-5 shadow-[inset_0_0_0_1px_var(--line)] space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="size-2 rounded-full bg-blue-500 animate-pulse" />
+                  <label className="text-xs font-mono font-bold uppercase text-ink">
+                    Google Search Console Token
+                  </label>
+                </div>
+                {structure.googleSearchConsoleToken ? (
+                  <span className="text-[0.65rem] font-bold px-2 py-0.5 rounded-full bg-lime-soft text-moss">
+                    ✓ Active
+                  </span>
+                ) : (
+                  <span className="text-[0.65rem] text-ink-soft/70">
+                    Not configured
+                  </span>
+                )}
+              </div>
+
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Paste token or entire <meta> tag here…"
+                  value={structure.googleSearchConsoleToken || ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const contentMatch = val.match(/content=["']([^"']+)["']/i);
+                    const clean = contentMatch && contentMatch[1] ? contentMatch[1].trim() : val.trim();
+                    onChange({
+                      ...structure,
+                      googleSearchConsoleToken: clean,
+                    });
+                  }}
+                  className="w-full h-11 rounded-xl bg-surface pl-3.5 pr-20 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none placeholder:text-ink-soft/40 focus:shadow-[inset_0_0_0_2px_var(--moss)] transition-all select-text"
+                />
+                {structure.googleSearchConsoleToken && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onChange({ ...structure, googleSearchConsoleToken: "" })
+                    }
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-[0.68rem] font-semibold transition-colors cursor-pointer"
+                  >
+                    Clear ✕
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[0.68rem] text-ink-soft leading-relaxed">
+                  💡 <strong>Smart Parser:</strong> You can paste just the code (e.g. <code className="bg-surface px-1 py-0.5 rounded text-moss font-mono">yQE25x…</code>) or the full <code className="bg-surface px-1 py-0.5 rounded text-ink font-mono">&lt;meta&gt;</code> tag — Courseyl automatically extracts it.
+                </p>
+                {structure.googleSearchConsoleToken && (
+                  <p className="text-[0.68rem] text-moss dark:text-[#b8c460] font-mono truncate">
+                    &lt;meta name=&quot;google-site-verification&quot; content=&quot;{structure.googleSearchConsoleToken}&quot; /&gt;
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Google Analytics 4 (GA4) Card */}
+            <div className="rounded-2xl bg-paper p-4 sm:p-5 shadow-[inset_0_0_0_1px_var(--line)] space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="size-2 rounded-full bg-amber-500 animate-pulse" />
+                  <label className="text-xs font-mono font-bold uppercase text-ink">
+                    Google Analytics (GA4) ID
+                  </label>
+                </div>
+                {structure.googleAnalyticsId ? (
+                  <span className="text-[0.65rem] font-bold px-2 py-0.5 rounded-full bg-lime-soft text-moss">
+                    ✓ gtag.js Active
+                  </span>
+                ) : (
+                  <span className="text-[0.65rem] text-ink-soft/70">
+                    Not configured
+                  </span>
+                )}
+              </div>
+
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="G-XXXXXXXXXX"
+                  value={structure.googleAnalyticsId || ""}
+                  onChange={(e) => {
+                    const val = e.target.value.trim();
+                    const idMatch = val.match(/\b(G-[A-Z0-9]+)\b/i);
+                    const clean = idMatch && idMatch[1] ? idMatch[1].toUpperCase() : val;
+                    onChange({
+                      ...structure,
+                      googleAnalyticsId: clean,
+                    });
+                  }}
+                  className="w-full h-11 rounded-xl bg-surface pl-3.5 pr-20 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none placeholder:text-ink-soft/40 focus:shadow-[inset_0_0_0_2px_var(--moss)] transition-all select-text"
+                />
+                {structure.googleAnalyticsId && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onChange({ ...structure, googleAnalyticsId: "" })
+                    }
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-[0.68rem] font-semibold transition-colors cursor-pointer"
+                  >
+                    Clear ✕
+                  </button>
+                )}
+              </div>
+
+              <p className="text-[0.68rem] text-ink-soft leading-relaxed">
+                Automatically injects official Google Tag Manager (<code className="bg-surface px-1 py-0.5 rounded text-moss font-mono">gtag.js</code>) across unauthenticated landing and authenticated learning rooms.
+              </p>
+            </div>
+          </div>
+
+          {/* Custom Head Scripts */}
+          <div className="rounded-2xl bg-paper p-4 sm:p-5 shadow-[inset_0_0_0_1px_var(--line)] space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-mono font-bold uppercase text-ink">
+                Custom &lt;head&gt; Scripts &amp; Tracking Pixels (Optional)
+              </label>
+              {structure.customHeadScripts && (
+                <button
+                  type="button"
+                  onClick={() => onChange({ ...structure, customHeadScripts: "" })}
+                  className="text-[0.68rem] text-red-600 dark:text-red-400 hover:underline cursor-pointer font-semibold"
+                >
+                  Clear Custom Scripts
+                </button>
+              )}
+            </div>
             <textarea
               rows={3}
-              placeholder="<!-- Paste custom Microsoft Clarity, Meta Pixel, or analytics scripts here -->"
+              placeholder="<!-- Paste custom Microsoft Clarity, Meta Pixel, PostHog, or verification scripts here -->"
               value={structure.customHeadScripts || ""}
               onChange={(e) =>
                 onChange({ ...structure, customHeadScripts: e.target.value })
               }
-              className="w-full rounded-xl bg-paper p-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none placeholder:text-ink-soft/40"
+              className="w-full rounded-xl bg-surface p-3 text-xs font-mono text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none placeholder:text-ink-soft/40 focus:shadow-[inset_0_0_0_2px_var(--moss)] select-text"
             />
           </div>
         </div>
