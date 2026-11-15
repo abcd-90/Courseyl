@@ -27,6 +27,7 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { settings } = useSiteSettings();
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [enrolledCount, setEnrolledCount] = useState<number>(0);
@@ -38,6 +39,28 @@ export function AppSidebar() {
       const saved = localStorage.getItem("courseyl_sidebar_collapsed");
       if (saved === "true") {
         setIsCollapsed(true);
+      }
+      const cached = localStorage.getItem("courseyl_auth_user");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.id) {
+          setCurrentUser(parsed);
+          setIsAuthLoading(false);
+          const initialScoped = readRecentCourses(parsed.id).map((item) => {
+            const cleanThumb = getCleanThumbnailUrl(
+              item.thumbnail || item.thumbnailUrl,
+              item.slug
+            );
+            return {
+              ...item,
+              thumbnail: cleanThumb,
+              thumbnailUrl: cleanThumb,
+            };
+          });
+          if (initialScoped.length > 0) {
+            setRecents(initialScoped);
+          }
+        }
       }
     } catch {}
   }, []);
@@ -113,16 +136,23 @@ export function AppSidebar() {
       fetch("/api/auth/me", { cache: "no-store" })
         .then((res) => (res.ok ? res.json() : { authenticated: false, user: null }))
         .then((data) => {
+          setIsAuthLoading(false);
           if (!data?.authenticated || !data?.user?.id) {
             setCurrentUser(null);
             setEnrolledCount(0);
             setRecents([]);
             clearRecentCourses();
+            try {
+              localStorage.removeItem("courseyl_auth_user");
+            } catch {}
             return;
           }
 
           const activeUserId: string = data.user.id;
           setCurrentUser(data.user);
+          try {
+            localStorage.setItem("courseyl_auth_user", JSON.stringify(data.user));
+          } catch {}
 
           const initialScoped = readRecentCourses(activeUserId).map((item) => {
             const cleanThumb = getCleanThumbnailUrl(
@@ -208,6 +238,10 @@ export function AppSidebar() {
     const handleUserUpdated = (e: any) => {
       if (e.detail) {
         setCurrentUser(e.detail);
+        setIsAuthLoading(false);
+        try {
+          localStorage.setItem("courseyl_auth_user", JSON.stringify(e.detail));
+        } catch {}
       } else {
         fetchUserData();
       }
@@ -231,6 +265,10 @@ export function AppSidebar() {
   const handleLogout = async () => {
     try {
       clearRecentCourses();
+      try {
+        localStorage.removeItem("courseyl_auth_user");
+      } catch {}
+      setCurrentUser(null);
       await supabase.auth.signOut().catch(() => {});
       await fetch("/api/auth/logout", { method: "POST" });
       window.location.href = "/login";
@@ -493,6 +531,8 @@ export function AppSidebar() {
               </div>
             )}
           </div>
+        ) : isAuthLoading ? (
+          <div className="w-8 h-8 rounded-full bg-black/10 dark:bg-white/10 animate-pulse shrink-0" />
         ) : (
           <Link
             href="/login"
@@ -760,6 +800,14 @@ export function AppSidebar() {
               </div>
             )}
           </div>
+        ) : isAuthLoading ? (
+          <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-black/5 dark:bg-white/5 animate-pulse min-h-[52px]">
+            <div className="w-8 h-8 rounded-full bg-black/10 dark:bg-white/10 shrink-0" />
+            <div className="space-y-1.5 flex-1 min-w-0">
+              <div className="h-3.5 bg-black/10 dark:bg-white/10 rounded-md w-24" />
+              <div className="h-2.5 bg-black/10 dark:bg-white/10 rounded-md w-16" />
+            </div>
+          </div>
         ) : (
           <Link
             href="/login"
@@ -829,6 +877,8 @@ export function AppSidebar() {
                 </span>
               )}
             </button>
+          ) : isAuthLoading ? (
+            <div className="w-8 h-8 rounded-full bg-black/10 dark:bg-white/10 animate-pulse shrink-0" />
           ) : (
             <Link
               href="/login"

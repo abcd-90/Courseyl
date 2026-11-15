@@ -107,6 +107,9 @@ export default function SettingsPage() {
   };
 
   const handleLogout = async () => {
+    try {
+      localStorage.removeItem("courseyl_auth_user");
+    } catch {}
     await supabase.auth.signOut().catch(() => {});
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");

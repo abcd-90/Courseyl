@@ -108,6 +108,11 @@ export default function LoginPage() {
         if (!res.ok) return;
         const data = await res.json();
         if (data?.verified && !cancelled) {
+          if (data?.user) {
+            try {
+              localStorage.setItem("courseyl_auth_user", JSON.stringify(data.user));
+            } catch {}
+          }
           redirectTargetRef.current = data.redirectTo || getNextUrl();
           setVerifySynced(true);
           setError("");
@@ -278,6 +283,11 @@ export default function LoginPage() {
           throw new Error(data.error || "Invalid email or password.");
         }
 
+        if (data?.user) {
+          try {
+            localStorage.setItem("courseyl_auth_user", JSON.stringify(data.user));
+          } catch {}
+        }
         setSuccessMsg("Signed in! Opening your dashboard...");
         window.dispatchEvent(new Event("user-updated"));
         router.push(getNextUrl());

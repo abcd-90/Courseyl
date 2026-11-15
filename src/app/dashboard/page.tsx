@@ -26,12 +26,30 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    try {
+      const cached = localStorage.getItem("courseyl_auth_user");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.id) {
+          setCurrentUser(parsed);
+        }
+      }
+    } catch {}
+
     const fetchUserData = () => {
       fetch("/api/auth/me", { cache: "no-store" })
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (data?.authenticated && data.user) {
             setCurrentUser(data.user);
+            try {
+              localStorage.setItem("courseyl_auth_user", JSON.stringify(data.user));
+            } catch {}
+          } else if (data && !data.authenticated) {
+            setCurrentUser(null);
+            try {
+              localStorage.removeItem("courseyl_auth_user");
+            } catch {}
           }
         })
         .catch(() => {});
@@ -81,6 +99,9 @@ export default function DashboardPage() {
     const handleUserUpdated = (e: any) => {
       if (e.detail) {
         setCurrentUser(e.detail);
+        try {
+          localStorage.setItem("courseyl_auth_user", JSON.stringify(e.detail));
+        } catch {}
       } else {
         fetchUserData();
       }

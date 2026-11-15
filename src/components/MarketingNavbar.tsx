@@ -19,11 +19,27 @@ export function MarketingNavbar() {
     const isDarkMode = document.documentElement.classList.contains("dark");
     setIsDark(isDarkMode);
 
+    try {
+      const cached = localStorage.getItem("courseyl_auth_user");
+      if (cached) {
+        setIsAuthenticated(true);
+      }
+    } catch {}
+
     // Check live authentication state
     fetch("/api/auth/me")
       .then((res) => res.json())
       .then((data) => {
         setIsAuthenticated(!!data?.authenticated);
+        if (data?.authenticated && data?.user) {
+          try {
+            localStorage.setItem("courseyl_auth_user", JSON.stringify(data.user));
+          } catch {}
+        } else if (data && !data.authenticated) {
+          try {
+            localStorage.removeItem("courseyl_auth_user");
+          } catch {}
+        }
       })
       .catch(() => {
         setIsAuthenticated(false);
