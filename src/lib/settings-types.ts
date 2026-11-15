@@ -302,7 +302,7 @@ export const DEFAULT_SETTINGS: FullSiteSettings = {
       contactEmail: "thecourseyl@gmail.com",
     },
     googleAnalyticsId: "",
-    googleSearchConsoleToken: "",
+    googleSearchConsoleToken: "yQE25xFJSaYPDeBvbvdTlsRkYyIMASgBcJnhjjGt4IA",
     customHeadScripts: "",
   },
 };

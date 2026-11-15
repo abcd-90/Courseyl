@@ -16,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const googleVerification =
     publicSettings?.structure?.googleSearchConsoleToken?.trim() ||
     process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ||
-    "";
+    "yQE25xFJSaYPDeBvbvdTlsRkYyIMASgBcJnhjjGt4IA";
 
   return {
     metadataBase: new URL(baseUrl),
@@ -216,6 +216,13 @@ export default async function RootLayout({
               } catch (e) {}
             })();`,
           }}
+        />
+        <meta
+          name="google-site-verification"
+          content={
+            publicSettings?.structure?.googleSearchConsoleToken?.trim() ||
+            "yQE25xFJSaYPDeBvbvdTlsRkYyIMASgBcJnhjjGt4IA"
+          }
         />
         {gaId && (
           <>
