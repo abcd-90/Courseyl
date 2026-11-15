@@ -59,6 +59,25 @@ export function AdminStructureEditor({
     });
   };
 
+  const isPricingVisible =
+    (structure.navLinks || []).find((l) => l.id === "pricing" || l.href.includes("pricing"))
+      ?.visible !== false;
+
+  const togglePricingVisibility = () => {
+    const links = structure.navLinks || DEFAULT_SETTINGS.structure.navLinks;
+    const nextLinks = links.some((l) => l.id === "pricing" || l.href.includes("pricing"))
+      ? links.map((l) =>
+          l.id === "pricing" || l.href.includes("pricing")
+            ? { ...l, visible: !isPricingVisible }
+            : l
+        )
+      : [
+          ...links,
+          { id: "pricing", label: "Pricing", href: "/pricing", visible: !isPricingVisible },
+        ];
+    onChange({ ...structure, navLinks: nextLinks });
+  };
+
   return (
     <div className="space-y-8">
       {/* Sticky Header Action Bar */}
@@ -354,15 +373,28 @@ export function AdminStructureEditor({
         <div className="rounded-[28px] bg-surface p-6 sm:p-8 shadow-[0_0_0_1px_var(--line)] space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-display font-bold text-ink">Top Navigation Bar Links</h3>
-            <button
-              type="button"
-              onClick={() =>
-                onChange({ ...structure, navLinks: DEFAULT_SETTINGS.structure.navLinks })
-              }
-              className="text-xs font-semibold text-moss hover:underline cursor-pointer"
-            >
-              Reset Links
-            </button>
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={togglePricingVisibility}
+                className={`px-3 py-1 rounded-full text-xs font-bold transition-colors cursor-pointer ${
+                  isPricingVisible
+                    ? "bg-moss text-on-moss shadow-xs"
+                    : "bg-red-500/15 text-red-600 dark:text-red-400 shadow-[inset_0_0_0_1px_var(--line)]"
+                }`}
+              >
+                {isPricingVisible ? "Pricing: ON" : "Pricing: OFF"}
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  onChange({ ...structure, navLinks: DEFAULT_SETTINGS.structure.navLinks })
+                }
+                className="text-xs font-semibold text-moss hover:underline cursor-pointer"
+              >
+                Reset Links
+              </button>
+            </div>
           </div>
           <div className="space-y-2.5">
             {(structure.navLinks || []).map((nav, idx) => (

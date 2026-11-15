@@ -447,6 +447,49 @@ export default function StudioHubAdminPage() {
     );
   };
 
+  const isPricingNavVisible =
+    (structureForm.navLinks && structureForm.navLinks.length > 0
+      ? structureForm.navLinks
+      : DEFAULT_SETTINGS.structure.navLinks
+    ).find((l) => l.id === "pricing" || l.href.includes("pricing"))?.visible !== false;
+
+  const handleTogglePricingNav = async () => {
+    const currentLinks =
+      structureForm.navLinks && structureForm.navLinks.length > 0
+        ? structureForm.navLinks
+        : DEFAULT_SETTINGS.structure.navLinks;
+
+    const willBeVisible = !isPricingNavVisible;
+
+    const updatedLinks = currentLinks.some(
+      (l) => l.id === "pricing" || l.href.includes("pricing")
+    )
+      ? currentLinks.map((l) =>
+          l.id === "pricing" || l.href.includes("pricing")
+            ? { ...l, visible: willBeVisible }
+            : l
+        )
+      : [
+          ...currentLinks,
+          { id: "pricing", label: "Pricing", href: "/pricing", visible: willBeVisible },
+        ];
+
+    const nextStructure = {
+      ...structureForm,
+      navLinks: updatedLinks,
+    };
+
+    setStructureForm(nextStructure);
+
+    await saveCategory(
+      "site_structure",
+      nextStructure,
+      willBeVisible
+        ? "🏷️ Pricing link is now VISIBLE in the navbar!"
+        : "🏷️ Pricing link is now REMOVED from the navbar!"
+    );
+  };
+
   const handleUpdateUser = async (
     targetUserId: string,
     updates: { role?: string; tier?: string; emailVerified?: boolean }
@@ -972,6 +1015,27 @@ export default function StudioHubAdminPage() {
                         {plansForm.maintenanceMode ? "MAINTENANCE ON" : "LIVE ONLINE"}
                       </button>
                     </div>
+
+                    <div className="flex items-center justify-between p-4 rounded-2xl bg-paper shadow-[inset_0_0_0_1px_var(--line)]">
+                      <div>
+                        <div className="text-sm font-semibold text-ink">Navbar Pricing Link</div>
+                        <div className="text-xs text-ink-soft">
+                          Show or remove the &quot;Pricing&quot; link in the top navigation bar.
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={savingCategory === "site_structure"}
+                        onClick={handleTogglePricingNav}
+                        className={`px-4 py-1.5 rounded-full text-xs font-bold cursor-pointer transition-colors disabled:opacity-50 ${
+                          isPricingNavVisible
+                            ? "bg-moss text-on-moss"
+                            : "bg-red-500/15 text-red-600 dark:text-red-400"
+                        }`}
+                      >
+                        {isPricingNavVisible ? "PRICING: VISIBLE" : "PRICING: HIDDEN"}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1034,6 +1098,18 @@ export default function StudioHubAdminPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2.5">
+                  <button
+                    type="button"
+                    disabled={savingCategory === "site_structure"}
+                    onClick={handleTogglePricingNav}
+                    className={`px-5 py-3 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                      isPricingNavVisible
+                        ? "bg-moss text-on-moss shadow-md"
+                        : "bg-red-500/15 text-red-600 dark:text-red-400 shadow-[inset_0_0_0_1px_var(--line)] hover:bg-red-500/25"
+                    }`}
+                  >
+                    {isPricingNavVisible ? "🏷️ Navbar Pricing: ON" : "🏷️ Navbar Pricing: OFF"}
+                  </button>
                   <button
                     type="button"
                     disabled={savingCategory === "site_plans"}
