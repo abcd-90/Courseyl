@@ -7,65 +7,59 @@ import { getPublicSettings } from "@/lib/settings";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const settings = await getPublicSettings();
-  const name = settings.branding.brandName || "Courseyl";
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://courseyl.online";
-  const title = `${name} — Turn YouTube into Interactive Courses with AI`;
+  const baseUrl = "https://courseyl.online";
+  const defaultTitle = "Courseyl - Turn Any YouTube Video Into an Interactive Course";
   const description =
-    settings.branding.tagline ||
-    "Transform multi-hour YouTube videos and playlists into structured courses with bite-sized lessons, interactive notes, and placement tests.";
+    "Courseyl turns any YouTube video or playlist into structured courses with active recall quizzes, interactive notes, and personalized diagnostic placement tests.";
 
   return {
     metadataBase: new URL(baseUrl),
     title: {
-      default: title,
-      template: `%s | ${name}`,
+      default: defaultTitle,
+      template: "%s | Courseyl",
     },
     description,
     keywords: [
-      name,
-      "courseyl",
+      "Courseyl",
       "courseyl.online",
       "Courseyl AI",
-      "CourseIt",
-      "courseit.xyz",
-      "CourseIt alternative",
-      "CourseIt vs Courseyl",
-      "best CourseIt alternative",
-      "YouTube to course",
-      "AI course generator",
-      "interactive learning",
-      "video to courses",
-      "study notes",
-      "placement test",
+      "YouTube to course converter",
+      "interactive YouTube learning",
+      "video to interactive course",
+      "diagnostic placement test",
+      "study YouTube videos faster",
+      "AI curriculum generator",
+      "distraction free learning",
     ],
     authors: [{ name: "Courseyl", url: baseUrl }],
-    creator: name,
-    publisher: name,
+    creator: "Courseyl",
+    publisher: "Courseyl",
     alternates: {
-      canonical: "/",
+      canonical: "https://courseyl.online",
     },
     openGraph: {
-      title,
-      description,
-      url: baseUrl,
-      siteName: name,
-      locale: "en_US",
       type: "website",
+      locale: "en_US",
+      siteName: "Courseyl",
+      title: "Courseyl - The Smartest Way to Learn from YouTube",
+      description:
+        "Convert YouTube videos and playlists into complete courses with quizzes, study plans, and diagnostic tests.",
+      url: baseUrl,
       images: [
         {
-          url: "/icon-512.png",
-          width: 512,
-          height: 512,
-          alt: `${name} Logo`,
+          url: "https://courseyl.online/og-image.png",
+          width: 1200,
+          height: 630,
+          alt: "Courseyl Platform Preview",
         },
       ],
     },
     twitter: {
       card: "summary_large_image",
-      title,
-      description,
-      images: ["/icon-512.png"],
+      title: "Courseyl - The Smartest Way to Learn from YouTube",
+      description:
+        "Convert YouTube videos and playlists into complete courses with quizzes, study plans, and diagnostic tests.",
+      images: ["https://courseyl.online/og-image.png"],
     },
     robots: {
       index: true,
@@ -99,46 +93,94 @@ export default async function RootLayout({
 }) {
   const publicSettings = await getPublicSettings();
 
+  const jsonLdGraph = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://courseyl.online/#website",
+        "url": "https://courseyl.online",
+        "name": "Courseyl",
+        "alternateName": ["Courseyl Online", "Courseyl App"],
+        "description":
+          "Courseyl turns any YouTube video or playlist into structured courses with active recall quizzes, interactive notes, and personalized diagnostic placement tests.",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://courseyl.online/courses?q={search_term_string}",
+          "query-input": "required name=search_term_string",
+        },
+      },
+      {
+        "@type": "Organization",
+        "@id": "https://courseyl.online/#organization",
+        "name": "Courseyl",
+        "url": "https://courseyl.online",
+        "logo": "https://courseyl.online/logo.png",
+        "email": "thecourseyl@gmail.com",
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://courseyl.online/#application",
+        "name": "Courseyl",
+        "operatingSystem": "All",
+        "applicationCategory": "EducationalApplication",
+        "url": "https://courseyl.online",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD",
+        },
+        "featureList": [
+          "YouTube to Course Extraction",
+          "Dynamic Placement Testing",
+          "Auto-generated Lesson Quizzes",
+          "Interactive Study Notes",
+          "Watch Telemetry Sync",
+        ],
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://courseyl.online/#faq",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is Courseyl?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text":
+                "Courseyl is a platform that transforms YouTube videos and playlists into structured, distraction-free courses with quizzes, diagnostic placement tests, and progress tracking.",
+            },
+          },
+          {
+            "@type": "Question",
+            "name": "Is Courseyl free to use?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text":
+                "Yes, Courseyl provides full free access to build and join interactive courses generated from YouTube.",
+            },
+          },
+          {
+            "@type": "Question",
+            "name": "How does the Courseyl placement test work?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text":
+                "Courseyl analyzes the video curriculum and generates an adaptive diagnostic test to help you skip lessons you already understand.",
+            },
+          },
+        ],
+      },
+    ],
+  };
+
   return (
     <html lang="en" className="h-full antialiased" suppressHydrationWarning>
       <head>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@graph": [
-                {
-                  "@type": "WebSite",
-                  "@id": "https://courseyl.online/#website",
-                  "url": "https://courseyl.online",
-                  "name": publicSettings.branding?.brandName || "Courseyl",
-                  "alternateName": [
-                    "Courseyl",
-                    "Courseyl Online",
-                    "Courseyl AI",
-                    "CourseIt Alternative",
-                    "Best CourseIt Alternative",
-                  ],
-                  "description":
-                    publicSettings.branding?.tagline ||
-                    "Transform multi-hour YouTube videos and playlists into structured courses with bite-sized lessons, interactive notes, and placement tests.",
-                  "potentialAction": {
-                    "@type": "SearchAction",
-                    "target": "https://courseyl.online/courses?q={search_term_string}",
-                    "query-input": "required name=search_term_string",
-                  },
-                },
-                {
-                  "@type": "Organization",
-                  "@id": "https://courseyl.online/#organization",
-                  "name": publicSettings.branding?.brandName || "Courseyl",
-                  "url": "https://courseyl.online",
-                  "logo": "https://courseyl.online/icon-512.png",
-                  "email": "thecourseyl@gmail.com",
-                },
-              ],
-            }),
+            __html: JSON.stringify(jsonLdGraph),
           }}
         />
         <script
@@ -146,7 +188,6 @@ export default async function RootLayout({
             __html: `(function() {
               try {
                 var theme = localStorage.getItem('theme');
-                // Default to clean light mode matching CourseIt signature identity
                 if (theme === 'dark') {
                   document.documentElement.classList.add('dark');
                   document.documentElement.classList.remove('light');

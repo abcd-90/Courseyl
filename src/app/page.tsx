@@ -191,8 +191,8 @@ export default function HomePage() {
 
   const brandName = settings?.branding?.brandName || "Courseyl";
   const heroBadge = settings?.branding?.badgeText || heroSec.badge || "Powered by NVIDIA Nemotron";
-  const heroHeadline = settings?.structure?.heroHeadline || heroSec.title || "Turn any YouTube video into a course you";
-  const heroHighlight = settings?.structure?.heroHeadlineHighlight || heroSec.titleHighlight || "actually finish.";
+  const heroHeadline = settings?.structure?.heroHeadline || heroSec.title || "Courseyl: Turn Any YouTube Video Into a Course You";
+  const heroHighlight = settings?.structure?.heroHeadlineHighlight || heroSec.titleHighlight || "Actually Finish";
   const heroSub =
     settings?.branding?.subTagline ||
     heroSec.subtitle ||
@@ -861,7 +861,7 @@ export default function HomePage() {
                   <div className="relative aspect-video overflow-hidden rounded-2xl bg-muted">
                     <img
                       src={c.thumbnail}
-                      alt={c.title}
+                      alt={`Courseyl Course - ${c.title}`}
                       loading="lazy"
                       onError={(e) => {
                         (e.currentTarget as HTMLImageElement).src =
