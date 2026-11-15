@@ -1,0 +1,17 @@
+# Courseyl
+> Turn any YouTube video or playlist into a structured, distraction-free course you actually finish.
+
+## Overview
+Courseyl (https://courseyl.online) is an automated educational platform that extracts long-form technical tutorials and video playlists, structuring them into modular, day-by-day learning plans with diagnostic placement tests, interactive active-recall quizzes, and distraction-free learning rooms.
+
+## Key Capabilities
+- YouTube to Course Synthesis: Automated breakdown of full video tracks into chapters, bite-sized lessons, definitions, and key takeaways.
+- Diagnostic Placement Assessment: Pre-course evaluation sampling modules to allow learners to skip topics they already master.
+- Interactive Learning Room: Synced video watch telemetry, integrated markdown study notes, and inline lesson quizzes.
+- Pricing & Access: Full Free Access Mode for open community learning.
+
+## Target Use Cases
+- Software engineering, coding bootcamps, and technical skill acquisition from YouTube.
+- Self-paced online study without social media feeds or algorithmic distractions.
+- Converting marathon 10h–24h+ YouTube development tutorials into multi-day curriculums.
+- Active recall practice with real-time video rewind to timestamped review segments upon missed quiz questions.

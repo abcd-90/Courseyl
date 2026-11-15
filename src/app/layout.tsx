@@ -124,6 +124,7 @@ export default async function RootLayout({
         "name": "Courseyl",
         "operatingSystem": "All",
         "applicationCategory": "EducationalApplication",
+        "applicationSubCategory": "Educational Platform & Course Builder",
         "url": "https://courseyl.online",
         "offers": {
           "@type": "Offer",
@@ -136,6 +137,13 @@ export default async function RootLayout({
           "Auto-generated Lesson Quizzes",
           "Interactive Study Notes",
           "Watch Telemetry Sync",
+          "Multi-hour Marathon Video Distribution",
+          "Adaptive Lesson Skipping Engine",
+          "Distraction-Free Video Player Room",
+          "Paced Daily Learning Plans",
+          "Full Curriculum Concept Mapping",
+          "Community Course Sharing",
+          "Timestamped Review Video Rewind",
         ],
       },
       {
