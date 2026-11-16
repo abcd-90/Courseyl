@@ -287,7 +287,7 @@ export default function AboutPage() {
           <div className="relative rounded-3xl border border-[#365314]/20 dark:border-white/10 bg-gradient-to-r from-[#edf4d8]/90 via-[#f8fbf0]/90 to-[#edf4d8]/90 dark:from-[#1b261e]/90 dark:via-[#141d16]/90 dark:to-[#1b261e]/90 p-5 sm:p-8 md:p-10 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-6 sm:gap-8 overflow-hidden">
             {/* Left Content with 3D Laptop Illustration */}
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 sm:gap-6 max-w-2xl text-center sm:text-left">
-              <div className="shrink-0 select-none">
+              <div className="w-[160px] sm:w-[200px] md:w-[230px] shrink-0 select-none flex items-center justify-center">
                 <LearningLaptopIllustration />
               </div>
 
