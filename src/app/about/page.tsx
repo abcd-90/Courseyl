@@ -4,7 +4,9 @@ import Image from "next/image";
 import type { Metadata } from "next";
 import { MarketingNavbar } from "@/components/MarketingNavbar";
 import { CourseItFooter } from "@/components/CourseItFooter";
-import { HeroLearningVisual } from "@/components/about/HeroLearningVisual";
+import { AboutHeroIllustration } from "@/components/about/AboutHeroIllustration";
+import { FounderSignature } from "@/components/about/FounderSignature";
+import { LearningLaptopIllustration } from "@/components/about/LearningLaptopIllustration";
 import {
   Sparkles,
   Star,
@@ -148,7 +150,7 @@ export default function AboutPage() {
 
           {/* Right Hero Visual / Interactive 3D Showcase */}
           <div className="lg:col-span-5 relative flex items-center justify-center pt-6 lg:pt-0">
-            <HeroLearningVisual />
+            <AboutHeroIllustration />
           </div>
         </section>
 
@@ -229,21 +231,9 @@ export default function AboutPage() {
                 </p>
               </div>
 
-              {/* Digital Signature */}
+              {/* Digital Signature Component */}
               <div className="md:col-span-3 flex md:justify-end items-center pt-2 md:pt-0">
-                <div className="text-right">
-                  <div className="relative w-28 h-12 inline-block">
-                    <Image
-                      src="/images/about/signature-transparent.png"
-                      alt="Mr. Sami Digital Signature"
-                      fill
-                      className="object-contain object-right brightness-95 contrast-125 dark:invert dark:brightness-150"
-                    />
-                  </div>
-                  <div className="text-[0.7rem] uppercase tracking-widest font-semibold text-[#365314] dark:text-[#a3b86c]">
-                    Sami • Founder
-                  </div>
-                </div>
+                <FounderSignature />
               </div>
             </div>
           </div>
@@ -297,13 +287,8 @@ export default function AboutPage() {
           <div className="relative rounded-3xl border border-[#365314]/20 dark:border-white/10 bg-gradient-to-r from-[#edf4d8]/90 via-[#f8fbf0]/90 to-[#edf4d8]/90 dark:from-[#1b261e]/90 dark:via-[#141d16]/90 dark:to-[#1b261e]/90 p-6 sm:p-10 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-8 overflow-hidden">
             {/* Left Content with Laptop Graphic */}
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 max-w-2xl text-center sm:text-left">
-              <div className="relative w-28 h-24 shrink-0 select-none">
-                <Image
-                  src="/images/about/laptop-illustration.png"
-                  alt="YouTube Laptop Learning Player"
-                  fill
-                  className="object-contain"
-                />
+              <div className="w-28 sm:w-36 shrink-0 select-none">
+                <LearningLaptopIllustration />
               </div>
 
               <div className="space-y-2">
