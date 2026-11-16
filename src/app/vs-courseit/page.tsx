@@ -45,15 +45,21 @@ export default function VsCourseItPage() {
       highlight: true,
     },
     {
-      feature: "Paced Daily Learning Plans",
-      courseyl: "Customizable daily study pace (30m, 60m, 90m, 120m) with day bins",
-      courseit: "Fixed pacing structures",
+      feature: "Smart Quiz Replay & Video Rewind",
+      courseyl: "Instant video jump to exact timestamp when a quiz concept needs review",
+      courseit: "Generic feedback without direct timestamp jumping",
+      highlight: true,
+    },
+    {
+      feature: "Timestamped Notes & Live Video Sync",
+      courseyl: "Per-lesson rich notes pinned to exact video seconds with cloud sync",
+      courseit: "Basic unlinked text notes",
       highlight: false,
     },
     {
-      feature: "Integrated Study Notes & Progress Tracking",
-      courseyl: "Per-lesson rich markdown notes with automatic cloud sync",
-      courseit: "Basic text notes",
+      feature: "Paced Daily Learning Plans",
+      courseyl: "Customizable daily study pace (30m, 60m, 90m, 120m) with day bins",
+      courseit: "Fixed pacing structures",
       highlight: false,
     },
     {
