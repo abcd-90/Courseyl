@@ -1,10 +1,17 @@
 import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/db";
+import { getPublicSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = "https://courseyl.online";
+  const settings = await getPublicSettings().catch(() => null);
+
+  const isPricingVisible =
+    settings?.structure?.navLinks?.find(
+      (l) => l.id === "pricing" || l.href.includes("pricing")
+    )?.visible !== false;
 
   const staticRoutes: MetadataRoute.Sitemap = [
     {
@@ -31,12 +38,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "daily",
       priority: 0.8,
     },
-    {
-      url: `${baseUrl}/pricing`,
-      lastModified: new Date(),
-      changeFrequency: "weekly",
-      priority: 0.8,
-    },
+    ...(isPricingVisible
+      ? [
+          {
+            url: `${baseUrl}/pricing`,
+            lastModified: new Date(),
+            changeFrequency: "weekly" as const,
+            priority: 0.8,
+          },
+        ]
+      : []),
     {
       url: `${baseUrl}/about`,
       lastModified: new Date(),
@@ -48,12 +59,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date(),
       changeFrequency: "monthly",
       priority: 0.7,
-    },
-    {
-      url: `${baseUrl}/login`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.5,
     },
     {
       url: `${baseUrl}/terms`,
