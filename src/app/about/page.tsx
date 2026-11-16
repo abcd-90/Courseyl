@@ -24,7 +24,6 @@ import {
   BarChart3,
   ShieldCheck,
   Heart,
-  CheckCircle2,
   Mail,
 } from "lucide-react";
 
@@ -101,7 +100,7 @@ export default function AboutPage() {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#fcfcfa] dark:bg-[#0a0f0c] text-[#0f1611] dark:text-[#f1f3ea] transition-colors selection:bg-[#365314]/20 selection:text-[#365314] dark:selection:text-[#a3b86c]">
+    <div className="min-h-screen flex flex-col bg-[#fbfcf8] dark:bg-[#0a0f0c] text-[#0f1611] dark:text-[#f1f3ea] transition-colors selection:bg-[#365314]/20 selection:text-[#365314] dark:selection:text-[#a3b86c]">
       <MarketingNavbar />
 
       <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 sm:pt-36 pb-24 w-full">
@@ -148,7 +147,7 @@ export default function AboutPage() {
             </div>
           </div>
 
-          {/* Right Hero Visual / Interactive 3D Showcase */}
+          {/* Right Hero Visual / 3D Educational Graphics */}
           <div className="lg:col-span-5 relative flex items-center justify-center pt-6 lg:pt-0">
             <AboutHeroIllustration />
           </div>
@@ -158,7 +157,7 @@ export default function AboutPage() {
             2. FOUNDER & LEAD INSTRUCTOR CARD
            ======================================================== */}
         <section id="founder-section" className="mt-20 sm:mt-24 scroll-mt-28">
-          <div className="relative rounded-3xl border border-[#365314]/15 dark:border-white/10 bg-white/80 dark:bg-[#121a14]/80 backdrop-blur-md p-6 sm:p-10 shadow-sm overflow-hidden">
+          <div className="relative rounded-3xl border border-[#365314]/15 dark:border-white/10 bg-white/90 dark:bg-[#121a14]/90 backdrop-blur-md p-6 sm:p-10 shadow-sm overflow-hidden">
             {/* Ambient wash */}
             <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-bl from-[#ecf5d6]/40 via-transparent to-transparent dark:from-[#365314]/15 pointer-events-none -z-10" />
 
@@ -183,11 +182,12 @@ export default function AboutPage() {
 
               {/* Founder Photo */}
               <div className="shrink-0 flex items-center gap-4">
-                <div className="relative w-28 sm:w-32 h-36 sm:h-40 rounded-2xl overflow-hidden border-2 border-[#365314]/20 dark:border-[#a3b86c]/30 shadow-md bg-[#5a7924]">
+                <div className="relative w-28 sm:w-32 h-36 sm:h-40 rounded-2xl overflow-hidden border-2 border-[#365314]/20 dark:border-[#a3b86c]/30 shadow-md bg-[#5c8024]">
                   <Image
-                    src="/images/about/mr-sami@2x.png"
+                    src="/images/about/mr-sami-sharp.png"
                     alt="Mr. Sami - Founder of Courseyl"
                     fill
+                    priority
                     sizes="(max-width: 640px) 112px, 128px"
                     className="object-cover object-top select-none"
                   />
@@ -195,7 +195,7 @@ export default function AboutPage() {
               </div>
             </div>
 
-            {/* 4-Item Quick Profile Grid */}
+            {/* 4-Item Quick Profile Grid (100% Full Text, No Truncation) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 py-6 border-b border-black/5 dark:border-white/10">
               {metaGrid.map((item, i) => (
                 <div
@@ -285,9 +285,9 @@ export default function AboutPage() {
            ======================================================== */}
         <section className="mt-20 sm:mt-24">
           <div className="relative rounded-3xl border border-[#365314]/20 dark:border-white/10 bg-gradient-to-r from-[#edf4d8]/90 via-[#f8fbf0]/90 to-[#edf4d8]/90 dark:from-[#1b261e]/90 dark:via-[#141d16]/90 dark:to-[#1b261e]/90 p-6 sm:p-10 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-8 overflow-hidden">
-            {/* Left Content with Laptop Graphic */}
+            {/* Left Content with 3D Laptop Illustration */}
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 max-w-2xl text-center sm:text-left">
-              <div className="w-28 sm:w-36 shrink-0 select-none">
+              <div className="w-36 sm:w-44 shrink-0 select-none">
                 <LearningLaptopIllustration />
               </div>
 
