@@ -4,6 +4,7 @@ import Image from "next/image";
 import type { Metadata } from "next";
 import { MarketingNavbar } from "@/components/MarketingNavbar";
 import { CourseItFooter } from "@/components/CourseItFooter";
+import { HeroLearningVisual } from "@/components/about/HeroLearningVisual";
 import {
   Sparkles,
   Star,
@@ -28,7 +29,7 @@ import {
 export const metadata: Metadata = {
   title: "About Courseyl & Founder Mr. Sami — Engineered for Serious Learners",
   description:
-    "Learn about Courseyl's mission to transform YouTube into structured, interactive courses. Founded by Mr. Sami (ShahSami), software architect & full-stack developer.",
+    "Learn about Courseyl's mission to transform YouTube into structured, interactive courses. Founded by Mr. Sami, software architect & full-stack developer.",
   alternates: {
     canonical: "https://www.courseyl.online/about",
   },
@@ -145,31 +146,9 @@ export default function AboutPage() {
             </div>
           </div>
 
-          {/* Right Hero Visual / 3D Graphics */}
+          {/* Right Hero Visual / Interactive 3D Showcase */}
           <div className="lg:col-span-5 relative flex items-center justify-center pt-6 lg:pt-0">
-            <div className="relative w-full max-w-md">
-              {/* Subtle radial backdrop behind 3D art */}
-              <div className="absolute inset-0 bg-gradient-to-tr from-[#ecf5d6]/70 via-[#f4f9e6]/50 to-transparent dark:from-[#365314]/20 dark:via-transparent dark:to-transparent rounded-full blur-2xl -z-10" />
-
-              <div className="relative rounded-3xl p-3 sm:p-4 transition-transform hover:scale-[1.01]">
-                <Image
-                  src="/images/about/hero-3d@2x.png"
-                  alt="Courseyl 3D Graduation Cap and Books Learning Illustration"
-                  width={460}
-                  height={380}
-                  priority
-                  className="w-full h-auto object-contain drop-shadow-xl select-none"
-                />
-
-                {/* Floating micro-badges */}
-                <div className="absolute top-2 right-4 text-xs">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/90 dark:bg-[#151e17]/90 backdrop-blur-md border border-black/5 dark:border-white/10 text-[#365314] dark:text-[#a3b86c] font-semibold shadow-xs">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-[#365314] dark:text-[#a3b86c]" />
-                    Structured Learning
-                  </span>
-                </div>
-              </div>
-            </div>
+            <HeroLearningVisual />
           </div>
         </section>
 
@@ -189,13 +168,10 @@ export default function AboutPage() {
                   FOUNDER & LEAD INSTRUCTOR
                 </div>
 
-                <div className="flex flex-wrap items-baseline gap-2.5 pt-1">
+                <div className="pt-1">
                   <h2 className="text-3xl sm:text-4xl font-display font-bold text-[#0f1611] dark:text-white">
                     Mr. Sami
                   </h2>
-                  <span className="text-lg sm:text-xl font-normal text-[#4c4c3d]/70 dark:text-white/60">
-                    (ShahSami)
-                  </span>
                 </div>
 
                 <p className="text-sm sm:text-base font-medium text-[#365314] dark:text-[#a3b86c]">
@@ -203,12 +179,12 @@ export default function AboutPage() {
                 </p>
               </div>
 
-              {/* Founder Photo (Top on mobile, or alongside on desktop) */}
+              {/* Founder Photo */}
               <div className="shrink-0 flex items-center gap-4">
                 <div className="relative w-28 sm:w-32 h-36 sm:h-40 rounded-2xl overflow-hidden border-2 border-[#365314]/20 dark:border-[#a3b86c]/30 shadow-md bg-[#5a7924]">
                   <Image
                     src="/images/about/mr-sami@2x.png"
-                    alt="Mr. Sami (ShahSami) - Founder of Courseyl"
+                    alt="Mr. Sami - Founder of Courseyl"
                     fill
                     sizes="(max-width: 640px) 112px, 128px"
                     className="object-cover object-top select-none"
@@ -218,20 +194,20 @@ export default function AboutPage() {
             </div>
 
             {/* 4-Item Quick Profile Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 py-6 border-b border-black/5 dark:border-white/10">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 py-6 border-b border-black/5 dark:border-white/10">
               {metaGrid.map((item, i) => (
                 <div
                   key={i}
-                  className="p-3.5 rounded-xl border border-black/5 dark:border-white/5 bg-[#fbfcf8] dark:bg-[#161f18]/60 flex items-start gap-3"
+                  className="p-4 rounded-2xl border border-black/5 dark:border-white/10 bg-[#fbfcf8] dark:bg-[#161f18]/60 flex items-start gap-3.5 shadow-2xs"
                 >
-                  <div className="p-2 rounded-lg bg-[#ecf5d6] dark:bg-[#365314]/30 shrink-0 mt-0.5">
+                  <div className="p-2.5 rounded-xl bg-[#ecf5d6] dark:bg-[#365314]/30 text-[#365314] dark:text-[#a3b86c] shrink-0 mt-0.5">
                     {item.icon}
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-[0.72rem] font-semibold uppercase tracking-wider text-[#4c4c3d]/70 dark:text-[#a9aba0]">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[0.7rem] font-bold uppercase tracking-wider text-[#4c4c3d]/70 dark:text-[#a9aba0]">
                       {item.label}
                     </div>
-                    <div className="text-xs sm:text-sm font-semibold text-[#0f1611] dark:text-white truncate">
+                    <div className="text-xs sm:text-[0.88rem] font-semibold text-[#0f1611] dark:text-white leading-snug mt-1 break-words">
                       {item.value}
                     </div>
                   </div>
