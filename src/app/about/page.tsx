@@ -1,256 +1,379 @@
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import type { Metadata } from "next";
 import { MarketingNavbar } from "@/components/MarketingNavbar";
 import { CourseItFooter } from "@/components/CourseItFooter";
 import {
   Sparkles,
-  CheckCircle2,
-  ShieldCheck,
-  Mail,
+  Star,
+  Play,
+  ArrowDown,
   ArrowRight,
-  Code2,
   GraduationCap,
-  MapPin,
-  Laptop,
+  Code2,
+  Briefcase,
+  User,
+  Search,
+  Calendar,
+  PlayCircle,
+  Zap,
+  BarChart3,
+  ShieldCheck,
   Heart,
-  Globe2,
+  CheckCircle2,
+  Mail,
 } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "About Courseyl & Founder Mr. Sami — Full-Stack AI Learning Platform",
+  title: "About Courseyl & Founder Mr. Sami — Engineered for Serious Learners",
   description:
-    "Courseyl was founded and developed by Mr. Sami, a 20-year-old Full-Stack Web Developer & Software Engineer from Multan, Pakistan. Learn about our mission and cutting-edge features.",
+    "Learn about Courseyl's mission to transform YouTube into structured, interactive courses. Founded by Mr. Sami (ShahSami), software architect & full-stack developer.",
   alternates: {
     canonical: "https://www.courseyl.online/about",
   },
   openGraph: {
-    title: "About Courseyl & Founder Mr. Sami — The Story Behind the Platform",
+    title: "About Courseyl & Founder Mr. Sami — Engineered for Serious Learners",
     description:
-      "Built by Mr. Sami from Multan, Pakistan. Transforming YouTube into structured, interactive courses with placement tests, smart quiz replay, and timestamped notes.",
+      "Transforming YouTube videos into structured interactive courses with placement tests, smart quiz replay, and time-stamped notes.",
     url: "https://www.courseyl.online/about",
   },
 };
 
 export default function AboutPage() {
-  const features = [
+  const metaGrid = [
     {
-      title: "Diagnostic Placement Tests",
-      desc: "Analyze full course curricula and skip lessons you already understand, saving dozens of hours.",
+      icon: <GraduationCap className="w-4 h-4 text-[#365314] dark:text-[#a3b86c]" />,
+      label: "University",
+      value: "Emerson University (Multan)",
     },
     {
-      title: "15h–24h+ Marathon Video Support",
-      desc: "Even mammoth developer and academic lectures get divided proportionally with full chapter precision.",
-    },
-    {
-      title: "Timestamped Notes & Smart Video Jump",
-      desc: "Cloud-synced study notes pinned to exact video seconds for rapid concept revision.",
-    },
-    {
-      title: "Smart Quiz Replay",
-      desc: "Active recall quizzes that instantly jump you to the exact video timestamp when you need clarity.",
-    },
-    {
-      title: "Distraction-Free Learning Space",
-      desc: "Focus purely on content without YouTube algorithm traps, recommendations, or comment drama.",
-    },
-    {
-      title: "Community Course Sharing",
-      desc: "Explore public community courses curated by learners worldwide or share your own.",
-    },
-  ];
-
-  const devHighlights = [
-    {
-      icon: <GraduationCap className="w-5 h-5 text-[#4b5e1e] dark:text-[#a3b86c]" />,
-      label: "Education",
-      value: "University Student (3rd Semester)",
-    },
-    {
-      icon: <MapPin className="w-5 h-5 text-[#4b5e1e] dark:text-[#a3b86c]" />,
-      label: "Location",
-      value: "Multan, Punjab, Pakistan",
-    },
-    {
-      icon: <Laptop className="w-5 h-5 text-[#4b5e1e] dark:text-[#a3b86c]" />,
+      icon: <Code2 className="w-4 h-4 text-[#365314] dark:text-[#a3b86c]" />,
       label: "Expertise",
-      value: "Full-Stack Web & AI Apps, SaaS & Systems",
+      value: "Modern Web Development",
     },
     {
-      icon: <Globe2 className="w-5 h-5 text-[#4b5e1e] dark:text-[#a3b86c]" />,
+      icon: <Briefcase className="w-4 h-4 text-[#365314] dark:text-[#a3b86c]" />,
+      label: "Experience",
+      value: "Full Stack Web, UX Apps, SaaS & Startups",
+    },
+    {
+      icon: <User className="w-4 h-4 text-[#365314] dark:text-[#a3b86c]" />,
       label: "Age",
       value: "20 Years Old",
     },
   ];
 
+  const features = [
+    {
+      icon: <Search className="w-5 h-5 text-[#365314] dark:text-[#a3b86c]" />,
+      title: "Diagnostic Placement Tests",
+      desc: "Assess what you know and get the perfect learning path without repeating basics.",
+    },
+    {
+      icon: <Calendar className="w-5 h-5 text-[#365314] dark:text-[#a3b86c]" />,
+      title: "Structured Learning Support",
+      desc: "Get step-by-step guidance and daily paced milestones you can stick with.",
+    },
+    {
+      icon: <PlayCircle className="w-5 h-5 text-[#365314] dark:text-[#a3b86c]" />,
+      title: "Time-Stamped Notes & Short Video Jump",
+      desc: "Quickly find key points in long multi-hour videos and jump to exact timestamps.",
+    },
+    {
+      icon: <Zap className="w-5 h-5 text-[#365314] dark:text-[#a3b86c]" />,
+      title: "Smart Quiz Engine",
+      desc: "Test your knowledge with adaptive active-recall quizzes and instant video replay.",
+    },
+    {
+      icon: <BarChart3 className="w-5 h-5 text-[#365314] dark:text-[#a3b86c]" />,
+      title: "Interactive, Free Learning Space",
+      desc: "Learn with no cost, anytime, anywhere in an ad-free, distraction-free environment.",
+    },
+    {
+      icon: <ShieldCheck className="w-5 h-5 text-[#365314] dark:text-[#a3b86c]" />,
+      title: "Community Course Sharing",
+      desc: "Explore public courses contributed by learners and educators worldwide.",
+    },
+  ];
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#fcfcfa] dark:bg-[#0a0f0c] text-[#0f1611] dark:text-[#f1f3ea] transition-colors">
+    <div className="min-h-screen flex flex-col bg-[#fcfcfa] dark:bg-[#0a0f0c] text-[#0f1611] dark:text-[#f1f3ea] transition-colors selection:bg-[#365314]/20 selection:text-[#365314] dark:selection:text-[#a3b86c]">
       <MarketingNavbar />
 
-      <main className="flex-1 max-w-4xl mx-auto px-6 pt-36 pb-24 w-full">
-        {/* Mission Hero */}
-        <div className="space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-[#4b5e1e]/10 text-[#4b5e1e] dark:bg-[#4b5e1e]/20 dark:text-[#a3b86c]">
-            <Sparkles className="w-3.5 h-3.5" />
-            Our Mission & Story
-          </div>
+      <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 sm:pt-36 pb-24 w-full">
+        {/* ========================================================
+            1. HERO SECTION
+           ======================================================== */}
+        <section className="relative grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+          {/* Subtle ambient light glow */}
+          <div className="absolute -top-16 -left-16 w-96 h-96 bg-[#ecf5d6]/50 dark:bg-[#365314]/10 rounded-full blur-3xl pointer-events-none -z-10" />
 
-          <h1 className="text-4xl sm:text-5xl font-display font-bold tracking-tight text-[#0f1611] dark:text-white">
-            About <span className="text-[#4b5e1e] dark:text-[#a3b86c]">Courseyl</span>
-          </h1>
-
-          <p className="text-lg sm:text-xl text-[#4c4c3d] dark:text-[#a9aba0] leading-relaxed pt-2">
-            The best teachers in the world share knowledge freely on YouTube. But long videos often lack structure:
-            no study plan, no diagnostic checks, and no way to prove you actually understood.
-            <strong> Courseyl</strong> turns those videos into complete, interactive courses you actually finish.
-          </p>
-        </div>
-
-        {/* Founder & Lead Developer Spotlight */}
-        <div className="mt-14 p-8 sm:p-10 rounded-3xl border border-black/10 dark:border-white/10 bg-gradient-to-br from-[#4b5e1e]/10 via-white/70 to-transparent dark:from-[#4b5e1e]/20 dark:via-[#141b16]/80 dark:to-transparent shadow-sm">
-          <div className="flex items-center gap-2.5 text-xs font-semibold uppercase tracking-wider text-[#4b5e1e] dark:text-[#a3b86c] mb-3">
-            <ShieldCheck className="w-4 h-4" />
-            Founder & Lead Engineer
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 pb-6 border-b border-black/10 dark:border-white/10">
-            <div>
-              <h2 className="text-3xl font-display font-bold text-[#0f1611] dark:text-white flex items-center gap-3">
-                Mr. Sami
-                <span className="text-base font-sans font-normal text-ink-soft dark:text-white/60">
-                  (Sheikh Sami)
-                </span>
-              </h2>
-              <p className="text-base text-[#4b5e1e] dark:text-[#a3b86c] font-medium mt-1">
-                Founder, Software Architect & Full-Stack Developer
-              </p>
+          {/* Left Hero Content */}
+          <div className="lg:col-span-7 space-y-6">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-[#ecf5d6] text-[#365314] dark:bg-[#365314]/25 dark:text-[#a3b86c] border border-[#365314]/15 dark:border-[#a3b86c]/20 shadow-xs">
+              <Sparkles className="w-3.5 h-3.5 fill-current" />
+              Our Mission & Story
             </div>
 
-            <a
-              href="mailto:sheikhsami3082@gmail.com"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#4b5e1e]/30 dark:border-[#a3b86c]/30 bg-white/80 dark:bg-black/30 hover:bg-[#4b5e1e] hover:text-white dark:hover:bg-[#a3b86c] dark:hover:text-black font-medium text-xs transition-all shadow-xs"
-            >
-              <Mail className="w-3.5 h-3.5" />
-              sheikhsami3082@gmail.com
-            </a>
+            <h1 className="text-4xl sm:text-6xl font-display font-extrabold tracking-tight text-[#0f1611] dark:text-white leading-[1.12]">
+              About <span className="text-[#365314] dark:text-[#a3b86c]">Courseyl</span>
+            </h1>
+
+            <p className="text-base sm:text-lg text-[#4c4c3d] dark:text-[#a9aba0] leading-relaxed max-w-2xl">
+              The best teachers in the world share knowledge freely on YouTube. But, long videos often lack structure:
+              no study plan, no diagnostic checks, and no way to prove you actually understood. Courseyl turns those
+              videos into complete, interactive courses you actually finish.
+            </p>
+
+            <div className="pt-2 flex flex-wrap items-center gap-3 sm:gap-4">
+              <Link
+                href="/courses"
+                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-[#365314] hover:bg-[#283e0f] text-white font-medium text-sm sm:text-base shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <Play className="w-4 h-4 fill-current" />
+                Explore Courses
+              </Link>
+
+              <a
+                href="#founder-section"
+                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full border border-black/15 dark:border-white/15 bg-white/70 dark:bg-white/5 hover:bg-black/5 dark:hover:bg-white/10 text-[#0f1611] dark:text-white font-medium text-sm sm:text-base transition-all"
+              >
+                <ArrowDown className="w-4 h-4" />
+                Learn More
+              </a>
+            </div>
           </div>
 
-          {/* Quick Stats Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-6 border-b border-black/10 dark:border-white/10">
-            {devHighlights.map((stat, i) => (
-              <div key={i} className="flex flex-col gap-1">
-                <div className="flex items-center gap-2 text-xs font-medium text-[#4c4c3d] dark:text-[#a9aba0]">
-                  {stat.icon}
-                  {stat.label}
-                </div>
-                <div className="text-sm font-semibold text-[#0f1611] dark:text-white">
-                  {stat.value}
+          {/* Right Hero Visual / 3D Graphics */}
+          <div className="lg:col-span-5 relative flex items-center justify-center pt-6 lg:pt-0">
+            <div className="relative w-full max-w-md">
+              {/* Subtle radial backdrop behind 3D art */}
+              <div className="absolute inset-0 bg-gradient-to-tr from-[#ecf5d6]/70 via-[#f4f9e6]/50 to-transparent dark:from-[#365314]/20 dark:via-transparent dark:to-transparent rounded-full blur-2xl -z-10" />
+
+              <div className="relative rounded-3xl p-3 sm:p-4 transition-transform hover:scale-[1.01]">
+                <Image
+                  src="/images/about/hero-3d@2x.png"
+                  alt="Courseyl 3D Graduation Cap and Books Learning Illustration"
+                  width={460}
+                  height={380}
+                  priority
+                  className="w-full h-auto object-contain drop-shadow-xl select-none"
+                />
+
+                {/* Floating micro-badges */}
+                <div className="absolute top-2 right-4 text-xs">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/90 dark:bg-[#151e17]/90 backdrop-blur-md border border-black/5 dark:border-white/10 text-[#365314] dark:text-[#a3b86c] font-semibold shadow-xs">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#365314] dark:text-[#a3b86c]" />
+                    Structured Learning
+                  </span>
                 </div>
               </div>
-            ))}
-          </div>
-
-          {/* Story & Biography */}
-          <div className="mt-6 space-y-4 text-base text-[#4c4c3d] dark:text-[#a9aba0] leading-relaxed">
-            <p>
-              I&apos;m <strong>Mr. Sami (Sheikh Sami)</strong>, a 20-year-old Full-Stack Web Developer and Software
-              Engineering university student (currently in my 3rd semester) based in <strong>Multan, Pakistan</strong>.
-            </p>
-            <p>
-              As an active developer specializing in modern web applications, scalable SaaS software, and AI-powered
-              educational tools, I built Courseyl to solve a personal pain point: saving 15-hour marathon coding
-              tutorials to &ldquo;Watch Later&rdquo;, only to get sidetracked by YouTube&apos;s recommendations twenty
-              minutes in.
-            </p>
-            <p>
-              Courseyl was crafted from the ground up using state-of-the-art Next.js, TypeScript, PostgreSQL, and deep
-              AI prompt engineering. My goal is to empower self-paced students across Pakistan and worldwide with
-              world-class learning features — completely free, distraction-free, and grounded in active learning.
-            </p>
-          </div>
-        </div>
-
-        {/* Core Features Grid */}
-        <div className="mt-14">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-display font-bold text-[#0f1611] dark:text-white">
-                Engineered for Serious Learners
-              </h2>
-              <p className="text-sm text-[#4c4c3d] dark:text-[#a9aba0] mt-1">
-                Every feature in Courseyl is designed to save time and boost retention.
-              </p>
             </div>
           </div>
+        </section>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {features.map((item, idx) => (
-              <div
-                key={idx}
-                className="p-5 rounded-2xl border border-black/5 dark:border-white/10 bg-white/60 dark:bg-[#141b16]/60 backdrop-blur-sm"
-              >
-                <div className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-[#4b5e1e] dark:text-[#a3b86c] shrink-0 mt-0.5" />
-                  <div>
-                    <h3 className="font-semibold text-base text-[#0f1611] dark:text-white">
-                      {item.title}
-                    </h3>
-                    <p className="text-sm text-[#4c4c3d] dark:text-[#a9aba0] mt-1 leading-relaxed">
-                      {item.desc}
-                    </p>
+        {/* ========================================================
+            2. FOUNDER & LEAD INSTRUCTOR CARD
+           ======================================================== */}
+        <section id="founder-section" className="mt-20 sm:mt-24 scroll-mt-28">
+          <div className="relative rounded-3xl border border-[#365314]/15 dark:border-white/10 bg-white/80 dark:bg-[#121a14]/80 backdrop-blur-md p-6 sm:p-10 shadow-sm overflow-hidden">
+            {/* Ambient wash */}
+            <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-bl from-[#ecf5d6]/40 via-transparent to-transparent dark:from-[#365314]/15 pointer-events-none -z-10" />
+
+            {/* Founder Card Header */}
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 pb-6 border-b border-black/5 dark:border-white/10">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-[#ecf5d6] text-[#365314] dark:bg-[#365314]/25 dark:text-[#a3b86c] border border-[#365314]/15">
+                  <Star className="w-3 h-3 fill-current" />
+                  FOUNDER & LEAD INSTRUCTOR
+                </div>
+
+                <div className="flex flex-wrap items-baseline gap-2.5 pt-1">
+                  <h2 className="text-3xl sm:text-4xl font-display font-bold text-[#0f1611] dark:text-white">
+                    Mr. Sami
+                  </h2>
+                  <span className="text-lg sm:text-xl font-normal text-[#4c4c3d]/70 dark:text-white/60">
+                    (ShahSami)
+                  </span>
+                </div>
+
+                <p className="text-sm sm:text-base font-medium text-[#365314] dark:text-[#a3b86c]">
+                  Founder, Software Architect & Full-Stack Developer
+                </p>
+              </div>
+
+              {/* Founder Photo (Top on mobile, or alongside on desktop) */}
+              <div className="shrink-0 flex items-center gap-4">
+                <div className="relative w-28 sm:w-32 h-36 sm:h-40 rounded-2xl overflow-hidden border-2 border-[#365314]/20 dark:border-[#a3b86c]/30 shadow-md bg-[#5a7924]">
+                  <Image
+                    src="/images/about/mr-sami@2x.png"
+                    alt="Mr. Sami (ShahSami) - Founder of Courseyl"
+                    fill
+                    sizes="(max-width: 640px) 112px, 128px"
+                    className="object-cover object-top select-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 4-Item Quick Profile Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 py-6 border-b border-black/5 dark:border-white/10">
+              {metaGrid.map((item, i) => (
+                <div
+                  key={i}
+                  className="p-3.5 rounded-xl border border-black/5 dark:border-white/5 bg-[#fbfcf8] dark:bg-[#161f18]/60 flex items-start gap-3"
+                >
+                  <div className="p-2 rounded-lg bg-[#ecf5d6] dark:bg-[#365314]/30 shrink-0 mt-0.5">
+                    {item.icon}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[0.72rem] font-semibold uppercase tracking-wider text-[#4c4c3d]/70 dark:text-[#a9aba0]">
+                      {item.label}
+                    </div>
+                    <div className="text-xs sm:text-sm font-semibold text-[#0f1611] dark:text-white truncate">
+                      {item.value}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Founder Bio Story & Digital Signature */}
+            <div className="pt-6 grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
+              <div className="md:col-span-9 space-y-4 text-sm sm:text-base text-[#4c4c3d] dark:text-[#a9aba0] leading-relaxed">
+                <p>
+                  As an active developer passionate in modern web applications, scalable SaaS solutions, and AI-powered
+                  education tools, I built Courseyl to help students learn better through structured courses and interactive
+                  content — just like YouTube, but complete and organized.
+                </p>
+                <p>
+                  Courseyl was created from the simple goal of making the best of the internet&apos;s knowledge accessible,
+                  affordable, and easy to follow. Our mission is to empower learners worldwide with high-quality education.
+                </p>
+              </div>
+
+              {/* Digital Signature */}
+              <div className="md:col-span-3 flex md:justify-end items-center pt-2 md:pt-0">
+                <div className="text-right">
+                  <div className="relative w-28 h-12 inline-block">
+                    <Image
+                      src="/images/about/signature-transparent.png"
+                      alt="Mr. Sami Digital Signature"
+                      fill
+                      className="object-contain object-right brightness-95 contrast-125 dark:invert dark:brightness-150"
+                    />
+                  </div>
+                  <div className="text-[0.7rem] uppercase tracking-widest font-semibold text-[#365314] dark:text-[#a3b86c]">
+                    Sami • Founder
                   </div>
                 </div>
               </div>
-            ))}
+            </div>
           </div>
-        </div>
+        </section>
 
-        {/* Creator Rights & Fair Use Note */}
-        <div className="mt-14 p-6 rounded-2xl border border-black/5 dark:border-white/10 bg-white/40 dark:bg-white/5">
-          <h3 className="font-semibold text-base text-[#0f1611] dark:text-white flex items-center gap-2">
-            <Heart className="w-4 h-4 text-rose-500" />
-            Respecting Original YouTube Creators
-          </h3>
-          <p className="text-sm text-[#4c4c3d] dark:text-[#a9aba0] mt-2 leading-relaxed">
-            All video playback on Courseyl happens directly through the official YouTube embedded player. We never
-            re-host or strip creator videos. Content creators receive 100% of their views, watch time, and channel
-            attribution while learners gain an enhanced, distraction-free study environment.
-          </p>
-        </div>
+        {/* ========================================================
+            3. ENGINEERED FOR SERIOUS LEARNERS (FEATURES GRID)
+           ======================================================== */}
+        <section className="mt-24 sm:mt-28">
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-[#ecf5d6] text-[#365314] dark:bg-[#365314]/25 dark:text-[#a3b86c] border border-[#365314]/15">
+              Built for Learners
+            </div>
 
-        {/* Contact and Call to action */}
-        <div className="mt-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 p-6 rounded-2xl border border-black/5 dark:border-white/10 bg-white/40 dark:bg-white/5">
-          <div>
-            <h3 className="font-semibold text-base text-[#0f1611] dark:text-white flex items-center gap-2">
-              <Mail className="w-4 h-4 text-[#4b5e1e] dark:text-[#a3b86c]" />
-              Have Questions or Feedback?
-            </h3>
-            <p className="text-sm text-[#4c4c3d] dark:text-[#a9aba0] mt-1">
-              Connect directly with Mr. Sami at{" "}
-              <a
-                href="mailto:sheikhsami3082@gmail.com"
-                className="text-[#4b5e1e] dark:text-[#a3b86c] underline underline-offset-4 font-medium"
-              >
-                sheikhsami3082@gmail.com
-              </a>{" "}
-              or{" "}
-              <a
-                href="mailto:thecourseyl@gmail.com"
-                className="text-[#4b5e1e] dark:text-[#a3b86c] underline underline-offset-4 font-medium"
-              >
-                thecourseyl@gmail.com
-              </a>
-              .
+            <h2 className="text-3xl sm:text-5xl font-display font-bold tracking-tight text-[#0f1611] dark:text-white">
+              Engineered for{" "}
+              <span className="text-[#365314] dark:text-[#a3b86c]">Serious Learners</span>
+            </h2>
+
+            <p className="text-sm sm:text-base text-[#4c4c3d] dark:text-[#a9aba0]">
+              Powerful features to help you learn smarter and faster.
             </p>
           </div>
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#4b5e1e] hover:bg-[#3d4d18] text-white font-medium text-sm transition-all shadow-sm shrink-0"
-          >
-            Start Learning Free
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
+
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {features.map((feat, idx) => (
+              <div
+                key={idx}
+                className="group p-6 rounded-2xl border border-black/5 dark:border-white/10 bg-white/70 dark:bg-[#141b16]/70 backdrop-blur-sm hover:border-[#365314]/25 dark:hover:border-[#a3b86c]/30 hover:shadow-md transition-all duration-200"
+              >
+                <div className="w-11 h-11 rounded-xl bg-[#ecf5d6] dark:bg-[#365314]/30 flex items-center justify-center mb-4 transition-transform group-hover:scale-105">
+                  {feat.icon}
+                </div>
+
+                <h3 className="font-semibold text-base text-[#0f1611] dark:text-white">
+                  {feat.title}
+                </h3>
+
+                <p className="mt-2 text-xs sm:text-sm text-[#4c4c3d] dark:text-[#a9aba0] leading-relaxed">
+                  {feat.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ========================================================
+            4. RESPECTING ORIGINAL YOUTUBE CONTENT (BOTTOM CTA)
+           ======================================================== */}
+        <section className="mt-20 sm:mt-24">
+          <div className="relative rounded-3xl border border-[#365314]/20 dark:border-white/10 bg-gradient-to-r from-[#edf4d8]/90 via-[#f8fbf0]/90 to-[#edf4d8]/90 dark:from-[#1b261e]/90 dark:via-[#141d16]/90 dark:to-[#1b261e]/90 p-6 sm:p-10 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-8 overflow-hidden">
+            {/* Left Content with Laptop Graphic */}
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 max-w-2xl text-center sm:text-left">
+              <div className="relative w-28 h-24 shrink-0 select-none">
+                <Image
+                  src="/images/about/laptop-illustration.png"
+                  alt="YouTube Laptop Learning Player"
+                  fill
+                  className="object-contain"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-xl sm:text-2xl font-display font-bold text-[#0f1611] dark:text-white flex items-center justify-center sm:justify-start gap-2">
+                  <Heart className="w-5 h-5 text-rose-500 fill-rose-500 shrink-0" />
+                  Accepting Original YouTube Content
+                </h3>
+
+                <p className="text-xs sm:text-sm text-[#4c4c3d] dark:text-[#a9aba0] leading-relaxed">
+                  If we add playlists on Courseyl specifically through official YouTube videos encoded there, we need to
+                  copy those videos, allow users to learn, save, and share them — so the content is easily accessible to
+                  all. Creators retain 100% of their views and attribution.
+                </p>
+
+                <div className="pt-2">
+                  <a
+                    href="mailto:thecourseyl@gmail.com"
+                    className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#365314] dark:text-[#a3b86c] hover:underline underline-offset-4"
+                  >
+                    + Have Questions or Feedback?
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Action Buttons */}
+            <div className="flex flex-col sm:flex-row lg:flex-col items-center gap-3 w-full sm:w-auto shrink-0">
+              <Link
+                href="/dashboard"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-[#365314] hover:bg-[#283e0f] text-white font-medium text-sm shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
+              >
+                Start Learning Free
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+
+              <a
+                href="mailto:sheikhsami3082@gmail.com"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 text-xs sm:text-sm font-medium text-[#0f1611] dark:text-white transition-colors"
+              >
+                <Mail className="w-3.5 h-3.5 text-[#365314] dark:text-[#a3b86c]" />
+                Contact Us
+              </a>
+            </div>
+          </div>
+        </section>
       </main>
 
       <CourseItFooter />
