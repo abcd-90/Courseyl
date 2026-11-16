@@ -5,7 +5,7 @@ import { getPublicSettings } from "@/lib/settings";
 export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = "https://courseyl.online";
+  const baseUrl = "https://www.courseyl.online";
   const settings = await getPublicSettings().catch(() => null);
 
   const isPricingVisible =

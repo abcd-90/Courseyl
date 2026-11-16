@@ -396,7 +396,7 @@ export async function sendWelcomeEmail(params: {
 
     const recipientName = (name || email.split("@")[0] || "Learner").trim();
     const subject = `Welcome to ${brandName} – Start Turning YouTube into Courses!`;
-    const dashboardUrl = "https://courseyl.online/dashboard";
+    const dashboardUrl = "https://www.courseyl.online/dashboard";
 
     const html = `<!DOCTYPE html>
 <html lang="en">

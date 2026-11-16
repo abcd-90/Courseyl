@@ -20,13 +20,13 @@ export const metadata: Metadata = {
     "free AI course generator",
   ],
   alternates: {
-    canonical: "/vs-courseit",
+    canonical: "https://www.courseyl.online/vs-courseit",
   },
   openGraph: {
     title: "CourseIt Alternative — Why Courseyl is the #1 Choice",
     description:
       "Looking for a CourseIt alternative? Compare Courseyl vs CourseIt and see why learners switch.",
-    url: "https://courseyl.online/vs-courseit",
+    url: "https://www.courseyl.online/vs-courseit",
   },
 };
 

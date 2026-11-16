@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const publicSettings = await getPublicSettings().catch(() => null);
-  const baseUrl = "https://courseyl.online";
+  const baseUrl = "https://www.courseyl.online";
   const defaultTitle = "Courseyl - Turn Any YouTube Video Into an Interactive Course";
   const description =
     "Courseyl turns any YouTube video or playlist into structured courses with active recall quizzes, interactive notes, and personalized diagnostic placement tests.";
@@ -28,6 +28,7 @@ export async function generateMetadata(): Promise<Metadata> {
     keywords: [
       "Courseyl",
       "courseyl.online",
+      "www.courseyl.online",
       "Courseyl AI",
       "YouTube to course converter",
       "interactive YouTube learning",
@@ -41,7 +42,7 @@ export async function generateMetadata(): Promise<Metadata> {
     creator: "Courseyl",
     publisher: "Courseyl",
     alternates: {
-      canonical: "https://courseyl.online",
+      canonical: "https://www.courseyl.online",
     },
     openGraph: {
       type: "website",
@@ -53,7 +54,7 @@ export async function generateMetadata(): Promise<Metadata> {
       url: baseUrl,
       images: [
         {
-          url: "https://courseyl.online/og-image.png",
+          url: "https://www.courseyl.online/og-image.png",
           width: 1200,
           height: 630,
           alt: "Courseyl Platform Preview",
@@ -65,7 +66,7 @@ export async function generateMetadata(): Promise<Metadata> {
       title: "Courseyl - The Smartest Way to Learn from YouTube",
       description:
         "Convert YouTube videos and playlists into complete courses with quizzes, study plans, and diagnostic tests.",
-      images: ["https://courseyl.online/og-image.png"],
+      images: ["https://www.courseyl.online/og-image.png"],
     },
     robots: {
       index: true,
@@ -106,34 +107,34 @@ export default async function RootLayout({
     "@graph": [
       {
         "@type": "WebSite",
-        "@id": "https://courseyl.online/#website",
-        "url": "https://courseyl.online",
+        "@id": "https://www.courseyl.online/#website",
+        "url": "https://www.courseyl.online",
         "name": "Courseyl",
         "alternateName": ["Courseyl Online", "Courseyl App"],
         "description":
           "Courseyl turns any YouTube video or playlist into structured courses with active recall quizzes, interactive notes, and personalized diagnostic placement tests.",
         "potentialAction": {
           "@type": "SearchAction",
-          "target": "https://courseyl.online/courses?q={search_term_string}",
+          "target": "https://www.courseyl.online/courses?q={search_term_string}",
           "query-input": "required name=search_term_string",
         },
       },
       {
         "@type": "Organization",
-        "@id": "https://courseyl.online/#organization",
+        "@id": "https://www.courseyl.online/#organization",
         "name": "Courseyl",
-        "url": "https://courseyl.online",
-        "logo": "https://courseyl.online/logo.png",
+        "url": "https://www.courseyl.online",
+        "logo": "https://www.courseyl.online/logo.png",
         "email": "thecourseyl@gmail.com",
       },
       {
         "@type": "SoftwareApplication",
-        "@id": "https://courseyl.online/#application",
+        "@id": "https://www.courseyl.online/#application",
         "name": "Courseyl",
         "operatingSystem": "All",
         "applicationCategory": "EducationalApplication",
         "applicationSubCategory": "Educational Platform & Course Builder",
-        "url": "https://courseyl.online",
+        "url": "https://www.courseyl.online",
         "offers": {
           "@type": "Offer",
           "price": "0",
@@ -156,7 +157,7 @@ export default async function RootLayout({
       },
       {
         "@type": "FAQPage",
-        "@id": "https://courseyl.online/#faq",
+        "@id": "https://www.courseyl.online/#faq",
         "mainEntity": [
           {
             "@type": "Question",

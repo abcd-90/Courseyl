@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     title: "About Courseyl — The Smartest Way to Learn from YouTube",
     description:
       "Learn how Courseyl empowers students and professionals with adaptive placement tests, timestamped notes, and smart quizzes.",
-    url: "https://courseyl.online/about",
+    url: "https://www.courseyl.online/about",
   },
 };
 

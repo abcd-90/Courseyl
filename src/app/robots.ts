@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = "https://courseyl.online";
+  const baseUrl = "https://www.courseyl.online";
 
   const publicAllowedRoutes = [
     "/",
