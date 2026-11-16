@@ -38,8 +38,11 @@ export async function generateMetadata(): Promise<Metadata> {
       "AI curriculum generator",
       "distraction free learning",
     ],
-    authors: [{ name: "Courseyl", url: baseUrl }],
-    creator: "Courseyl",
+    authors: [
+      { name: "Mr. Sami (Sheikh Sami)", url: "https://www.courseyl.online/about" },
+      { name: "Courseyl", url: baseUrl },
+    ],
+    creator: "Mr. Sami (Sheikh Sami)",
     publisher: "Courseyl",
     alternates: {
       canonical: "https://www.courseyl.online",
@@ -120,12 +123,39 @@ export default async function RootLayout({
         },
       },
       {
+        "@type": "Person",
+        "@id": "https://www.courseyl.online/#founder",
+        "name": "Mr. Sami",
+        "alternateName": ["Sheikh Sami", "Mr Sami", "Sami (Courseyl Founder)"],
+        "jobTitle": "Founder & Lead Full-Stack Software Engineer",
+        "nationality": "Pakistani",
+        "homeLocation": {
+          "@type": "Place",
+          "name": "Multan, Punjab, Pakistan",
+        },
+        "email": "sheikhsami3082@gmail.com",
+        "url": "https://www.courseyl.online/about",
+        "description":
+          "Mr. Sami (Sheikh Sami) is the founder and lead full-stack software engineer of Courseyl. A 20-year-old software engineering university student from Multan, Pakistan, dedicated to developing intelligent web apps, SaaS tools, and distraction-free AI learning platforms.",
+        "knowsAbout": [
+          "Full-Stack Web Development",
+          "Artificial Intelligence Applications",
+          "Next.js & React Ecosystem",
+          "Software Architecture",
+          "Educational Technology",
+          "PostgreSQL & Database Design",
+        ],
+      },
+      {
         "@type": "Organization",
         "@id": "https://www.courseyl.online/#organization",
         "name": "Courseyl",
         "url": "https://www.courseyl.online",
         "logo": "https://www.courseyl.online/logo.png",
         "email": "thecourseyl@gmail.com",
+        "founder": {
+          "@id": "https://www.courseyl.online/#founder",
+        },
       },
       {
         "@type": "SoftwareApplication",
@@ -135,6 +165,12 @@ export default async function RootLayout({
         "applicationCategory": "EducationalApplication",
         "applicationSubCategory": "Educational Platform & Course Builder",
         "url": "https://www.courseyl.online",
+        "author": {
+          "@id": "https://www.courseyl.online/#founder",
+        },
+        "creator": {
+          "@id": "https://www.courseyl.online/#founder",
+        },
         "offers": {
           "@type": "Offer",
           "price": "0",
@@ -159,6 +195,15 @@ export default async function RootLayout({
         "@type": "FAQPage",
         "@id": "https://www.courseyl.online/#faq",
         "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Who founded and created Courseyl?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text":
+                "Courseyl was founded and developed by Mr. Sami (Sheikh Sami), a 20-year-old Full-Stack Web Developer and Software Engineering university student based in Multan, Pakistan.",
+            },
+          },
           {
             "@type": "Question",
             "name": "What is Courseyl?",

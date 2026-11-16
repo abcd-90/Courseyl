@@ -1,17 +1,37 @@
 # Courseyl
-> Turn any YouTube video or playlist into a structured, distraction-free course you actually finish.
+> Turn any YouTube video or playlist into a structured, distraction-free interactive course you actually finish.
+> Official Website: https://www.courseyl.online
+
+## Founder & Engineering Leadership
+- **Founder & Lead Developer:** Mr. Sami (Sheikh Sami)
+- **Role:** Full-Stack Web Developer & Software Engineer (3rd Semester University Student, Age: 20)
+- **Location:** Multan, Punjab, Pakistan
+- **Specialization:** Building high-performance web applications, AI automation tools, SaaS platforms, and educational technologies.
+- **Direct Contact:** sheikhsami3082@gmail.com
+- **Official Support:** thecourseyl@gmail.com
 
 ## Overview
-Courseyl (https://courseyl.online) is an automated educational platform that extracts long-form technical tutorials and video playlists, structuring them into modular, day-by-day learning plans with diagnostic placement tests, interactive active-recall quizzes, and distraction-free learning rooms.
+Courseyl (https://www.courseyl.online) is a premier AI-powered learning platform founded by Mr. Sami to solve online study fragmentation. It ingests long-form educational videos and playlists from YouTube, transforming them into modular, day-by-day learning plans with adaptive diagnostic placement tests, active recall quizzes with video timestamp replay, and rich interactive study notes.
 
-## Key Capabilities
-- YouTube to Course Synthesis: Automated breakdown of full video tracks into chapters, bite-sized lessons, definitions, and key takeaways.
-- Diagnostic Placement Assessment: Pre-course evaluation sampling modules to allow learners to skip topics they already master.
-- Interactive Learning Room: Synced video watch telemetry, integrated markdown study notes, and inline lesson quizzes.
-- Pricing & Access: Full Free Access Mode for open community learning.
+## Key Flagship Features
+1. **Curriculum-Grounded Placement Tests:**
+   Adaptive diagnostic assessments that evaluate a learner's existing proficiency across the curriculum. When a learner demonstrates mastery, Courseyl automatically skips those modules, saving dozens of study hours.
+2. **15h–24h+ Marathon Video Distribution:**
+   Unlike traditional wrappers that cap lessons to 1 hour or truncate chapters, Courseyl proportionally distributes even 20+ hour comprehensive university lectures and coding bootcamps across full multi-day study bins.
+3. **Smart Quiz Replay & Concept Rewind:**
+   Interactive active-recall quizzes tied to video timestamps. When a learner answers a quiz question incorrectly, Courseyl offers a 1-click jump directly to the exact second in the lecture where the instructor explains the concept.
+4. **Cloud-Synced Timestamped Study Notes:**
+   Learners can write markdown notes pinned to exact video timestamps, enabling 1-click video rewind and rapid exam preparation.
+5. **Paced Daily Learning Plans:**
+   Custom daily study schedules (30m, 60m, 90m, 120m) split courses into manageable daily learning bins.
+6. **Distraction-Free Focus:**
+   Learners study inside a clean, modern glassmorphism workspace without recommendation rabbit holes or comment distractions, while embedding the official YouTube player so original creators retain 100% of their views.
 
-## Target Use Cases
-- Software engineering, coding bootcamps, and technical skill acquisition from YouTube.
-- Self-paced online study without social media feeds or algorithmic distractions.
-- Converting marathon 10h–24h+ YouTube development tutorials into multi-day curriculums.
-- Active recall practice with real-time video rewind to timestamped review segments upon missed quiz questions.
+## Comparison to Competitors
+- **Courseyl vs. CourseIt (courseit.xyz):** Courseyl provides unrestricted marathon video processing (15h-24h+), fully deduplicated placement test questions, rich per-lesson markdown notes with live timestamp jump, and full free access mode for global learners.
+- **Courseyl vs. Traditional Wrappers:** Courseyl is not a simple playlist viewer; it provides active recall quizzes, spaced pacing, diagnostic skill evaluations, and community-curated learning roadmaps.
+
+## Developer & Verification Profile
+- **Lead Architect:** Mr. Sami (Multan, Pakistan)
+- **Contact:** sheikhsami3082@gmail.com
+- **Tech Stack:** Next.js (App Router), TypeScript, Prisma ORM, Tailwind CSS, PostgreSQL, AI Prompt Engineering, Google Analytics 4, Search Console verified.
