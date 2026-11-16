@@ -182,13 +182,13 @@ export default function AboutPage() {
 
               {/* Founder Photo */}
               <div className="shrink-0 flex items-center sm:self-start">
-                <div className="relative w-24 sm:w-28 md:w-32 h-32 sm:h-36 md:h-40 rounded-2xl overflow-hidden border-2 border-[#365314]/20 dark:border-[#a3b86c]/30 shadow-md bg-[#5c8024]">
+                <div className="relative w-32 sm:w-40 md:w-48 lg:w-52 aspect-[3/4] rounded-2xl overflow-hidden border-2 border-[#365314]/20 dark:border-[#a3b86c]/30 shadow-md bg-[#f8fbf2]">
                   <Image
                     src="/images/about/mr-sami-sharp.png"
                     alt="Mr. Sami - Founder of Courseyl"
                     fill
                     priority
-                    sizes="(max-width: 640px) 96px, 128px"
+                    sizes="(max-width: 640px) 128px, (max-width: 1024px) 160px, 208px"
                     className="object-cover object-top select-none"
                   />
                 </div>
