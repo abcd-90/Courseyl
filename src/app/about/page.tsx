@@ -100,38 +100,38 @@ export default function AboutPage() {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#fbfcf8] dark:bg-[#0a0f0c] text-[#0f1611] dark:text-[#f1f3ea] transition-colors selection:bg-[#365314]/20 selection:text-[#365314] dark:selection:text-[#a3b86c]">
+    <div className="min-h-screen flex flex-col bg-[#fbfcf8] dark:bg-[#0a0f0c] text-[#0f1611] dark:text-[#f1f3ea] transition-colors selection:bg-[#365314]/20 selection:text-[#365314] dark:selection:text-[#a3b86c] overflow-x-hidden w-full">
       <MarketingNavbar />
 
-      <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 sm:pt-36 pb-24 w-full">
+      <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 sm:pt-36 pb-20 sm:pb-24 w-full overflow-hidden">
         {/* ========================================================
             1. HERO SECTION
            ======================================================== */}
         <section className="relative grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
           {/* Subtle ambient light glow */}
-          <div className="absolute -top-16 -left-16 w-96 h-96 bg-[#ecf5d6]/50 dark:bg-[#365314]/10 rounded-full blur-3xl pointer-events-none -z-10" />
+          <div className="absolute -top-16 -left-16 w-72 sm:w-96 h-72 sm:h-96 bg-[#ecf5d6]/50 dark:bg-[#365314]/10 rounded-full blur-3xl pointer-events-none -z-10" />
 
           {/* Left Hero Content */}
-          <div className="lg:col-span-7 space-y-6">
+          <div className="lg:col-span-7 space-y-4 sm:space-y-6 text-center lg:text-left">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-[#ecf5d6] text-[#365314] dark:bg-[#365314]/25 dark:text-[#a3b86c] border border-[#365314]/15 dark:border-[#a3b86c]/20 shadow-xs">
               <Sparkles className="w-3.5 h-3.5 fill-current" />
               Our Mission & Story
             </div>
 
-            <h1 className="text-4xl sm:text-6xl font-display font-extrabold tracking-tight text-[#0f1611] dark:text-white leading-[1.12]">
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-display font-extrabold tracking-tight text-[#0f1611] dark:text-white leading-[1.15] sm:leading-[1.12]">
               About <span className="text-[#365314] dark:text-[#a3b86c]">Courseyl</span>
             </h1>
 
-            <p className="text-base sm:text-lg text-[#4c4c3d] dark:text-[#a9aba0] leading-relaxed max-w-2xl">
+            <p className="text-sm sm:text-base lg:text-lg text-[#4c4c3d] dark:text-[#a9aba0] leading-relaxed max-w-2xl mx-auto lg:mx-0">
               The best teachers in the world share knowledge freely on YouTube. But, long videos often lack structure:
               no study plan, no diagnostic checks, and no way to prove you actually understood. Courseyl turns those
               videos into complete, interactive courses you actually finish.
             </p>
 
-            <div className="pt-2 flex flex-wrap items-center gap-3 sm:gap-4">
+            <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-center lg:justify-start gap-3 sm:gap-4">
               <Link
                 href="/courses"
-                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-[#365314] hover:bg-[#283e0f] text-white font-medium text-sm sm:text-base shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-[#365314] hover:bg-[#283e0f] text-white font-medium text-sm sm:text-base shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
               >
                 <Play className="w-4 h-4 fill-current" />
                 Explore Courses
@@ -139,7 +139,7 @@ export default function AboutPage() {
 
               <a
                 href="#founder-section"
-                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full border border-black/15 dark:border-white/15 bg-white/70 dark:bg-white/5 hover:bg-black/5 dark:hover:bg-white/10 text-[#0f1611] dark:text-white font-medium text-sm sm:text-base transition-all"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full border border-black/15 dark:border-white/15 bg-white/70 dark:bg-white/5 hover:bg-black/5 dark:hover:bg-white/10 text-[#0f1611] dark:text-white font-medium text-sm sm:text-base transition-all"
               >
                 <ArrowDown className="w-4 h-4" />
                 Learn More
@@ -148,7 +148,7 @@ export default function AboutPage() {
           </div>
 
           {/* Right Hero Visual / 3D Educational Graphics */}
-          <div className="lg:col-span-5 relative flex items-center justify-center pt-6 lg:pt-0">
+          <div className="lg:col-span-5 relative flex items-center justify-center pt-4 lg:pt-0">
             <AboutHeroIllustration />
           </div>
         </section>
@@ -156,13 +156,13 @@ export default function AboutPage() {
         {/* ========================================================
             2. FOUNDER & LEAD INSTRUCTOR CARD
            ======================================================== */}
-        <section id="founder-section" className="mt-20 sm:mt-24 scroll-mt-28">
-          <div className="relative rounded-3xl border border-[#365314]/15 dark:border-white/10 bg-white/90 dark:bg-[#121a14]/90 backdrop-blur-md p-6 sm:p-10 shadow-sm overflow-hidden">
+        <section id="founder-section" className="mt-16 sm:mt-24 scroll-mt-24 sm:scroll-mt-28">
+          <div className="relative rounded-3xl border border-[#365314]/15 dark:border-white/10 bg-white/90 dark:bg-[#121a14]/90 backdrop-blur-md p-5 sm:p-8 md:p-10 shadow-sm overflow-hidden">
             {/* Ambient wash */}
             <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-bl from-[#ecf5d6]/40 via-transparent to-transparent dark:from-[#365314]/15 pointer-events-none -z-10" />
 
             {/* Founder Card Header */}
-            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 pb-6 border-b border-black/5 dark:border-white/10">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5 sm:gap-6 pb-6 border-b border-black/5 dark:border-white/10">
               <div className="space-y-2">
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-[#ecf5d6] text-[#365314] dark:bg-[#365314]/25 dark:text-[#a3b86c] border border-[#365314]/15">
                   <Star className="w-3 h-3 fill-current" />
@@ -170,43 +170,43 @@ export default function AboutPage() {
                 </div>
 
                 <div className="pt-1">
-                  <h2 className="text-3xl sm:text-4xl font-display font-bold text-[#0f1611] dark:text-white">
+                  <h2 className="text-2xl sm:text-3xl md:text-4xl font-display font-bold text-[#0f1611] dark:text-white">
                     Mr. Sami
                   </h2>
                 </div>
 
-                <p className="text-sm sm:text-base font-medium text-[#365314] dark:text-[#a3b86c]">
+                <p className="text-xs sm:text-sm md:text-base font-medium text-[#365314] dark:text-[#a3b86c]">
                   Founder, Software Architect & Full-Stack Developer
                 </p>
               </div>
 
               {/* Founder Photo */}
-              <div className="shrink-0 flex items-center gap-4">
-                <div className="relative w-28 sm:w-32 h-36 sm:h-40 rounded-2xl overflow-hidden border-2 border-[#365314]/20 dark:border-[#a3b86c]/30 shadow-md bg-[#5c8024]">
+              <div className="shrink-0 flex items-center sm:self-start">
+                <div className="relative w-24 sm:w-28 md:w-32 h-32 sm:h-36 md:h-40 rounded-2xl overflow-hidden border-2 border-[#365314]/20 dark:border-[#a3b86c]/30 shadow-md bg-[#5c8024]">
                   <Image
                     src="/images/about/mr-sami-sharp.png"
                     alt="Mr. Sami - Founder of Courseyl"
                     fill
                     priority
-                    sizes="(max-width: 640px) 112px, 128px"
+                    sizes="(max-width: 640px) 96px, 128px"
                     className="object-cover object-top select-none"
                   />
                 </div>
               </div>
             </div>
 
-            {/* 4-Item Quick Profile Grid (100% Full Text, No Truncation) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 py-6 border-b border-black/5 dark:border-white/10">
+            {/* 4-Item Quick Profile Grid (100% Full Text, Responsive) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 py-5 sm:py-6 border-b border-black/5 dark:border-white/10">
               {metaGrid.map((item, i) => (
                 <div
                   key={i}
-                  className="p-4 rounded-2xl border border-black/5 dark:border-white/10 bg-[#fbfcf8] dark:bg-[#161f18]/60 flex items-start gap-3.5 shadow-2xs"
+                  className="p-3.5 sm:p-4 rounded-2xl border border-black/5 dark:border-white/10 bg-[#fbfcf8] dark:bg-[#161f18]/60 flex items-start gap-3 sm:gap-3.5 shadow-2xs"
                 >
-                  <div className="p-2.5 rounded-xl bg-[#ecf5d6] dark:bg-[#365314]/30 text-[#365314] dark:text-[#a3b86c] shrink-0 mt-0.5">
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#ecf5d6] dark:bg-[#365314]/30 text-[#365314] dark:text-[#a3b86c] shrink-0 mt-0.5">
                     {item.icon}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-[0.7rem] font-bold uppercase tracking-wider text-[#4c4c3d]/70 dark:text-[#a9aba0]">
+                    <div className="text-[0.68rem] sm:text-[0.7rem] font-bold uppercase tracking-wider text-[#4c4c3d]/70 dark:text-[#a9aba0]">
                       {item.label}
                     </div>
                     <div className="text-xs sm:text-[0.88rem] font-semibold text-[#0f1611] dark:text-white leading-snug mt-1 break-words">
@@ -218,8 +218,8 @@ export default function AboutPage() {
             </div>
 
             {/* Founder Bio Story & Digital Signature */}
-            <div className="pt-6 grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
-              <div className="md:col-span-9 space-y-4 text-sm sm:text-base text-[#4c4c3d] dark:text-[#a9aba0] leading-relaxed">
+            <div className="pt-6 flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <div className="flex-1 space-y-3.5 sm:space-y-4 text-xs sm:text-sm md:text-base text-[#4c4c3d] dark:text-[#a9aba0] leading-relaxed">
                 <p>
                   As an active developer passionate in modern web applications, scalable SaaS solutions, and AI-powered
                   education tools, I built Courseyl to help students learn better through structured courses and interactive
@@ -231,8 +231,8 @@ export default function AboutPage() {
                 </p>
               </div>
 
-              {/* Digital Signature Component */}
-              <div className="md:col-span-3 flex md:justify-end items-center pt-2 md:pt-0">
+              {/* Digital Signature Component (Cleanly positioned bottom right) */}
+              <div className="shrink-0 flex justify-end self-end pt-2 md:pt-0">
                 <FounderSignature />
               </div>
             </div>
@@ -242,37 +242,37 @@ export default function AboutPage() {
         {/* ========================================================
             3. ENGINEERED FOR SERIOUS LEARNERS (FEATURES GRID)
            ======================================================== */}
-        <section className="mt-24 sm:mt-28">
-          <div className="text-center max-w-2xl mx-auto space-y-3">
+        <section className="mt-20 sm:mt-28">
+          <div className="text-center max-w-2xl mx-auto space-y-2.5 sm:space-y-3">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-[#ecf5d6] text-[#365314] dark:bg-[#365314]/25 dark:text-[#a3b86c] border border-[#365314]/15">
               Built for Learners
             </div>
 
-            <h2 className="text-3xl sm:text-5xl font-display font-bold tracking-tight text-[#0f1611] dark:text-white">
+            <h2 className="text-2xl sm:text-4xl lg:text-5xl font-display font-bold tracking-tight text-[#0f1611] dark:text-white">
               Engineered for{" "}
               <span className="text-[#365314] dark:text-[#a3b86c]">Serious Learners</span>
             </h2>
 
-            <p className="text-sm sm:text-base text-[#4c4c3d] dark:text-[#a9aba0]">
+            <p className="text-xs sm:text-sm md:text-base text-[#4c4c3d] dark:text-[#a9aba0]">
               Powerful features to help you learn smarter and faster.
             </p>
           </div>
 
-          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="mt-8 sm:mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
             {features.map((feat, idx) => (
               <div
                 key={idx}
-                className="group p-6 rounded-2xl border border-black/5 dark:border-white/10 bg-white/70 dark:bg-[#141b16]/70 backdrop-blur-sm hover:border-[#365314]/25 dark:hover:border-[#a3b86c]/30 hover:shadow-md transition-all duration-200"
+                className="group p-5 sm:p-6 rounded-2xl border border-black/5 dark:border-white/10 bg-white/70 dark:bg-[#141b16]/70 backdrop-blur-sm hover:border-[#365314]/25 dark:hover:border-[#a3b86c]/30 hover:shadow-md transition-all duration-200"
               >
-                <div className="w-11 h-11 rounded-xl bg-[#ecf5d6] dark:bg-[#365314]/30 flex items-center justify-center mb-4 transition-transform group-hover:scale-105">
+                <div className="w-10 sm:w-11 h-10 sm:h-11 rounded-xl bg-[#ecf5d6] dark:bg-[#365314]/30 flex items-center justify-center text-[#365314] dark:text-[#a3b86c] mb-3.5 sm:mb-4 transition-transform group-hover:scale-105">
                   {feat.icon}
                 </div>
 
-                <h3 className="font-semibold text-base text-[#0f1611] dark:text-white">
+                <h3 className="font-semibold text-sm sm:text-base text-[#0f1611] dark:text-white">
                   {feat.title}
                 </h3>
 
-                <p className="mt-2 text-xs sm:text-sm text-[#4c4c3d] dark:text-[#a9aba0] leading-relaxed">
+                <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-[#4c4c3d] dark:text-[#a9aba0] leading-relaxed">
                   {feat.desc}
                 </p>
               </div>
@@ -283,17 +283,17 @@ export default function AboutPage() {
         {/* ========================================================
             4. RESPECTING ORIGINAL YOUTUBE CONTENT (BOTTOM CTA)
            ======================================================== */}
-        <section className="mt-20 sm:mt-24">
-          <div className="relative rounded-3xl border border-[#365314]/20 dark:border-white/10 bg-gradient-to-r from-[#edf4d8]/90 via-[#f8fbf0]/90 to-[#edf4d8]/90 dark:from-[#1b261e]/90 dark:via-[#141d16]/90 dark:to-[#1b261e]/90 p-6 sm:p-10 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-8 overflow-hidden">
+        <section className="mt-16 sm:mt-24">
+          <div className="relative rounded-3xl border border-[#365314]/20 dark:border-white/10 bg-gradient-to-r from-[#edf4d8]/90 via-[#f8fbf0]/90 to-[#edf4d8]/90 dark:from-[#1b261e]/90 dark:via-[#141d16]/90 dark:to-[#1b261e]/90 p-5 sm:p-8 md:p-10 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-6 sm:gap-8 overflow-hidden">
             {/* Left Content with 3D Laptop Illustration */}
-            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 max-w-2xl text-center sm:text-left">
-              <div className="w-36 sm:w-44 shrink-0 select-none">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 sm:gap-6 max-w-2xl text-center sm:text-left">
+              <div className="shrink-0 select-none">
                 <LearningLaptopIllustration />
               </div>
 
               <div className="space-y-2">
-                <h3 className="text-xl sm:text-2xl font-display font-bold text-[#0f1611] dark:text-white flex items-center justify-center sm:justify-start gap-2">
-                  <Heart className="w-5 h-5 text-rose-500 fill-rose-500 shrink-0" />
+                <h3 className="text-lg sm:text-xl md:text-2xl font-display font-bold text-[#0f1611] dark:text-white flex items-center justify-center sm:justify-start gap-2">
+                  <Heart className="w-4 sm:w-5 h-4 sm:h-5 text-rose-500 fill-rose-500 shrink-0" />
                   Accepting Original YouTube Content
                 </h3>
 
@@ -303,7 +303,7 @@ export default function AboutPage() {
                   all. Creators retain 100% of their views and attribution.
                 </p>
 
-                <div className="pt-2">
+                <div className="pt-1.5">
                   <a
                     href="mailto:thecourseyl@gmail.com"
                     className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#365314] dark:text-[#a3b86c] hover:underline underline-offset-4"
@@ -316,10 +316,10 @@ export default function AboutPage() {
             </div>
 
             {/* Right Action Buttons */}
-            <div className="flex flex-col sm:flex-row lg:flex-col items-center gap-3 w-full sm:w-auto shrink-0">
+            <div className="flex flex-col sm:flex-row lg:flex-col items-stretch sm:items-center gap-3 w-full sm:w-auto shrink-0">
               <Link
                 href="/dashboard"
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-[#365314] hover:bg-[#283e0f] text-white font-medium text-sm shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-[#365314] hover:bg-[#283e0f] text-white font-medium text-xs sm:text-sm shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
               >
                 Start Learning Free
                 <ArrowRight className="w-4 h-4" />
