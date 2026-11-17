@@ -3,6 +3,7 @@ import {
   parseYouTubeUrl,
   fetchYouTubeMetadata,
   fetchYouTubeTranscript,
+  fetchYouTubePlaylist,
   TranscriptSegment,
   formatDuration,
   formatClockTimestamp,
@@ -76,6 +77,8 @@ interface CheckpointState {
   meta?: VideoMetadata;
   transcripts?: TranscriptSegment[] | null;
   curriculumData?: RawCurriculum;
+  playlistVideos?: { videoId: string; title: string; thumbnailUrl?: string }[];
+  playlistTitle?: string;
 }
 
 function trimTranscriptForCheckpoint(
@@ -340,8 +343,25 @@ export async function initializeCourseGenerationJob(
   const { url, userId, manualTranscript, difficulty = "BEGINNER", isPublic } = params;
 
   const parsedUrl = parseYouTubeUrl(url);
-  if (!parsedUrl.valid || !parsedUrl.videoId) {
+  if (!parsedUrl.valid) {
     throw new Error("Invalid YouTube video or playlist URL. Please provide a valid YouTube link.");
+  }
+
+  let playlistData = null;
+  if (parsedUrl.playlistId) {
+    try {
+      playlistData = await fetchYouTubePlaylist(parsedUrl.playlistId);
+    } catch (plErr) {
+      console.warn("Playlist fetch warning:", plErr);
+    }
+  }
+
+  if (!parsedUrl.videoId && playlistData && playlistData.videos.length > 0) {
+    parsedUrl.videoId = playlistData.videos[0].videoId;
+  }
+
+  if (!parsedUrl.videoId) {
+    throw new Error("Could not find any videos in the provided YouTube video or playlist link. Please verify the URL.");
   }
 
   const existingSource = await prisma.courseSource.findFirst({
@@ -461,18 +481,25 @@ export async function initializeCourseGenerationJob(
       : defaultIsPublic;
 
   const quickOEmbed = await fetchQuickYouTubeOEmbed(parsedUrl.videoId);
-  const baseSlug = slugify(quickOEmbed.title) || `course-${parsedUrl.videoId.toLowerCase()}`;
+  const initialTitle =
+    playlistData?.title && playlistData.title !== "YouTube Playlist"
+      ? playlistData.title
+      : quickOEmbed.title;
+  const initialThumbnail = playlistData?.thumbnailUrl || quickOEmbed.thumbnailUrl;
+  const initialChannel = playlistData?.channelTitle || quickOEmbed.channelTitle;
+
+  const baseSlug = slugify(initialTitle) || `course-${parsedUrl.videoId.toLowerCase()}`;
   const uniqueSlug = `${baseSlug}-${Math.random().toString(36).slice(2, 7)}`;
 
   const course = await prisma.course.create({
     data: {
       creatorId: userId,
-      title: quickOEmbed.title,
+      title: initialTitle,
       slug: uniqueSlug,
-      description: `Interactive structured course from "${quickOEmbed.title}".`,
+      description: playlistData?.description || `Interactive structured course from "${initialTitle}".`,
       targetAudience: "Self-paced learners, software developers, and students.",
       difficulty,
-      thumbnailUrl: quickOEmbed.thumbnailUrl,
+      thumbnailUrl: initialThumbnail,
       totalDurationSeconds: 0,
       estimatedStudyMinutes: 30,
       status: "PROCESSING",
@@ -487,7 +514,7 @@ export async function initializeCourseGenerationJob(
       sourceType: parsedUrl.type === "PLAYLIST" ? "YOUTUBE_PLAYLIST" : "YOUTUBE_VIDEO",
       sourceUrl: url,
       youtubeId: parsedUrl.videoId,
-      channelTitle: quickOEmbed.channelTitle,
+      channelTitle: initialChannel,
     },
   });
 
@@ -496,6 +523,8 @@ export async function initializeCourseGenerationJob(
     videoId: parsedUrl.videoId,
     sourceType: parsedUrl.type,
     difficulty,
+    playlistVideos: playlistData?.videos || undefined,
+    playlistTitle: playlistData?.title || undefined,
   };
 
   const job = await prisma.generationJob.create({
@@ -721,15 +750,25 @@ export async function runGenerationJobStep(jobId: string): Promise<{
       const transcripts = state.transcripts ?? null;
       const provider = await resolveAIProvider();
 
-      let curriculumData = await generateCurriculumStructure(
-        meta,
-        transcripts,
-        provider,
-        state.difficulty
-      );
+      let curriculumData: RawCurriculum;
 
-      if (!curriculumData.chapters || curriculumData.chapters.length === 0) {
-        curriculumData = generateFallbackCurriculum(meta, state.difficulty, transcripts);
+      if (state.playlistVideos && state.playlistVideos.length >= 2) {
+        curriculumData = buildPlaylistCurriculum(
+          state.playlistVideos,
+          state.playlistTitle || meta?.title || "Course Playlist",
+          state.difficulty
+        );
+      } else {
+        curriculumData = await generateCurriculumStructure(
+          meta!,
+          transcripts,
+          provider,
+          state.difficulty
+        );
+
+        if (!curriculumData.chapters || curriculumData.chapters.length === 0) {
+          curriculumData = generateFallbackCurriculum(meta!, state.difficulty, transcripts);
+        }
       }
 
       const nextState: CheckpointState = {
@@ -918,7 +957,7 @@ export async function runGenerationJobStep(jobId: string): Promise<{
           orderIndex: lIdx,
           title: l.title,
           description: l.description || l.summary || `Comprehensive lesson on ${l.title}.`,
-          youtubeVideoId: videoId,
+          youtubeVideoId: l.youtubeVideoId || videoId,
           startSeconds: startSec,
           endSeconds: endSec,
           durationSeconds: Math.max(30, endSec - startSec),
@@ -1021,9 +1060,13 @@ export async function runGenerationJobStep(jobId: string): Promise<{
       prisma.placementOption.createMany({ data })
     );
 
+    const totalLessonDuration = lessonRows.reduce((sum, r) => sum + r.durationSeconds, 0);
     await prisma.course.update({
       where: { id: course.id },
-      data: { status: "READY" },
+      data: {
+        status: "READY",
+        totalDurationSeconds: Math.max(meta.durationSeconds, totalLessonDuration),
+      },
     });
 
     if (!existing.quotaCharged) {
@@ -1245,6 +1288,7 @@ export interface RawLesson {
   importantDefinitions: string[];
   quizQuestions: RawQuizQuestion[];
   transcriptExcerpt?: string;
+  youtubeVideoId?: string;
 }
 
 export interface RawChapter {
@@ -2585,5 +2629,71 @@ function generateFallbackCurriculum(
 
   void difficulty;
   return curriculum;
+}
+
+export function buildPlaylistCurriculum(
+  videos: { videoId: string; title: string; thumbnailUrl?: string }[],
+  playlistTitle: string,
+  difficulty: string = "BEGINNER"
+): RawCurriculum {
+  const total = videos.length;
+  const lessonsPerChapter = total <= 6 ? total : total <= 15 ? Math.ceil(total / 3) : Math.min(8, Math.ceil(total / 5));
+  const chapterCount = Math.ceil(total / lessonsPerChapter);
+
+  const chapterThemeNames = [
+    "Foundations, Environment & Core Setup",
+    "Essential Concepts, Syntax & Control Flow",
+    "Intermediate Patterns & Data Architecture",
+    "Applied Architecture, Logic & Workflows",
+    "Advanced Paradigms & Industry Implementations",
+    "Production Best Practices & Capstone Mastery",
+  ];
+
+  const chapters: RawChapter[] = [];
+  for (let cIdx = 0; cIdx < chapterCount; cIdx++) {
+    const startIdx = cIdx * lessonsPerChapter;
+    const endIdx = Math.min(total, startIdx + lessonsPerChapter);
+    const chapterVideos = videos.slice(startIdx, endIdx);
+
+    const chapterTitle = `Chapter ${cIdx + 1}: ${chapterThemeNames[cIdx % chapterThemeNames.length]}`;
+
+    const lessons: RawLesson[] = chapterVideos.map((v) => {
+      const cleanTitle = v.title
+        .replace(/^(?:Day\s*#?\d+|Part\s*#?\d+|Episode\s*#?\d+|Lesson\s*#?\d+|Video\s*#?\d+)[\s:\-–|]+/i, "")
+        .trim() || v.title;
+
+      const primaryKeyword = cleanTitle.split(/[:\-–|]/)[0].trim() || cleanTitle;
+
+      return {
+        title: cleanTitle,
+        youtubeVideoId: v.videoId,
+        startSeconds: 0,
+        endSeconds: 600,
+        description: `Comprehensive lesson on ${cleanTitle} with hands-on exercises, key terminology, and active recall testing.`,
+        summary: `Walkthrough of ${cleanTitle}. Explores architectural principles, core syntax, common pitfalls, and real-world development patterns.`,
+        keyTakeaways: [
+          `Master the fundamental mechanics and workflow of ${cleanTitle}.`,
+          `Avoid common pitfalls and debugging traps when applying ${primaryKeyword}.`,
+          `Implement production-ready patterns following industry best practices.`,
+        ],
+        importantDefinitions: [
+          `${primaryKeyword}: Foundational building block essential for high-quality engineering and practical mastery.`,
+        ],
+        quizQuestions: [],
+      };
+    });
+
+    chapters.push({
+      title: chapterTitle,
+      description: `Sequential module covering ${chapterVideos.length} core lessons.`,
+      lessons,
+    });
+  }
+
+  void playlistTitle;
+  void difficulty;
+  return {
+    chapters,
+  };
 }
 

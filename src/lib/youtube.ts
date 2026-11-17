@@ -28,6 +28,22 @@ export interface VideoMetadata {
   chapters?: VideoChapter[];
 }
 
+export interface PlaylistVideoItem {
+  videoId: string;
+  title: string;
+  durationSeconds?: number;
+  thumbnailUrl?: string;
+}
+
+export interface PlaylistMetadata {
+  playlistId: string;
+  title: string;
+  channelTitle: string;
+  description?: string;
+  thumbnailUrl?: string;
+  videos: PlaylistVideoItem[];
+}
+
 export function parseYouTubeUrl(url: string): YouTubeUrlInfo {
   if (!url) return { valid: false, type: "VIDEO" };
 
@@ -845,6 +861,215 @@ export async function fetchYouTubeTranscript(videoId: string): Promise<Transcrip
     return segments.length > 0 ? segments : null;
   } catch (err) {
     console.warn(`Could not extract automatic transcript for video ${videoId}:`, err);
+    return null;
+  }
+}
+
+function decodeHtmlEntities(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)));
+}
+
+/**
+ * Robust YouTube playlist fetcher supporting both YouTube Data API v3 and direct InnerTube/HTML scraping.
+ */
+export async function fetchYouTubePlaylist(playlistId: string): Promise<PlaylistMetadata | null> {
+  if (!playlistId) return null;
+  const trimmed = playlistId.trim();
+
+  // 1. YouTube Data API v3 (if apiKey is configured)
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  if (apiKey) {
+    try {
+      const [playlistRes, itemsRes] = await Promise.all([
+        fetch(`https://www.googleapis.com/youtube/v3/playlists?part=snippet&id=${trimmed}&key=${apiKey}`, {
+          signal: AbortSignal.timeout(6000),
+        }),
+        fetch(
+          `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&maxResults=50&playlistId=${trimmed}&key=${apiKey}`,
+          { signal: AbortSignal.timeout(6000) }
+        ),
+      ]);
+
+      if (playlistRes.ok && itemsRes.ok) {
+        const pData = await playlistRes.json();
+        const iData = await itemsRes.json();
+        const pSnippet = pData.items?.[0]?.snippet;
+        const videos: PlaylistVideoItem[] = (iData.items || [])
+          .map((item: any) => {
+            const videoId = item.contentDetails?.videoId || item.snippet?.resourceId?.videoId;
+            const title = item.snippet?.title || "";
+            if (!videoId || title === "Private video" || title === "Deleted video") return null;
+            return {
+              videoId,
+              title: decodeHtmlEntities(title),
+              thumbnailUrl:
+                item.snippet?.thumbnails?.high?.url ||
+                item.snippet?.thumbnails?.medium?.url ||
+                `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+            };
+          })
+          .filter(Boolean);
+
+        if (videos.length > 0) {
+          return {
+            playlistId: trimmed,
+            title: decodeHtmlEntities(pSnippet?.title || "YouTube Playlist"),
+            channelTitle: decodeHtmlEntities(pSnippet?.channelTitle || "Instructor"),
+            description: pSnippet?.description || "",
+            thumbnailUrl:
+              pSnippet?.thumbnails?.high?.url ||
+              pSnippet?.thumbnails?.medium?.url ||
+              videos[0].thumbnailUrl,
+            videos,
+          };
+        }
+      }
+    } catch (apiErr) {
+      console.warn("YouTube Data API playlist fetch failed, falling back to direct ingestion:", apiErr);
+    }
+  }
+
+  // 2. Direct Scraper Fallback via desktop YouTube HTML
+  try {
+    const url = `https://www.youtube.com/playlist?list=${trimmed}`;
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(9000),
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+    if (!res.ok) return null;
+    const text = await res.text();
+
+    const dataMatch = text.match(/ytInitialData\s*=\s*(\{.+?\});<\/script>/);
+    if (!dataMatch) return null;
+
+    let json: any;
+    try {
+      json = JSON.parse(dataMatch[1]);
+    } catch {
+      return null;
+    }
+
+    if (json.alerts && Array.isArray(json.alerts) && json.alerts.length > 0) {
+      // Playlist not found or error
+      return null;
+    }
+
+    const header = json.header?.playlistHeaderRenderer || json.metadata?.playlistMetadataRenderer;
+    const rawTitle =
+      header?.title?.simpleText ||
+      header?.title?.runs?.[0]?.text ||
+      text.match(/<title>(.*?) - YouTube<\/title>/)?.[1] ||
+      "YouTube Playlist";
+    const playlistTitle = decodeHtmlEntities(rawTitle.replace(/\s*-\s*YouTube\s*$/i, "").trim());
+
+    const channelTitle = decodeHtmlEntities(
+      header?.ownerText?.runs?.[0]?.text ||
+      header?.author?.simpleText ||
+      "Instructor"
+    );
+
+    const description =
+      header?.descriptionText?.simpleText ||
+      header?.descriptionText?.runs?.map((r: any) => r.text || "").join("") ||
+      "";
+
+    const videos: PlaylistVideoItem[] = [];
+    const seenIds = new Set<string>();
+
+    // Strategy A: lockupViewModel (modern YouTube 2024-2026)
+    const tab0 = json.contents?.twoColumnBrowseResultsRenderer?.tabs?.[0]?.tabRenderer;
+    const sectionContents = tab0?.content?.sectionListRenderer?.contents;
+    const itemSection = sectionContents?.[0]?.itemSectionRenderer?.contents;
+    if (Array.isArray(itemSection)) {
+      for (const item of itemSection) {
+        const lockup = item.lockupViewModel;
+        const videoId =
+          lockup?.contentId ||
+          lockup?.rendererContext?.commandContext?.onTap?.innertubeCommand?.watchEndpoint?.videoId;
+
+        if (videoId && /^[\w-]{11}$/.test(videoId) && !seenIds.has(videoId)) {
+          seenIds.add(videoId);
+          let title =
+            lockup?.metadata?.lockupMetadataViewModel?.title?.content ||
+            lockup?.rendererContext?.accessibilityContext?.label ||
+            "";
+
+          // Remove duration suffixes like "11 minutes, 50 seconds" from accessibility labels
+          title = title.replace(/\s+\d+\s*(?:hours?|minutes?|seconds?)(?:,\s*\d+\s*(?:minutes?|seconds?))?$/i, "").trim();
+
+          videos.push({
+            videoId,
+            title: decodeHtmlEntities(title || `Lesson ${videos.length + 1}`),
+            thumbnailUrl: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+          });
+        }
+      }
+    }
+
+    // Strategy B: classic playlistVideoRenderer
+    if (videos.length === 0) {
+      function scanForVideoRenderers(node: any) {
+        if (!node || typeof node !== "object") return;
+        if (node.playlistVideoRenderer?.videoId) {
+          const v = node.playlistVideoRenderer;
+          const vId = v.videoId;
+          if (vId && /^[\w-]{11}$/.test(vId) && !seenIds.has(vId)) {
+            seenIds.add(vId);
+            const vTitle = v.title?.runs?.[0]?.text || v.title?.simpleText || `Lesson ${videos.length + 1}`;
+            videos.push({
+              videoId: vId,
+              title: decodeHtmlEntities(vTitle),
+              thumbnailUrl: `https://i.ytimg.com/vi/${vId}/hqdefault.jpg`,
+            });
+          }
+        }
+        for (const k of Object.keys(node)) {
+          if (Array.isArray(node[k])) node[k].forEach(scanForVideoRenderers);
+          else if (typeof node[k] === "object") scanForVideoRenderers(node[k]);
+        }
+      }
+      scanForVideoRenderers(json);
+    }
+
+    // Strategy C: regex search for videoIds in watchEndpoint
+    if (videos.length === 0) {
+      const matches = [...text.matchAll(/"videoId"\s*:\s*"([\w-]{11})"/g)];
+      for (const m of matches) {
+        const id = m[1];
+        if (!seenIds.has(id)) {
+          seenIds.add(id);
+          videos.push({
+            videoId: id,
+            title: `Lesson ${videos.length + 1}`,
+            thumbnailUrl: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+          });
+        }
+      }
+    }
+
+    if (videos.length === 0) return null;
+
+    return {
+      playlistId: trimmed,
+      title: playlistTitle,
+      channelTitle,
+      description,
+      thumbnailUrl: videos[0].thumbnailUrl,
+      videos,
+    };
+  } catch (err) {
+    console.warn("Direct playlist scraping error:", err);
     return null;
   }
 }
