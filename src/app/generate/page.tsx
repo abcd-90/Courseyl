@@ -113,12 +113,15 @@ function GenerateContent() {
                 type="url"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://www.youtube.com/watch?v=... or playlist link"
+                placeholder="https://www.youtube.com/playlist?list=... or video link"
                 disabled={loading}
                 required
                 className="w-full bg-transparent dark:bg-transparent text-sm text-[#0f1611] dark:text-[#f1f3ea] placeholder-[#4c4c3d]/60 outline-none border-none shadow-none"
               />
             </div>
+            <p className="mt-2 text-[11px] text-[#4c4c3d] dark:text-[#a1a89c]">
+              💡 <strong>Tip for Playlists:</strong> Paste the full playlist link (containing <code className="bg-[#e4e9c6]/50 dark:bg-[#1a231b] px-1 py-0.5 rounded text-[10px]">?list=...</code>) from your browser address bar. YouTube&apos;s short share button (<code className="bg-[#e4e9c6]/50 dark:bg-[#1a231b] px-1 py-0.5 rounded text-[10px]">youtu.be/...</code>) links only to that individual video.
+            </p>
           </div>
 
           {/* Difficulty Selection */}

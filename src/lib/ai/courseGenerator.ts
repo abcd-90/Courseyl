@@ -364,8 +364,14 @@ export async function initializeCourseGenerationJob(
     throw new Error("Could not find any videos in the provided YouTube video or playlist link. Please verify the URL.");
   }
 
+  const lookupId = parsedUrl.playlistId || parsedUrl.videoId;
+  const lookupType = parsedUrl.type === "PLAYLIST" ? "YOUTUBE_PLAYLIST" : "YOUTUBE_VIDEO";
+
   const existingSource = await prisma.courseSource.findFirst({
-    where: { youtubeId: parsedUrl.videoId },
+    where: {
+      youtubeId: lookupId,
+      sourceType: lookupType,
+    },
     include: {
       course: {
         include: {
@@ -513,7 +519,7 @@ export async function initializeCourseGenerationJob(
       courseId: course.id,
       sourceType: parsedUrl.type === "PLAYLIST" ? "YOUTUBE_PLAYLIST" : "YOUTUBE_VIDEO",
       sourceUrl: url,
-      youtubeId: parsedUrl.videoId,
+      youtubeId: parsedUrl.playlistId || parsedUrl.videoId,
       channelTitle: initialChannel,
     },
   });
@@ -671,12 +677,13 @@ export async function runGenerationJobStep(jobId: string): Promise<{
       const meta = await fetchYouTubeMetadata(videoId);
       await verifyUserQuota(existing.userId, meta.durationSeconds);
 
+      const resolvedTitle = state.playlistTitle || meta.title;
       await prisma.course.update({
         where: { id: course.id },
         data: {
-          title: meta.title,
-          description: meta.description || `Comprehensive interactive course covering ${meta.title}.`,
-          thumbnailUrl: meta.thumbnailUrl,
+          title: resolvedTitle,
+          description: meta.description || `Comprehensive interactive course covering ${resolvedTitle}.`,
+          thumbnailUrl: course.thumbnailUrl || meta.thumbnailUrl,
           totalDurationSeconds: meta.durationSeconds,
           estimatedStudyMinutes: Math.ceil((meta.durationSeconds * 1.5) / 60),
         },
