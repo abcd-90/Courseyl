@@ -339,6 +339,7 @@ export function AppSidebar() {
       {currentUser?.role === "ADMIN" && (
         <Link
           href="/studio-hub"
+          prefetch={true}
           onClick={() => {
             setShowUserMenu(false);
             if (isMobile) setIsMobileOpen(false);
@@ -351,6 +352,7 @@ export function AppSidebar() {
       )}
       <Link
         href="/settings"
+        prefetch={true}
         onClick={() => {
           setShowUserMenu(false);
           if (isMobile) setIsMobileOpen(false);
@@ -363,6 +365,7 @@ export function AppSidebar() {
       {isPricingVisible && (
         <Link
           href="/pricing"
+          prefetch={true}
           onClick={() => {
             setShowUserMenu(false);
             if (isMobile) setIsMobileOpen(false);
@@ -375,6 +378,7 @@ export function AppSidebar() {
       )}
       <Link
         href="/support"
+        prefetch={true}
         onClick={() => {
           setShowUserMenu(false);
           if (isMobile) setIsMobileOpen(false);
@@ -435,6 +439,7 @@ export function AppSidebar() {
         {/* + Circular New Course Button */}
         <Link
           href="/generate"
+          prefetch={true}
           className="w-10 h-10 rounded-full bg-[#b8c460] text-[#0f1611] flex items-center justify-center font-bold text-lg hover:bg-[#a6b350] transition-transform hover:scale-105 shadow-xs shrink-0 cursor-pointer"
           title="New course"
         >
@@ -447,6 +452,7 @@ export function AppSidebar() {
             <Link
               key={item.name}
               href={item.href}
+              prefetch={true}
               title={item.name + (item.badge ? ` (${item.badge})` : "")}
               className={`w-10 h-10 flex items-center justify-center rounded-xl transition-colors ${
                 item.active
@@ -472,6 +478,7 @@ export function AppSidebar() {
                 <Link
                   key={r.slug || idx}
                   href={`/courses/${r.slug}`}
+                  prefetch={true}
                   title={`${r.title} (${r.progress || 0}%)`}
                   className="w-7 h-7 rounded-lg overflow-hidden border border-line bg-black shrink-0 hover:scale-110 transition-transform cursor-pointer"
                 >
@@ -496,6 +503,7 @@ export function AppSidebar() {
       <div className="flex flex-col items-center space-y-2.5 w-full pb-1 pt-2 border-t border-line/60 dark:border-white/10 relative" data-user-menu-container>
         <Link
           href="/community"
+          prefetch={true}
           title="Community"
           className={`w-10 h-10 flex items-center justify-center rounded-xl transition-colors ${
             pathname === "/community"
@@ -588,6 +596,7 @@ export function AppSidebar() {
         <div>
           <Link
             href="/generate"
+            prefetch={true}
             onClick={() => isMobile && setIsMobileOpen(false)}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-[#b8c460] text-[#0f1611] text-sm font-semibold hover:bg-[#a6b350] transition-transform hover:-translate-y-0.5 shadow-sm"
           >
@@ -602,6 +611,7 @@ export function AppSidebar() {
             <Link
               key={item.name}
               href={item.href}
+              prefetch={true}
               onClick={() => isMobile && setIsMobileOpen(false)}
               className={`flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
                 item.active
@@ -645,6 +655,7 @@ export function AppSidebar() {
                   <Link
                     key={r.slug || idx}
                     href={`/courses/${r.slug}`}
+                    prefetch={true}
                     onClick={() => isMobile && setIsMobileOpen(false)}
                     className="flex items-center justify-between p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors group cursor-pointer text-xs"
                   >
@@ -736,6 +747,7 @@ export function AppSidebar() {
           </h5>
           <Link
             href="/community"
+            prefetch={true}
             onClick={() => isMobile && setIsMobileOpen(false)}
             className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
               pathname === "/community"

@@ -111,7 +111,7 @@ export function CourseItLogo({
 
   if (href) {
     return (
-      <Link href={href} className="inline-flex items-center transition-opacity hover:opacity-85">
+      <Link href={href} prefetch={true} className="inline-flex items-center transition-opacity hover:opacity-85">
         {Content}
       </Link>
     );

@@ -2,6 +2,8 @@ import React from "react";
 import { MarketingNavbar } from "@/components/MarketingNavbar";
 import { CourseItFooter } from "@/components/CourseItFooter";
 
+export const revalidate = 3600;
+
 export default function TermsPage() {
   return (
     <div className="min-h-screen flex flex-col bg-paper text-ink">

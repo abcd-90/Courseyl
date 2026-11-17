@@ -43,7 +43,7 @@ export function CourseItFooter() {
         <div className="grid gap-12 md:grid-cols-[1.4fr_2fr]">
           {/* Brand info */}
           <div className="flex flex-col items-start">
-            <Link className="flex items-center gap-2 font-display text-[2rem] font-medium leading-none text-[#0f1611]" href="/">
+            <Link prefetch={true} className="flex items-center gap-2 font-display text-[2rem] font-medium leading-none text-[#0f1611]" href="/">
               {customLogoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={customLogoUrl} alt={brandName} className="h-[40px] w-auto object-contain rounded-lg" />
@@ -72,6 +72,7 @@ export function CourseItFooter() {
 
             <Link
               href="/generate"
+              prefetch={true}
               className="mt-8 flex w-full max-w-sm items-center justify-center gap-2 bg-[#0f1611] px-6 py-4 font-medium text-lime shadow-[6px_6px_0_0_#4b5e1e] transition-[translate,box-shadow] hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-[3px_3px_0_0_#4b5e1e]"
             >
               {structure?.heroPrimaryCtaLabel || "Build your first course"}{" "}
@@ -223,6 +224,7 @@ export function CourseItFooter() {
                   return (
                     <li key={nav.id}>
                       <Link
+                        prefetch={true}
                         className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline cursor-pointer"
                         href={nav.href}
                         onClick={isHash ? (e) => scrollToSection(e, targetId) : undefined}
@@ -233,7 +235,7 @@ export function CourseItFooter() {
                   );
                 })}
                 <li>
-                  <Link className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline" href="/community">
+                  <Link prefetch={true} className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline" href="/community">
                     Community
                   </Link>
                 </li>
@@ -244,12 +246,12 @@ export function CourseItFooter() {
               <h2 className="font-mono text-label font-medium tracking-[0.2em] uppercase text-[#0f1611]">Company</h2>
               <ul className="mt-6 flex flex-col gap-4 text-[0.95rem] text-[#0f1611]/75">
                 <li>
-                  <Link className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline" href="/about">
+                  <Link prefetch={true} className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline" href="/about">
                     About
                   </Link>
                 </li>
                 <li>
-                  <Link className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline" href="/vs-courseit">
+                  <Link prefetch={true} className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline" href="/vs-courseit">
                     CourseIt Alternative
                   </Link>
                 </li>
@@ -265,17 +267,17 @@ export function CourseItFooter() {
               <h2 className="font-mono text-label font-medium tracking-[0.2em] uppercase text-[#0f1611]">Legal</h2>
               <ul className="mt-6 flex flex-col gap-4 text-[0.95rem] text-[#0f1611]/75">
                 <li>
-                  <Link className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline" href="/privacy">
+                  <Link prefetch={true} className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline" href="/privacy">
                     Privacy
                   </Link>
                 </li>
                 <li>
-                  <Link className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline" href="/terms">
+                  <Link prefetch={true} className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline" href="/terms">
                     Terms
                   </Link>
                 </li>
                 <li>
-                  <Link className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline" href="/refunds">
+                  <Link prefetch={true} className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline" href="/refunds">
                     Refunds
                   </Link>
                 </li>

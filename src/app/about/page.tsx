@@ -27,6 +27,8 @@ import {
   Mail,
 } from "lucide-react";
 
+export const revalidate = 3600;
+
 export const metadata: Metadata = {
   title: "About Courseyl & Founder Mr. Sami — Engineered for Serious Learners",
   description:
@@ -292,8 +294,8 @@ export default function AboutPage() {
               </div>
 
               <div className="space-y-2">
-                <h3 className="text-lg sm:text-xl md:text-2xl font-display font-bold text-[#0f1611] dark:text-white flex items-center justify-center sm:justify-start gap-2">
-                  <Heart className="w-4 sm:w-5 h-4 sm:h-5 text-rose-500 fill-rose-500 shrink-0" />
+                <h3 className="text-lg sm:text-xl md:text-2xl font-display font-bold text-[#0f1611] dark:text-white leading-snug">
+                  <Heart className="w-4 sm:w-5 h-4 sm:h-5 text-rose-500 fill-rose-500 shrink-0 inline-block align-[-2px] mr-1.5" />
                   Accepting Original YouTube Content
                 </h3>
 

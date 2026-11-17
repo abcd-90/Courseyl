@@ -88,6 +88,7 @@ export function MarketingNavbar() {
             return (
               <Link
                 key={nav.id}
+                prefetch={true}
                 className="transition-colors hover:text-ink cursor-pointer"
                 href={nav.href}
                 onClick={isHash ? (e) => scrollToSection(e, targetId) : undefined}
@@ -150,6 +151,7 @@ export function MarketingNavbar() {
           {isAuthenticated ? (
             <Link
               href="/dashboard"
+              prefetch={true}
               className="inline-flex shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-moss-dark hover:-translate-y-px transition-all font-medium h-10 sm:h-11 px-4 sm:px-5 text-xs sm:text-[0.92rem] shadow-sm cursor-pointer whitespace-nowrap"
             >
               Dashboard
@@ -157,6 +159,7 @@ export function MarketingNavbar() {
           ) : (
             <Link
               href="/login?next=/dashboard"
+              prefetch={true}
               className="inline-flex shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-moss-dark hover:-translate-y-px transition-all font-medium h-10 sm:h-11 px-3.5 sm:px-5 text-xs sm:text-[0.92rem] shadow-sm cursor-pointer whitespace-nowrap"
             >
               {navCtaLabel}

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "./db";
 import { DEFAULT_SETTINGS, FullSiteSettings } from "./settings-types";
 
@@ -5,12 +6,12 @@ export * from "./settings-types";
 
 let memoryCachedSettings: FullSiteSettings | null = null;
 let lastCacheTimestamp = 0;
-const CACHE_TTL_MS = 15000; // 15 seconds
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes (600,000 ms) in-memory cache
 
 /**
  * Fetch full settings merged with defaults (Server only)
  */
-export async function getFullSettings(): Promise<FullSiteSettings> {
+export const getFullSettings = cache(async function getFullSettings(): Promise<FullSiteSettings> {
   const now = Date.now();
   if (memoryCachedSettings && now - lastCacheTimestamp < CACHE_TTL_MS) {
     return memoryCachedSettings;
@@ -82,12 +83,12 @@ export async function getFullSettings(): Promise<FullSiteSettings> {
     console.error("Error reading site settings, using defaults:", err);
     return memoryCachedSettings || DEFAULT_SETTINGS;
   }
-}
+});
 
 /**
  * Fetch public settings safe for unauthenticated visitors (Server only)
  */
-export async function getPublicSettings() {
+export const getPublicSettings = cache(async function getPublicSettings() {
   const full = await getFullSettings();
   return {
     branding: full.branding,
@@ -98,7 +99,7 @@ export async function getPublicSettings() {
     },
     structure: full.structure,
   };
-}
+});
 
 /**
  * Save settings category to database (Server only)

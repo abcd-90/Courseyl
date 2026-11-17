@@ -5,6 +5,8 @@ import { MarketingNavbar } from "@/components/MarketingNavbar";
 import { CourseItFooter } from "@/components/CourseItFooter";
 import { Check, X, ArrowRight, Sparkles, Zap, ShieldCheck, PlayCircle } from "lucide-react";
 
+export const revalidate = 3600;
+
 export const metadata: Metadata = {
   title: "CourseIt Alternative — Why Courseyl is the #1 Choice for Learning from YouTube",
   description:
