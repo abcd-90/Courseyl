@@ -25,6 +25,7 @@ import {
   ShieldCheck,
   Heart,
   Mail,
+  MessageSquare,
 } from "lucide-react";
 
 export const revalidate = 3600;
@@ -286,20 +287,20 @@ export default function AboutPage() {
             4. RESPECTING ORIGINAL YOUTUBE CONTENT (BOTTOM CTA)
            ======================================================== */}
         <section className="mt-16 sm:mt-24">
-          <div className="relative rounded-3xl border border-[#365314]/20 dark:border-white/10 bg-gradient-to-r from-[#edf4d8]/90 via-[#f8fbf0]/90 to-[#edf4d8]/90 dark:from-[#1b261e]/90 dark:via-[#141d16]/90 dark:to-[#1b261e]/90 p-5 sm:p-8 md:p-10 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-6 sm:gap-8 overflow-hidden">
+          <div className="relative rounded-3xl border border-[#365314]/20 dark:border-white/10 bg-gradient-to-r from-[#edf4d8]/90 via-[#f8fbf0]/90 to-[#edf4d8]/90 dark:from-[#1b261e]/90 dark:via-[#141d16]/90 dark:to-[#1b261e]/90 p-5 sm:p-7 md:p-8 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-6 sm:gap-8 overflow-hidden">
             {/* Left Content with 3D Laptop Illustration */}
-            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 sm:gap-6 max-w-2xl text-center sm:text-left">
-              <div className="w-[160px] sm:w-[200px] md:w-[230px] shrink-0 select-none flex items-center justify-center">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 sm:gap-6 flex-1 min-w-0 text-center sm:text-left">
+              <div className="w-[130px] sm:w-[160px] md:w-[185px] shrink-0 select-none flex items-center justify-center">
                 <LearningLaptopIllustration />
               </div>
 
-              <div className="space-y-2">
-                <h3 className="text-lg sm:text-xl md:text-2xl font-display font-bold text-[#0f1611] dark:text-white leading-snug">
-                  <Heart className="w-4 sm:w-5 h-4 sm:h-5 text-rose-500 fill-rose-500 shrink-0 inline-block align-[-2px] mr-1.5" />
-                  Accepting Original YouTube Content
+              <div className="space-y-2 flex-1 min-w-0">
+                <h3 className="text-base sm:text-lg md:text-xl lg:text-2xl font-display font-bold text-[#0f1611] dark:text-white flex items-center justify-center sm:justify-start gap-2 whitespace-nowrap">
+                  <Heart className="w-4 sm:w-5 h-4 sm:h-5 text-rose-500 fill-rose-500 shrink-0 inline-block" />
+                  <span>Accepting Original YouTube Content</span>
                 </h3>
 
-                <p className="text-xs sm:text-sm text-[#4c4c3d] dark:text-[#a9aba0] leading-relaxed">
+                <p className="text-xs sm:text-sm text-[#4c4c3d] dark:text-[#a9aba0] leading-relaxed max-w-xl">
                   If we add playlists on Courseyl specifically through official YouTube videos encoded there, we need to
                   copy those videos, allow users to learn, save, and share them — so the content is easily accessible to
                   all. Creators retain 100% of their views and attribution.
@@ -310,7 +311,7 @@ export default function AboutPage() {
                     href="mailto:thecourseyl@gmail.com"
                     className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#365314] dark:text-[#a3b86c] hover:underline underline-offset-4"
                   >
-                    + Have Questions or Feedback?
+                    + More Questions or Feedback?
                     <ArrowRight className="w-3.5 h-3.5" />
                   </a>
                 </div>
@@ -321,6 +322,7 @@ export default function AboutPage() {
             <div className="flex flex-col sm:flex-row lg:flex-col items-stretch sm:items-center gap-3 w-full sm:w-auto shrink-0">
               <Link
                 href="/dashboard"
+                prefetch={true}
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-[#365314] hover:bg-[#283e0f] text-white font-medium text-xs sm:text-sm shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
               >
                 Start Learning Free
@@ -328,10 +330,10 @@ export default function AboutPage() {
               </Link>
 
               <a
-                href="mailto:sheikhsami3082@gmail.com"
+                href="mailto:thecourseyl@gmail.com"
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 text-xs sm:text-sm font-medium text-[#0f1611] dark:text-white transition-colors"
               >
-                <Mail className="w-3.5 h-3.5 text-[#365314] dark:text-[#a3b86c]" />
+                <MessageSquare className="w-3.5 h-3.5 text-[#365314] dark:text-[#a3b86c]" />
                 Contact Us
               </a>
             </div>

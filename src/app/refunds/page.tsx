@@ -9,12 +9,11 @@ export default function RefundsPage() {
     <div className="min-h-screen flex flex-col bg-paper text-ink">
       <MarketingNavbar />
 
-      <main className="flex-1 max-w-3xl mx-auto px-6 py-16">
-        <span className="text-xs font-bold uppercase tracking-wider text-moss">Legal</span>
-        <h1 className="text-3xl sm:text-4xl font-display font-medium text-ink mt-2">
-          Refund Policy
+      <main className="flex-1 max-w-3xl mx-auto px-6 pt-36 pb-24">
+        <span className="text-xs font-mono uppercase tracking-wider text-ink-soft">Last updated November 2026</span>
+        <h1 className="text-4xl sm:text-5xl font-display font-bold text-ink tracking-tight mt-2">
+          Refund <em className="italic text-moss font-serif">policy.</em>
         </h1>
-        <p className="text-xs text-ink-soft mt-2">Last updated: January 2026</p>
 
         <div className="mt-8 space-y-6 text-sm text-ink-soft leading-relaxed">
           <h2 className="text-xl font-display font-semibold text-ink">7-Day Money Back Guarantee</h2>
