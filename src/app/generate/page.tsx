@@ -119,9 +119,25 @@ function GenerateContent() {
                 className="w-full bg-transparent dark:bg-transparent text-sm text-[#0f1611] dark:text-[#f1f3ea] placeholder-[#4c4c3d]/60 outline-none border-none shadow-none"
               />
             </div>
-            <p className="mt-2 text-[11px] text-[#4c4c3d] dark:text-[#a1a89c]">
-              💡 <strong>Tip for Playlists:</strong> Paste the full playlist link (containing <code className="bg-[#e4e9c6]/50 dark:bg-[#1a231b] px-1 py-0.5 rounded text-[10px]">?list=...</code>) from your browser address bar. YouTube&apos;s short share button (<code className="bg-[#e4e9c6]/50 dark:bg-[#1a231b] px-1 py-0.5 rounded text-[10px]">youtu.be/...</code>) links only to that individual video.
-            </p>
+            <div className="mt-3 p-3 rounded-2xl bg-[#f7f9f0] dark:bg-[#161d17] border border-[#4b5e1e]/15 dark:border-[#7c9a3a]/25 text-xs text-[#2d3a1f] dark:text-[#d7e2c9] flex items-start gap-2.5 transition-all">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#4b5e1e]/10 dark:bg-[#7c9a3a]/20 text-[#4b5e1e] dark:text-[#a5c762] text-xs shrink-0 mt-0.5">
+                💡
+              </span>
+              <div className="space-y-1 leading-relaxed">
+                <div className="flex items-center gap-1.5 font-medium text-[#0f1611] dark:text-[#f4f7ea]">
+                  <span>Want to import a full playlist?</span>
+                  <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[#e4e9c6] dark:bg-[#253620] text-[#4b5e1e] dark:text-[#b4d870] font-semibold">
+                    Pro tip
+                  </span>
+                </div>
+                <p className="text-[11.5px] text-[#4c4c3d] dark:text-[#b0bba8]">
+                  Paste the browser link with <code className="px-1.5 py-0.5 rounded-md bg-white dark:bg-[#0c120e] font-mono text-[10.5px] border border-[#0f1611]/10 dark:border-[#334636] text-[#4b5e1e] dark:text-[#a5c762] font-semibold">?list=...</code> from your address bar.
+                </p>
+                <p className="text-[11px] text-[#70705a] dark:text-[#889482]">
+                  Note: YouTube&apos;s &ldquo;Share&rdquo; button only copies the 1-video link (<code className="font-mono text-[10px]">youtu.be/...</code>).
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Difficulty Selection */}

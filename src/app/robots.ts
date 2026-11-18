@@ -14,6 +14,11 @@ export default function robots(): MetadataRoute.Robots {
     "/llms.txt",
     "/sitemap.xml",
     "/manifest.webmanifest",
+    "/favicon.ico",
+    "/icon*",
+    "/apple-touch-icon.png",
+    "/logo.png",
+    "/og-image.png",
   ];
 
   const privateDisallowedRoutes = [
@@ -39,6 +44,10 @@ export default function robots(): MetadataRoute.Robots {
 
   return {
     rules: [
+      {
+        userAgent: "Googlebot-Favicon",
+        allow: "/",
+      },
       {
         userAgent: "*",
         allow: publicAllowedRoutes,

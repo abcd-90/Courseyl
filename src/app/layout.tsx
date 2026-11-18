@@ -84,11 +84,16 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     icons: {
       icon: [
+        { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+        { url: "/icon-96.png", type: "image/png", sizes: "96x96" },
+        { url: "/icon-48.png", type: "image/png", sizes: "48x48" },
         { url: "/icon.svg", type: "image/svg+xml" },
         { url: "/favicon.ico", sizes: "any" },
-        { url: "/icon-32.png", type: "image/png", sizes: "32x32" },
       ],
-      apple: "/apple-touch-icon.png",
+      shortcut: "/favicon.ico",
+      apple: [
+        { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+      ],
     },
     verification: {
       google: googleVerification,
@@ -239,6 +244,12 @@ export default async function RootLayout({
   return (
     <html lang="en" className="h-full antialiased" suppressHydrationWarning>
       <head>
+        <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+        <link rel="icon" type="image/png" sizes="96x96" href="/icon-96.png" />
+        <link rel="icon" type="image/png" sizes="48x48" href="/icon-48.png" />
+        <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+        <link rel="shortcut icon" href="/favicon.ico" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
