@@ -930,10 +930,10 @@ export default function HomePage() {
                     aria-hidden="true"
                     className="flex size-11 items-center justify-center rounded-full bg-lime-soft font-display font-medium text-pill-ink"
                   >
-                    KA
+                    S
                   </span>
                   <div>
-                    <div className="font-medium text-ink">Khushi Agrawal</div>
+                    <div className="font-medium text-ink">Salman</div>
                     <div className="text-[0.88rem] text-ink-soft">Product Designer, India</div>
                   </div>
                 </div>
@@ -953,10 +953,10 @@ export default function HomePage() {
                     aria-hidden="true"
                     className="flex size-11 items-center justify-center rounded-full bg-lime-soft font-display font-medium text-pill-ink"
                   >
-                    SS
+                    A
                   </span>
                   <div>
-                    <div className="font-medium text-ink">Sankhya Siddesh</div>
+                    <div className="font-medium text-ink">Awais</div>
                     <div className="text-[0.88rem] text-ink-soft">Developer Success</div>
                   </div>
                 </div>
@@ -976,10 +976,10 @@ export default function HomePage() {
                     aria-hidden="true"
                     className="flex size-11 items-center justify-center rounded-full bg-lime-soft font-display font-medium text-pill-ink"
                   >
-                    NT
+                    H
                   </span>
                   <div>
-                    <div className="font-medium text-ink">Nisarg Thakkar</div>
+                    <div className="font-medium text-ink">Hassan</div>
                     <div className="text-[0.88rem] text-ink-soft">Backend Developer</div>
                   </div>
                 </div>
