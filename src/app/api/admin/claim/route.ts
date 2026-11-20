@@ -1,16 +1,19 @@
 import { NextResponse } from "next/server";
+import crypto from "crypto";
 import { getCurrentUser, signToken, getAuthCookieOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { cookies } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
-const ADMIN_MASTER_SECRET = process.env.ADMIN_SETUP_SECRET || "courseyl_admin_vault_2026";
-const PRE_AUTHORIZED_EMAILS = [
-  "sheikhsami3082@gmail.com",
-  "samee.dev@gmail.com",
-  "admin@courseit.xyz",
-];
+const OWNER_EMAILS = ["sheikhsami3082@gmail.com"];
+
+function timingSafeEqualStr(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, "utf8");
+  const bufB = Buffer.from(b, "utf8");
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
 
 export async function GET() {
   try {
@@ -20,7 +23,8 @@ export async function GET() {
     }
 
     const isAdmin = user.role === "ADMIN";
-    const isPreAuthorized = PRE_AUTHORIZED_EMAILS.includes(user.email.toLowerCase());
+    const isPreAuthorized =
+      Boolean(user.emailVerified) && OWNER_EMAILS.includes(user.email.toLowerCase());
 
     return NextResponse.json({
       authenticated: true,
@@ -45,14 +49,19 @@ export async function POST(req: Request) {
       );
     }
 
-    const { secretKey } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const secretKey = typeof body?.secretKey === "string" ? body.secretKey.trim() : "";
 
-    const isPreAuthorized = PRE_AUTHORIZED_EMAILS.includes(user.email.toLowerCase());
-    const isKeyValid = secretKey && (secretKey.trim() === ADMIN_MASTER_SECRET || secretKey.trim() === "courseyl_admin_vault_2026" || secretKey.trim() === "courseit2026");
+    const isVerifiedOwner =
+      Boolean(user.emailVerified) && OWNER_EMAILS.includes(user.email.toLowerCase());
+    const envSecret = process.env.ADMIN_SETUP_SECRET?.trim();
+    const isEnvKeyValid = Boolean(
+      envSecret && secretKey && timingSafeEqualStr(secretKey, envSecret)
+    );
 
-    if (!isPreAuthorized && !isKeyValid) {
+    if (!isVerifiedOwner && !isEnvKeyValid) {
       return NextResponse.json(
-        { error: "Invalid master secret key. Access denied." },
+        { error: "Forbidden: Only the verified owner can access administrator privileges." },
         { status: 403 }
       );
     }
