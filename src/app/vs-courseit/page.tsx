@@ -129,7 +129,46 @@ export default function VsCourseItPage() {
             </p>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-[#0f1611]/10 dark:border-white/10 shadow-sm bg-white dark:bg-[#111714]">
+          {/* Mobile Stacked Cards (Zero Horizontal Scroll) */}
+          <div className="md:hidden space-y-4">
+            {comparisonItems.map((item, idx) => (
+              <div
+                key={idx}
+                className={`rounded-2xl border border-[#0f1611]/10 dark:border-white/10 p-4 space-y-3 shadow-sm ${
+                  item.highlight
+                    ? "bg-[#f8faee] dark:bg-[#151e18]"
+                    : "bg-white dark:bg-[#111714]"
+                }`}
+              >
+                <h3 className="font-display text-base font-semibold text-[#0f1611] dark:text-white">
+                  {item.feature}
+                </h3>
+
+                <div className="rounded-xl bg-[#4b5e1e]/[0.07] dark:bg-[#4b5e1e]/20 border border-[#4b5e1e]/20 p-3">
+                  <div className="text-[0.7rem] font-mono font-bold uppercase tracking-wider text-[#4b5e1e] dark:text-[#a3b86c] mb-1">
+                    Courseyl (courseyl.online)
+                  </div>
+                  <div className="flex items-start gap-2 text-sm font-medium text-[#0f1611] dark:text-[#e4e6dc]">
+                    <Check className="w-4 h-4 text-[#4b5e1e] dark:text-[#a3b86c] shrink-0 mt-0.5" />
+                    <span>{item.courseyl}</span>
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-black/[0.03] dark:bg-white/[0.03] border border-[#0f1611]/5 dark:border-white/5 p-3">
+                  <div className="text-[0.7rem] font-mono font-bold uppercase tracking-wider text-[#737368] dark:text-[#8d9082] mb-1">
+                    CourseIt (courseit.xyz)
+                  </div>
+                  <div className="flex items-start gap-2 text-sm text-[#737368] dark:text-[#8d9082]">
+                    <X className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                    <span>{item.courseit}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Comparison Table */}
+          <div className="hidden md:block overflow-x-auto rounded-2xl border border-[#0f1611]/10 dark:border-white/10 shadow-sm bg-white dark:bg-[#111714]">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-[#0f1611]/10 dark:border-white/10 bg-[#f6f8ec] dark:bg-[#17201b]">
