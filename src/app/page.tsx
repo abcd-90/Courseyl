@@ -934,7 +934,7 @@ export default function HomePage() {
                   </span>
                   <div>
                     <div className="font-medium text-ink">Salman</div>
-                    <div className="text-[0.88rem] text-ink-soft">Product Designer, India</div>
+                    <div className="text-[0.88rem] text-ink-soft">Product Designer, Pakistan</div>
                   </div>
                 </div>
                 <span className="font-mono text-[0.72rem] tracking-[0.07em] text-ink-soft uppercase">
