@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// Good bots allowed for SEO & social link previews
+// Good bots allowed for SEO, social link previews, and AI/LLM search assistants (on public pages only)
 const ALLOWED_BOT_RE =
-  /(googlebot|bingbot|duckduckbot|applebot|twitterbot|linkedinbot|whatsapp|discordbot|slackbot|facebookexternalhit|telegrambot)/i;
+  /(googlebot|bingbot|duckduckbot|applebot|twitterbot|linkedinbot|whatsapp|discordbot|slackbot|facebookexternalhit|telegrambot|gptbot|chatgpt-user|oai-searchbot|claudebot|claude-web|perplexitybot|google-extended)/i;
 
 // Known scrapers, site cloners, headless automation, and CLI fetchers
 const BLOCKED_SCRAPER_RE =
-  /(httrack|webcopier|teleport|sitesucker|offline\s*explorer|wget|curl\/|httpie|python-requests|python-urllib|aiohttp|httpx|scrapy|beautifulsoup|go-http-client|libwww-perl|mechanize|phantomjs|headlesschrome|playwright|puppeteer|selenium|colly|apify|firecrawl|bytespider|ccbot|semrushbot|ahrefsbot|mj12bot|dotbot|dataforseobot|petalbot|gptbot|claudebot|perplexitybot)/i;
+  /(httrack|webcopier|teleport|sitesucker|offline\s*explorer|wget|curl\/|httpie|python-requests|python-urllib|aiohttp|httpx|scrapy|beautifulsoup|go-http-client|libwww-perl|mechanize|phantomjs|headlesschrome|playwright|puppeteer|selenium|colly|apify|firecrawl|bytespider|ccbot|semrushbot|ahrefsbot|mj12bot|dotbot|dataforseobot|petalbot)/i;
 
 // Sensitive files & source-map probes that should never be served
 const SENSITIVE_PATH_RE =
@@ -59,8 +59,13 @@ export function middleware(request: NextRequest) {
   const host = request.headers.get("host") || "";
   const isLocal = host.startsWith("localhost") || host.startsWith("127.0.0.1");
 
-  // Allow SEO & link-preview bots without disturbance
+  const isApi = pathname.startsWith("/api/");
+
+  // Allow SEO, social preview & AI/LLM assistants on public pages only (never /api/* or /admin)
   if (ALLOWED_BOT_RE.test(ua)) {
+    if (isApi || pathname.startsWith("/admin")) {
+      return new NextResponse("Access Denied", { status: 403 });
+    }
     return NextResponse.next();
   }
 
@@ -74,7 +79,6 @@ export function middleware(request: NextRequest) {
 
   // 3. Require standard Accept header on non-API page navigations from external clients
   const accept = request.headers.get("accept") || "";
-  const isApi = pathname.startsWith("/api/");
   if (!isApi && !isLocal && !accept) {
     return new NextResponse("Access Denied", { status: 403 });
   }
