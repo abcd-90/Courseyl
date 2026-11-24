@@ -13,16 +13,16 @@ export function CourseItFooter() {
   const structure = settings.structure;
   const footerDesc =
     structure?.footerDescription ||
-    "Paste any YouTube video or playlist and NVIDIA Nemotron turns it into a distraction-free course: bite-sized lessons, a daily plan, quizzes that replay the moment you missed, and notes pinned to the video.";
+    "Transform any long-form YouTube lecture or playlist into structured, distraction-free courses with adaptive placement diagnostics, interactive timestamped quizzes, and synchronized study notes.";
   const copyrightName = structure?.footerCopyrightName || brandName;
   const footerSubNote =
-    structure?.footerSubNote || "Made for people who finish what they start.";
+    structure?.footerSubNote || "Made for learners who finish what they start.";
   const footerRightNote =
-    structure?.footerRightNote || "Videos play in YouTube's own player. Creators keep their views.";
+    structure?.footerRightNote || "Videos play in YouTube's official player. Original creators retain 100% of their views.";
   const socialLinks = structure?.socialLinks || {
-    twitterUrl: "https://twitter.com/courseitxyz",
-    linkedinUrl: "https://www.linkedin.com/company/courseit/",
-    instagramUrl: "https://www.instagram.com/courseitxyz",
+    twitterUrl: "https://twitter.com/courseyl",
+    linkedinUrl: "https://www.linkedin.com/company/courseyl/",
+    instagramUrl: "https://www.instagram.com/courseyl/",
     contactEmail: "thecourseyl@gmail.com",
   };
   const productLinks = structure?.navLinks?.filter((n) => n.visible !== false) || [];

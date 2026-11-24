@@ -412,9 +412,9 @@ export default function HomePage() {
               </div>
 
               <div>
-                <h3 className="text-h3 font-medium text-ink">This 6-hour course is 2h 40m for you.</h3>
+                <h3 className="text-h3 font-medium text-ink">Skip what you already know.</h3>
                 <p className="mt-1.5 text-[0.92rem] text-ink-soft">
-                  A 2-minute placement test finds what you already know and takes those lessons out of your plan.
+                  Our 2-minute diagnostic placement test assesses your background and automatically fast-tracks past topics you&apos;ve already mastered.
                 </p>
               </div>
             </article>
@@ -489,9 +489,9 @@ export default function HomePage() {
               </div>
 
               <div>
-                <h3 className="text-h3 font-medium text-ink">Watch it, then read it.</h3>
+                <h3 className="text-h3 font-medium text-ink">Watch with focus, review with AI notes.</h3>
                 <p className="mt-1.5 text-[0.92rem] text-ink-soft">
-                  Distraction-free video for each lesson, plus study notes Nemotron writes from what was said.
+                  Enjoy a clean, distraction-free player alongside AI-extracted study summaries and core definitions synced to lecture audio.
                 </p>
               </div>
             </article>
@@ -522,15 +522,15 @@ export default function HomePage() {
                     >
                       <path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" />
                     </svg>
-                    Replay 3:12 that explains it
+                    Rewind to 3:12 for concept breakdown
                   </Link>
                 </div>
               </div>
 
               <div>
-                <h3 className="text-h3 font-medium text-ink">Miss one, replay the moment.</h3>
+                <h3 className="text-h3 font-medium text-ink">Interactive concept rewind.</h3>
                 <p className="mt-1.5 text-[0.92rem] text-ink-soft">
-                  Every lesson ends with a quiz. A wrong answer jumps the video to the moment that explains it.
+                  Reinforce concepts immediately after every lesson. When an answer is incorrect, Courseyl jumps straight to the exact timestamp that explains the theory.
                 </p>
               </div>
             </article>
@@ -561,9 +561,9 @@ export default function HomePage() {
               </div>
 
               <div>
-                <h3 className="text-h3 font-medium text-ink">Any YouTube video or whole playlist → a course.</h3>
+                <h3 className="text-h3 font-medium text-ink">Convert individual lectures or marathon playlists into courses.</h3>
                 <p className="mt-1.5 text-[0.92rem] text-ink-soft">
-                  Paste the link straight from YouTube. Lesson 1 is ready to watch while the rest is written.
+                  Simply paste any educational YouTube link. Lesson 1 is ready immediately while our background pipeline structures the rest.
                 </p>
               </div>
             </article>
@@ -594,9 +594,9 @@ export default function HomePage() {
               </div>
 
               <div>
-                <h3 className="text-h3 font-medium text-ink">Your pace, every course.</h3>
+                <h3 className="text-h3 font-medium text-ink">Personalized daily pacing for busy schedules.</h3>
                 <p className="mt-1.5 text-[0.92rem] text-ink-soft">
-                  Set your daily time once. Every course splits into days, and skipped lessons drop out.
+                  Choose your study availability from 30 to 120 minutes. Courseyl partitions lessons into realistic daily goals that fit your routine.
                 </p>
               </div>
             </article>
@@ -696,9 +696,9 @@ export default function HomePage() {
               </div>
 
               <div>
-                <h3 className="text-h3 font-medium text-ink">Roadmaps: courses from many creators, in stages.</h3>
+                <h3 className="text-h3 font-medium text-ink">Curated multi-stage learning roadmaps.</h3>
                 <p className="mt-1.5 text-[0.92rem] text-ink-soft">
-                  Build your own path and share the link. Anyone with it can enroll and track their own progress.
+                  Sequence multiple courses into end-to-end skill paths. Share your custom roadmap so peers can track their progress alongside you.
                 </p>
               </div>
             </article>
@@ -771,9 +771,9 @@ export default function HomePage() {
               </div>
 
               <div>
-                <h3 className="text-h3 font-medium text-ink">Notes pinned to the moment.</h3>
+                <h3 className="text-h3 font-medium text-ink">Timestamp-anchored study notes.</h3>
                 <p className="mt-1.5 text-[0.92rem] text-ink-soft">
-                  Write while you watch. Each note keeps its time; click it and the video plays from there.
+                  Capture key insights without pausing. Each note anchors to the exact video second for rapid 1-click revision.
                 </p>
               </div>
             </article>
@@ -802,10 +802,9 @@ export default function HomePage() {
               >
                 1
               </span>
-              <h3 className="text-h3 font-medium text-ink">Paste a video or playlist</h3>
+              <h3 className="text-h3 font-medium text-ink">Input any educational link</h3>
               <p className="max-w-[340px] text-ink-soft leading-relaxed">
-                Any YouTube video, or a playlist up to 20 hours. NVIDIA Nemotron plans the lessons and writes study notes
-                and quizzes for each one.
+                Paste any YouTube lecture or multi-hour playlist. Courseyl extracts chapters, prepares structured lessons, and drafts interactive assessments.
               </p>
             </li>
             <li className="flex flex-col gap-3.5">
@@ -815,10 +814,9 @@ export default function HomePage() {
               >
                 2
               </span>
-              <h3 className="text-h3 font-medium text-ink">Learn at your pace</h3>
+              <h3 className="text-h3 font-medium text-ink">Diagnostic test &amp; paced schedule</h3>
               <p className="max-w-[340px] text-ink-soft leading-relaxed">
-                A 2-minute placement test skips what you know. Set 30 to 120 minutes a day and every course splits into
-                days.
+                Take a quick diagnostic test to eliminate familiar material, then study in bite-sized daily increments tailored to your goals.
               </p>
             </li>
             <li className="flex flex-col gap-3.5">
@@ -828,10 +826,9 @@ export default function HomePage() {
               >
                 3
               </span>
-              <h3 className="text-h3 font-medium text-ink">Prove it, keep it</h3>
+              <h3 className="text-h3 font-medium text-ink">Master concepts through active recall</h3>
               <p className="max-w-[340px] text-ink-soft leading-relaxed">
-                Miss a quiz question and the video jumps to the moment that explains it. Pin notes to any moment, and
-                chain courses into a roadmap.
+                Test your retention with instant timestamp rewinds on missed questions, capture timestamped notes, and track your completion streak.
               </p>
             </li>
           </ol>

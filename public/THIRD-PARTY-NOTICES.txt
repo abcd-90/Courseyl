@@ -1,0 +1,12 @@
+Courseyl Open Source & Third-Party Software Acknowledgments
+
+Courseyl acknowledges and respects the open-source community and third-party contributions.
+Certain interface structures and design foundations reference open-source works published under permissive licenses including the MIT License.
+
+Triggerfy Services / CourseIt
+Copyright (c) 2026 Triggerfy Services
+Licensed under the MIT License.
+
+All referenced components comply with their respective open-source licensing guidelines.
+Courseyl core features, AI video partitioning pipelines, adaptive diagnostic testing,
+and full-length marathon lesson distribution are proprietary works of Courseyl.
