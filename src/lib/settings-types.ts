@@ -89,6 +89,7 @@ export interface SiteStructureSettings {
   footerCopyrightName: string;
   footerSubNote: string;
   footerRightNote: string;
+  showVsCourseItLink?: boolean;
   socialLinks: {
     twitterUrl: string;
     twitterEnabled?: boolean;
@@ -280,6 +281,7 @@ export const DEFAULT_SETTINGS: FullSiteSettings = {
     footerCopyrightName: "Courseyl",
     footerSubNote: "Made for learners who finish what they start.",
     footerRightNote: "Videos play in YouTube's official player. Original creators retain 100% of their views.",
+    showVsCourseItLink: false,
     socialLinks: {
       twitterUrl: "https://twitter.com/courseyl",
       twitterEnabled: true,

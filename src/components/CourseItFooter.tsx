@@ -250,11 +250,13 @@ export function CourseItFooter() {
                     About
                   </Link>
                 </li>
-                <li>
-                  <Link prefetch={true} className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline" href="/vs-courseit">
-                    CourseIt Alternative
-                  </Link>
-                </li>
+                {structure?.showVsCourseItLink === true && (
+                  <li>
+                    <Link prefetch={true} className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline" href="/vs-courseit">
+                      CourseIt Alternative
+                    </Link>
+                  </li>
+                )}
                 <li>
                   <a className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline" href={`mailto:${socialLinks.contactEmail || "thecourseyl@gmail.com"}`}>
                     Contact us
