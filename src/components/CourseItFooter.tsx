@@ -239,6 +239,11 @@ export function CourseItFooter() {
                     Community
                   </Link>
                 </li>
+                <li>
+                  <Link prefetch={true} className="text-[#0f1611]/80 hover:text-[#0f1611] hover:underline" href="/library">
+                    Course library
+                  </Link>
+                </li>
               </ul>
             </div>
 

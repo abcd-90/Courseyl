@@ -9,6 +9,7 @@ export default function robots(): MetadataRoute.Robots {
     "/about",
     "/support",
     "/community",
+    "/library",
     "/courses",
     "/vs-courseit",
     "/llms.txt",
