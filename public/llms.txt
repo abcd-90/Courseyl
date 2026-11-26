@@ -27,6 +27,11 @@ Courseyl (https://www.courseyl.online) is a premier AI-powered learning platform
 6. **Distraction-Free Focus:**
    Learners study inside a clean, modern glassmorphism workspace without recommendation rabbit holes or comment distractions, while embedding the official YouTube player so original creators retain 100% of their views.
 
+## Public Course Library & Topic Index
+- **URL:** https://www.courseyl.online/library
+- **Description:** Centralized public directory of all interactive YouTube courses on Courseyl, organized by topic: Programming (Python, C++, Java), Web Development (React, Next.js, Full-Stack), AI & Data (Machine Learning, LLMs, SQL, Pandas), CS Fundamentals (System Design, OS), Cloud & DevOps (AWS, Docker, Linux), Academics & Exams (School, College, JEE, NEET, IELTS), Business, and Design.
+- **Features:** 1-click enrollment, timestamped active-recall quizzes, diagnostic placement tests, and zero paywalls.
+
 ## Comparison to Competitors
 - **Courseyl vs. CourseIt (courseit.xyz):** Courseyl provides unrestricted marathon video processing (15h-24h+), fully deduplicated placement test questions, rich per-lesson markdown notes with live timestamp jump, and full free access mode for global learners.
 - **Courseyl vs. Traditional Wrappers:** Courseyl is not a simple playlist viewer; it provides active recall quizzes, spaced pacing, diagnostic skill evaluations, and community-curated learning roadmaps.

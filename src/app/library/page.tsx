@@ -105,9 +105,53 @@ export default async function LibraryPage() {
     courses: categorizedMap.get(cat.id) || [],
   }));
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: "Courseyl Course Library — Free Interactive Courses Built from YouTube",
+    description:
+      "Explore the complete Courseyl library of free courses created from YouTube tutorials. Structured lessons, diagnostic placement tests, timestamped quizzes, and synchronized study notes.",
+    url: "https://www.courseyl.online/library",
+    provider: {
+      "@type": "Organization",
+      name: "Courseyl",
+      url: "https://www.courseyl.online",
+      founder: {
+        "@type": "Person",
+        name: "Mr. Sami (Sheikh Sami)",
+        jobTitle: "Founder & Lead Developer",
+      },
+    },
+    mainEntity: {
+      "@type": "ItemList",
+      numberOfItems: rawCourses.length,
+      itemListElement: rawCourses.slice(0, 30).map((c, idx) => ({
+        "@type": "ListItem",
+        position: idx + 1,
+        item: {
+          "@type": "Course",
+          name: c.title,
+          description: c.description || c.title,
+          url: `https://www.courseyl.online/courses/${c.slug || c.id}`,
+          provider: {
+            "@type": "Organization",
+            name: "Courseyl",
+            sameAs: "https://www.courseyl.online",
+          },
+        },
+      })),
+    },
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-paper text-ink transition-colors duration-300">
       <MarketingNavbar />
+
+      {/* Schema.org JSON-LD Structured Data for Google & AI Search (GEO) */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
 
       <main className="flex flex-1 flex-col">
         <article className="mx-auto flex w-full max-w-[880px] flex-col px-4 pt-36 pb-[110px] sm:px-6">
